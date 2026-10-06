@@ -1,0 +1,26 @@
+# Progress
+
+## Status terakhir
+Tahap 1, 2, dan 3 selesai dan terverifikasi (12 aset sudah dikirim ke Adobe Stock, status In review). Tahap 3b (peningkatan kualitas generate) selesai dikode dan sudah di-deploy, tinggal diverifikasi pengguna lewat satu batch pola. Dari sekarang kerja di branch `dev`, bukan `main`.
+
+## Sudah selesai
+- [2026-10-06] Tahap 1: fondasi (Next.js, Supabase Auth, skema + RLS, deploy Vercel)
+- [2026-10-06] Tahap 2: generate + galeri dengan Kenari, antrean di browser, biaya dan batas bulanan Kenari
+- [2026-10-06] Tahap 3: QC otomatis, metadata AI, ekspor ZIP + CSV Adobe, checklist upload; metadata tidak lagi menyebut clipart sebagai "icon"
+- [2026-10-07] Tahap 3b: palet bawaan, set terpadu (warna dipaksa dari palet), contoh SVG hanya untuk pola, coba-ulang otomatis sekali saat Gagal QC, isian model Kenari untuk konsep dan metadata (migrasi `20261007000000_kenari_text_model.sql`)
+
+## Sedang dikerjakan
+- Tidak ada.
+
+## Langkah berikutnya
+1. Pengguna menjalankan satu batch pola (`autumn leaves`, palet Musim gugur, 5 aset) lalu kabari; cek di database apakah gagal sambung tile turun dari 2 per 5. Setelah itu centang Tahap 3b di `CLAUDE.md`.
+2. Tunggu hasil review Adobe untuk 12 file; catat diterima/ditolak dan alasannya (data untuk Tahap 6).
+3. Pilih tahap berikutnya: 5 (Gemini cadangan), 6 (uji unggah Adobe dan penyetelan ambang QC), atau 8 (riset tema, bernilai paling besar untuk pendapatan).
+
+## Catatan penting
+- Aturan Adobe: maksimal 3 iterasi aset AI serupa per tema. Jangan terus membuat tema yang sama (pemeriksa kemiripan sudah menandainya).
+- Uji banding Oktober 2026: contoh SVG di prompt menaikkan biaya SVG dari Rp4,3 ke Rp12,4 tanpa perbaikan di ikon/background, jadi hanya dipakai untuk pola. `deepseek-v4-flash` tetap disarankan untuk teks; `gpt-oss-*` murah tapi konsep dan metadatanya tipis.
+- Aset lama (15 di akun `adminproject.code@gmail.com`) masih bermetadata dengan kata "icon"; 5 sudah terunggah ke Adobe. Edit manual di portal atau "Buat ulang metadata (AI)". Nama file ekspor bergantung pada judul, jadi ekspor ulang mengubah nama file.
+- Catatan untuk Tahap 6 dan seterusnya: nama file ekspor yang stabil, keputusan soal gaya `icon_set` (mode ikon sungguhan vs ganti nama), verifikasi nomor kategori Adobe selain 8, penyetelan ambang QC dari data penerimaan nyata.
+- Setiap push ke `main` otomatis deploy ke produksi di Vercel; branch `dev` hanya membuat preview.
+- Jangan commit `.env*`. Jalankan `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build` sebelum menyatakan tugas selesai.
