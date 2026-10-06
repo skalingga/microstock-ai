@@ -21,7 +21,14 @@ export function LoginForm() {
     <form action={isMasuk ? masukAction : daftarAction} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          defaultValue={state.email}
+          required
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
