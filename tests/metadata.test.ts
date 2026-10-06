@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cleanKeywords, cleanTitle, normalizeMetadata } from "@/lib/metadata/postprocess";
+import { cleanKeywords, cleanTitle, normalizeMetadata, stripIconWords } from "@/lib/metadata/postprocess";
+import { metadataPrompt } from "@/lib/providers/prompts";
 
 describe("cleanTitle", () => {
   it("removes commas, quotes, and extra spaces", () => {
@@ -27,7 +28,7 @@ describe("cleanKeywords", () => {
       ["disney"],
     );
     expect(keywords).toEqual(["pumpkin"]);
-    expect(dropped).toEqual({ banned: 1, invalid: 2, overLimit: 0 });
+    expect(dropped).toEqual({ banned: 1, invalid: 2, overLimit: 0, misleading: 0 });
   });
 
   it("caps the list at 49", () => {
@@ -81,5 +82,61 @@ describe("parseKeywordText", () => {
   it("round-trips through formatKeywordText", () => {
     const list = ["a", "b c", "d"];
     expect(parseKeywordText(formatKeywordText(list))).toEqual(list);
+  });
+});
+
+describe("icon words", () => {
+  it("rewrites titles without breaking them", () => {
+    expect(stripIconWords("Halloween bubbling cauldron with green potion skull and bone icon set")).toBe(
+      "Halloween bubbling cauldron with green potion skull and bone set",
+    );
+    expect(stripIconWords("Angry Halloween pumpkin jack-o-lantern icon")).toBe("Angry Halloween pumpkin jack-o-lantern");
+    expect(stripIconWords("Sleepy Crescent Moon Icon for Halloween")).toBe("Sleepy Crescent Moon for Halloween");
+    expect(stripIconWords("Winter icons with a snowflake")).toBe("Winter with a snowflake");
+    expect(stripIconWords("Icon")).toBe("Icon"); // never empty the title
+    expect(stripIconWords("Iconic castle")).toBe("Iconic castle"); // whole words only
+  });
+
+  it("drops keywords that call the picture an icon", () => {
+    const { keywords, dropped } = cleanKeywords(
+      ["pumpkin", "icon", "icon set", "ui icon", "pictogram", "glyph", "iconic", "autumn"],
+      [],
+    );
+    expect(keywords).toEqual(["pumpkin", "iconic", "autumn"]);
+    expect(dropped.misleading).toBe(5);
+  });
+
+  it("applies both in normalizeMetadata and reports it", () => {
+    const { metadata, notes } = normalizeMetadata(
+      { title: "Wrapped gift box icon", keywords: ["gift", "icon set", "ribbon"], category: "Graphic resources", needsRelease: false },
+      [],
+      "icon_set",
+    );
+    expect(metadata.title).toBe("Wrapped gift box");
+    expect(metadata.keywords).toEqual(["gift", "ribbon"]);
+    expect(notes.join(" ")).toContain("kata icon dibuang dari judul");
+    expect(notes.join(" ")).toContain("keyword bertema icon dibuang");
+  });
+});
+
+describe("metadataPrompt", () => {
+  const prompt = metadataPrompt({ theme: "halloween icons", style: "icon_set", concept: "A pumpkin." }).user;
+
+  it("never leaks the internal style id and describes the picture as clipart", () => {
+    expect(prompt).not.toContain("icon_set");
+    expect(prompt).toContain("clipart illustration");
+  });
+
+  it("forbids the icon words and no longer asks for them", () => {
+    expect(prompt).toContain("Never use the words icon, icons, icon set, pictogram or glyph");
+    expect(prompt).not.toContain('"flat vector" or "icon"');
+  });
+
+  it("describes every style without internal ids", () => {
+    for (const style of ["icon_set", "seamless_pattern", "flat_illustration", "badge_label", "abstract_background"] as const) {
+      const text = metadataPrompt({ theme: "t", style, concept: "c" }).user;
+      expect(text).not.toContain(style);
+      expect(text).toMatch(/Asset type: (a|an) /);
+    }
   });
 });

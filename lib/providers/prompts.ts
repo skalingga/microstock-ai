@@ -93,21 +93,33 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
   };
 }
 
+// How each style is described to the metadata writer. The internal style id (for example "icon_set") must never
+// reach the model: it made titles and keywords call clipart an "icon", but Adobe reserves that label for interface
+// symbols and the app has no icon mode.
+const METADATA_STYLE: Record<StyleId, string> = {
+  icon_set: "a single flat vector clipart illustration on a transparent background",
+  seamless_pattern: "a seamless repeating pattern tile",
+  flat_illustration: "a flat vector illustration",
+  badge_label: "a badge or label emblem",
+  abstract_background: "an abstract geometric background",
+};
+
 export function metadataPrompt(input: MetadataInput): { system: string; user: string } {
   return {
     system:
       "You write search metadata for Adobe Stock vector assets. " +
       "You answer with a single JSON object and nothing else.",
     user: [
-      `Theme: ${input.theme}`,
-      `Asset style: ${input.style}`,
+      `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
+      `Asset type: ${METADATA_STYLE[input.style]}`,
       `What the vector shows: ${input.concept}`,
       "",
-      "Write the metadata a buyer would search for.",
+      "Write the metadata a buyer would search for. Describe what the picture actually shows.",
       `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters.`,
-      `- keywords: 25 to 35 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, colors, style words such as "flat vector" or "icon", and likely use cases. No brand, artist, character, or celebrity names.`,
+      `- keywords: 25 to 35 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, colors, style words such as "flat vector", "vector illustration" or "clipart", and likely use cases. No brand, artist, character, or celebrity names.`,
       `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
       "- needs_release: true only if the picture shows a realistic person or a real private property, otherwise false.",
+      "Never use the words icon, icons, icon set, pictogram or glyph in the title or keywords, even if the theme above uses them: Adobe reserves them for interface symbols, and this picture is an illustration.",
       "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters.",
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","needs_release":false}',

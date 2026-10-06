@@ -22,13 +22,31 @@ export function cleanTitle(raw: string): string {
   return (lastSpace > ADOBE.titleMaxChars * 0.5 ? cut.slice(0, lastSpace) : cut).trim();
 }
 
+// Safety net for the prompt rule that forbids "icon" words. The app has no icon mode, and Adobe reserves the
+// icon label for interface symbols, so these words in the metadata would mislead buyers.
+const UI_WORD = /\b(icons?|pictograms?|glyphs?)\b/i;
+const TRAILING_CONNECTOR = /\s+(a|an|the|with|and|for|of|in|on|to)$/i;
+
+/** Removes interface-symbol words from a title and keeps it readable: "Halloween icon set with a bat" becomes "Halloween set with a bat". */
+export function stripIconWords(title: string): string {
+  const stripped = title
+    .replace(/\bicon\s+sets?\b/gi, "set")
+    .replace(/\b(icons?|pictograms?|glyphs?)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(TRAILING_CONNECTOR, "")
+    .trim();
+  // A title that was nothing but the word itself is better left alone than emptied.
+  return stripped || title;
+}
+
 export function cleanKeywords(
   raw: string[],
   bannedWords: string[],
-): { keywords: string[]; dropped: { banned: number; invalid: number; overLimit: number } } {
+): { keywords: string[]; dropped: { banned: number; invalid: number; overLimit: number; misleading: number } } {
   const seen = new Set<string>();
   const keywords: string[] = [];
-  const dropped = { banned: 0, invalid: 0, overLimit: 0 };
+  const dropped = { banned: 0, invalid: 0, overLimit: 0, misleading: 0 };
 
   for (const item of raw) {
     const keyword = String(item)
@@ -46,6 +64,10 @@ export function cleanKeywords(
 
     if (findBannedWords(keyword, bannedWords).length > 0) {
       dropped.banned += 1;
+      continue;
+    }
+    if (UI_WORD.test(keyword)) {
+      dropped.misleading += 1;
       continue;
     }
     if (keywords.length >= ADOBE.keywordsMax) {
@@ -74,13 +96,16 @@ export function normalizeMetadata(
 ): { metadata: CleanMetadata; notes: string[] } {
   const notes: string[] = [];
 
-  const title = cleanTitle(raw.title);
+  const cleaned = cleanTitle(raw.title);
+  const title = cleanTitle(stripIconWords(cleaned));
   if (title !== raw.title.trim()) notes.push("judul dirapikan");
+  if (title !== cleaned) notes.push("kata icon dibuang dari judul");
 
   const { keywords, dropped } = cleanKeywords(raw.keywords, bannedWords);
   if (dropped.banned > 0) notes.push(`${dropped.banned} keyword terlarang dibuang`);
   if (dropped.invalid > 0) notes.push(`${dropped.invalid} keyword tidak valid dibuang`);
   if (dropped.overLimit > 0) notes.push(`${dropped.overLimit} keyword melebihi batas dibuang`);
+  if (dropped.misleading > 0) notes.push(`${dropped.misleading} keyword bertema icon dibuang`);
 
   let category = normalizeCategory(raw.category);
   if (style && GRAPHIC_STYLES.includes(style) && category !== DEFAULT_CATEGORY) {
