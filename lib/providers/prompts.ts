@@ -27,7 +27,8 @@ const STYLE_SPECS: Record<StyleId, StyleSpec> = {
       "A badge or label emblem built from shapes (ribbon, shield, circle, banner). The badge MUST contain NO text and NO letters or numbers; use icons or decorative shapes instead.",
   },
   abstract_background: {
-    viewBox: "0 0 1600 900",
+    // 3:2, not 16:9: Adobe wants at least 15 MP but at most 4800 px per side, which a 16:9 canvas cannot satisfy.
+    viewBox: "0 0 1500 1000",
     brief:
       "An abstract geometric background that fills the whole canvas edge to edge. Overlapping simple shapes, balanced composition, calm area for placing text later.",
   },
@@ -83,6 +84,7 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       "- Flat solid fills. At most one or two simple linear gradients if really needed.",
       "- NO <text>, <image>, <foreignObject>, <script>, <style>, filters, masks, or external links.",
       "- Use short coordinates (integers, at most one decimal) and keep every shape inside the viewBox.",
+      "- Organize the drawing into a few <g> groups with short descriptive id attributes (for example id=\"leaf\", id=\"body\"), so it is easy to edit as a layered vector.",
       ...SAFETY_RULES.map((rule) => `- ${rule}`),
       "",
       "Output the complete SVG now.",

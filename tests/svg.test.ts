@@ -115,6 +115,6 @@ describe("analyzeSvg", () => {
     const stats = analyzeSvg(
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><g><path d="M0 0"/><path d="M1 1"/><circle r="1"/></g><text>x</text></svg>`,
     );
-    expect(stats).toEqual({ pathCount: 2, shapeCount: 3, hasText: true });
+    expect(stats).toEqual({ pathCount: 2, shapeCount: 3, pointCount: 2, hasText: true });
   });
 });
