@@ -240,12 +240,12 @@ async function makeAsset(
   const svgUpload = await storage.upload(svgPath, new Blob([clean.svg], { type: "image/svg+xml" }), {
     contentType: "image/svg+xml",
   });
-  if (svgUpload.error) throw new ApiError("storage", "Gagal menyimpan file SVG.");
+  if (svgUpload.error) throw new ApiError("storage", `Gagal menyimpan file SVG (${svgUpload.error.message}).`);
 
   const pngUpload = await storage.upload(previewPath, png, { contentType: "image/png" });
   if (pngUpload.error) {
     await storage.remove([svgPath]);
-    throw new ApiError("storage", "Gagal menyimpan preview PNG.");
+    throw new ApiError("storage", `Gagal menyimpan preview PNG (${pngUpload.error.message}).`);
   }
 
   const insert = await p.supabase.from("assets").insert({
@@ -263,7 +263,7 @@ async function makeAsset(
   });
   if (insert.error) {
     await storage.remove([svgPath, previewPath]);
-    throw new ApiError("storage", "Gagal menyimpan data aset.");
+    throw new ApiError("storage", `Gagal menyimpan data aset (${insert.error.message}).`);
   }
 
   return {

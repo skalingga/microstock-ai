@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     textToCheck: (input) => `${input.theme} ${input.concept}`,
     run: async (provider, input, { bannedWords }) => {
       const result = await provider.generateMetadata({ ...input, style: input.style as StyleId });
-      const { metadata, notes } = normalizeMetadata(result.metadata, bannedWords);
+      const { metadata, notes } = normalizeMetadata(result.metadata, bannedWords, input.style as StyleId);
       return { metadata, notes, model: result.model, costIdr: result.costIdr, rateLimit: result.rateLimit };
     },
   });

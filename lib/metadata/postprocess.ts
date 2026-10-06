@@ -1,6 +1,7 @@
 import { ADOBE, DEFAULT_CATEGORY, normalizeCategory } from "@/lib/adobe/rules";
 import type { AssetMetadata } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
+import type { StyleId } from "@/lib/settings/schema";
 
 // The AI is asked for clean metadata but does not always deliver it. This tidies what it can and
 // reports what it had to drop. Anything left over is caught by the QC metadata check.
@@ -56,6 +57,9 @@ export function cleanKeywords(
   return { keywords, dropped };
 }
 
+// Adobe files icons, patterns, backgrounds and badge/label sets under Graphic resources, whatever they depict.
+const GRAPHIC_STYLES: StyleId[] = ["icon_set", "seamless_pattern", "abstract_background", "badge_label"];
+
 export type CleanMetadata = {
   title: string;
   keywords: string[];
@@ -63,7 +67,11 @@ export type CleanMetadata = {
   needsRelease: boolean;
 };
 
-export function normalizeMetadata(raw: AssetMetadata, bannedWords: string[]): { metadata: CleanMetadata; notes: string[] } {
+export function normalizeMetadata(
+  raw: AssetMetadata,
+  bannedWords: string[],
+  style?: StyleId,
+): { metadata: CleanMetadata; notes: string[] } {
   const notes: string[] = [];
 
   const title = cleanTitle(raw.title);
@@ -75,6 +83,10 @@ export function normalizeMetadata(raw: AssetMetadata, bannedWords: string[]): { 
   if (dropped.overLimit > 0) notes.push(`${dropped.overLimit} keyword melebihi batas dibuang`);
 
   let category = normalizeCategory(raw.category);
+  if (style && GRAPHIC_STYLES.includes(style) && category !== DEFAULT_CATEGORY) {
+    if (category) notes.push(`kategori ${category} diganti ${DEFAULT_CATEGORY} untuk gaya ini`);
+    category = DEFAULT_CATEGORY;
+  }
   if (!category) {
     category = DEFAULT_CATEGORY;
     notes.push(`kategori "${raw.category}" tidak dikenal, diganti ${DEFAULT_CATEGORY}`);

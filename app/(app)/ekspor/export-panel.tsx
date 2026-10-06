@@ -32,7 +32,8 @@ export function ExportPanel({ userId, candidates }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const visible = useMemo(() => (onlyNew ? candidates.filter((c) => !c.exportedAt) : candidates), [candidates, onlyNew]);
-  const chosen = candidates.filter((c) => selected.has(c.id));
+  // Only what is on screen counts: assets hidden by the filter (already exported) are not part of the next export.
+  const chosen = visible.filter((c) => selected.has(c.id));
   const cekCount = chosen.filter((c) => c.status === "perlu_cek").length;
   const tooMany = chosen.length > MAX_PER_EXPORT;
   const canExport = chosen.length > 0 && !tooMany && (cekCount === 0 || confirmCek) && !building;
@@ -74,6 +75,7 @@ export function ExportPanel({ userId, candidates }: Props) {
       setResult({ data, stamp, saved: null });
       const saved = await saveExport(supabase, userId, data);
       setResult({ data, stamp, saved });
+      if (saved) setSelected(new Set());
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ekspor gagal.");

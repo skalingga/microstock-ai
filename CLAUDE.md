@@ -64,7 +64,9 @@ export interface SvgProvider {
 - Judul tidak boleh menyiratkan peristiwa berita nyata.
 - Aset yang menggambarkan orang atau properti nyata ditandai "Perlu Release". Hindari orang realistis.
 - Keyword maksimal 49, urut dari yang terpenting (cek ulang batas ini di dokumentasi Adobe saat implementasi).
-- Aturan disimpan sebagai konfigurasi yang mudah diubah, karena kebijakan Adobe bisa berubah.
+- Ukuran artboard 15 sampai 65 MP dan maksimal 4800 px per sisi: ekspor mengatur `width`/`height` SVG (sisi terpanjang 4800 px) tanpa mengubah `viewBox`. Rasio lebar-tinggi di bawah sekitar 0,65 (mis. 16:9) tidak bisa memenuhi keduanya, jadi gaya background memakai 3:2.
+- Nama file maksimal 30 karakter termasuk `.svg`, judul maksimal 70 karakter tanpa koma. Adobe tidak menerima ZIP untuk vektor: ZIP hanya kemudahan unduh.
+- Aturan disimpan sebagai konfigurasi yang mudah diubah (`lib/adobe/rules.ts`, ambang QC di `lib/qc/config.ts`), karena kebijakan Adobe bisa berubah. Nomor kategori Adobe 1 sampai 21 belum dikonfirmasi resmi.
 
 ## QC otomatis
 

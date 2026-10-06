@@ -2,7 +2,7 @@
 
 Aplikasi web untuk membuat aset vektor SVG siap upload ke Adobe Stock dari satu tema. Spesifikasi lengkap ada di [docs/PRD.md](docs/PRD.md), aturan kerja di [CLAUDE.md](CLAUDE.md).
 
-Status: **Tahap 2 (Generate + galeri dengan Kenari)**. Sudah ada login, pengaturan, generate SVG lewat Kenari (antrean di browser, sanitasi, preview PNG), dan galeri aset. Pemeriksaan QC, metadata AI, dan ekspor belum dikerjakan.
+Status: **Tahap 3 (QC, metadata, ekspor)**. Sudah ada login, pengaturan, generate SVG lewat Kenari, QC otomatis, metadata AI, galeri aset, dan ekspor ZIP + CSV untuk Adobe Stock. Uji banding model (Tahap 4), Gemini (Tahap 5), uji unggah ke Adobe (Tahap 6), Recraft (Tahap 7), dan riset tema (Tahap 8) belum dikerjakan.
 
 ## Menjalankan di komputer sendiri
 
@@ -38,6 +38,17 @@ Buka http://localhost:3000. Halaman selain `/login` hanya bisa dibuka setelah ma
 
 Model berakhiran `:free` tidak dihitung. Model berbayar dicatat per panggilan di `provider_usage.cost_idr` (token dari respons dikali harga katalog Kenari), dan berhenti otomatis saat pengeluaran bulan berjalan (zona WIB) mencapai batas di **Pengaturan** (bawaan Rp20.000). Pengeluaran bulan ini tampil di halaman Generate.
 
+## QC otomatis dan ekspor
+
+Setiap aset melewati pemeriksaan di browser: validitas render, teks, kerumitan, isi di dalam kanvas, tidak kosong, latar transparan (ikon), uji tile 2x2 (pola), kemiripan (perceptual hash), dan metadata (kata terlarang, judul, keyword, kategori). Hasilnya Lolos, Perlu Cek, atau Gagal. Aset yang belum punya QC atau metadata bisa diproses massal lewat tombol di halaman Aset.
+
+Aturan Adobe dan ambang QC ada di dua file konfigurasi yang mudah diubah:
+
+- `lib/adobe/rules.ts`: batas judul, keyword, nama file, CSV, artboard, dan 21 kategori (nomornya belum dikonfirmasi resmi, cocokkan di dialog unggah Adobe).
+- `lib/qc/config.ts`: ambang QC (angka awal, disetel setelah uji unggah di Tahap 6).
+
+Catatan ekspor: Adobe tidak menerima file ZIP untuk vektor. ZIP hanya untuk kemudahan unduh; ekstrak dulu, lalu unggah file SVG satu per satu dan impor CSV-nya. Tiap SVG diberi ukuran artboard 4800 px pada sisi terpanjang (Adobe mewajibkan 15 sampai 65 MP).
+
 ## Menerapkan migrasi database
 
 Migrasi ada di `supabase/migrations/` dan harus dijalankan berurutan sesuai nama file:
@@ -47,6 +58,7 @@ Migrasi ada di `supabase/migrations/` dan harus dijalankan berurutan sesuai nama
 3. `..._fk_indexes.sql`: indeks untuk foreign key gabungan
 4. `..._asset_concept_usage_ok.sql`: kolom `assets.concept` dan `provider_usage.ok`
 5. `..._kenari_cost_budget.sql`: kolom biaya Rupiah, batas bulanan Kenari, dan fungsi `provider_cost_since`
+6. `..._export_files_bucket.sql`: bucket menerima ZIP dan CSV untuk riwayat ekspor
 
 **Cara 1, Supabase CLI** (disarankan):
 

@@ -55,6 +55,17 @@ describe("normalizeMetadata", () => {
     expect(notes.join(" ")).toContain("Gadgets");
   });
 
+  it("files icons, patterns, backgrounds and badges under Graphic resources", () => {
+    const snow = { ...raw, category: "The environment" };
+    expect(normalizeMetadata(snow, [], "icon_set").metadata.category).toBe("Graphic resources");
+    expect(normalizeMetadata(snow, [], "seamless_pattern").metadata.category).toBe("Graphic resources");
+    expect(normalizeMetadata(snow, [], "icon_set").notes.join(" ")).toContain("The environment");
+  });
+
+  it("keeps the AI category for illustrations", () => {
+    expect(normalizeMetadata({ ...raw, category: "Food" }, [], "flat_illustration").metadata.category).toBe("Food");
+  });
+
   it("passes needsRelease through", () => {
     expect(normalizeMetadata({ ...raw, needsRelease: true }, []).metadata.needsRelease).toBe(true);
   });
