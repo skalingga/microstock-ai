@@ -15,6 +15,7 @@ export const AUTO_PROVIDERS = [
   { value: "gemini", label: "Gemini" },
 ] as const;
 
+export type StyleId = (typeof STYLES)[number]["value"];
 export type ProviderEntry = { provider: "kenari" | "gemini"; model: string };
 export type Palette = { name: string; colors: string[] };
 

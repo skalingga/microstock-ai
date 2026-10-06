@@ -17,6 +17,7 @@ export type Database = {
       assets: {
         Row: {
           category: string | null
+          concept: string | null
           created_at: string
           exported_at: string | null
           id: string
@@ -36,6 +37,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          concept?: string | null
           created_at?: string
           exported_at?: string | null
           id?: string
@@ -55,6 +57,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          concept?: string | null
           created_at?: string
           exported_at?: string | null
           id?: string
@@ -157,6 +160,7 @@ export type Database = {
           id: string
           kind: string
           model: string
+          ok: boolean
           provider: string
           user_id: string
         }
@@ -166,6 +170,7 @@ export type Database = {
           id?: string
           kind: string
           model: string
+          ok?: boolean
           provider: string
           user_id?: string
         }
@@ -175,6 +180,7 @@ export type Database = {
           id?: string
           kind?: string
           model?: string
+          ok?: boolean
           provider?: string
           user_id?: string
         }

@@ -1,0 +1,30 @@
+import { z } from "zod";
+import { STYLES } from "@/lib/settings/schema";
+
+export const MAX_VARIATIONS = 30;
+
+const styleValues = STYLES.map((s) => s.value) as [string, ...string[]];
+const hex = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Warna harus berformat hex.");
+
+const theme = z.string().trim().min(2, "Tema minimal 2 karakter.").max(120, "Tema maksimal 120 karakter.");
+const style = z.enum(styleValues);
+
+export const conceptsRequestSchema = z.object({
+  theme,
+  style,
+  palette: z.array(hex).max(12).default([]),
+  count: z.number().int().min(1, "Jumlah variasi minimal 1.").max(MAX_VARIATIONS, `Jumlah variasi maksimal ${MAX_VARIATIONS}.`),
+});
+
+export const svgRequestSchema = z.object({
+  theme,
+  style,
+  concept: z.object({
+    subject: z.string().trim().min(1).max(200),
+    composition: z.string().trim().min(1).max(300),
+    palette: z.array(hex).max(5),
+  }),
+});
+
+export type ConceptsRequest = z.infer<typeof conceptsRequestSchema>;
+export type SvgRequest = z.infer<typeof svgRequestSchema>;
