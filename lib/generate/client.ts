@@ -57,6 +57,9 @@ export async function postJson<T>(url: string, body: unknown, signal?: AbortSign
     | { error: { code: ApiErrorCode; message: string; retryAfterSec?: number } }
     | null;
 
+  // A redirect to an HTML page means the session ended (the proxy normally answers 401 JSON first).
+  if (res.redirected) throw new ApiError("unauthenticated", "Sesi berakhir. Silakan masuk lagi.");
+
   if (res.ok && data && !("error" in data && data.error)) return data as T;
 
   if (data && "error" in data && data.error) {

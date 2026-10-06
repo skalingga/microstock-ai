@@ -32,6 +32,14 @@ export async function updateSession(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname === "/login";
 
+  if (!user && request.nextUrl.pathname.startsWith("/api/")) {
+    // Fetch calls need a machine-readable answer, not a redirect to the login page.
+    return NextResponse.json(
+      { error: { code: "unauthenticated", message: "Sesi berakhir. Silakan masuk lagi." } },
+      { status: 401 },
+    );
+  }
+
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
