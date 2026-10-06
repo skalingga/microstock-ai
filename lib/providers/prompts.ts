@@ -1,5 +1,6 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import type { StyleId } from "@/lib/settings/schema";
+import { SVG_EXAMPLES } from "./examples";
 import type { ConceptInput, MetadataInput, SvgInput } from "./types";
 
 // Prompts to the AI are in English (CLAUDE.md).
@@ -55,12 +56,13 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
       "",
       `Propose exactly ${input.count} clearly different concepts for this theme. Vary subject, composition, and color combination so no two assets look alike.`,
       "Each concept must be easy to draw with a handful of flat vector shapes.",
+      "The concepts form ONE cohesive set sold together: the same visual language, the same level of detail, and colors only from the available palette. Vary the subject and composition, never the style.",
       ...SAFETY_RULES,
       "",
       'Reply with JSON only, in this exact shape: {"concepts":[{"subject":"...","composition":"...","palette":["#RRGGBB","#RRGGBB"]}]}',
       "- subject: what is drawn, max 12 words.",
       "- composition: layout and arrangement, max 20 words.",
-      "- palette: 2 to 5 hex colors chosen from the available palette.",
+      "- palette: 2 to 5 hex colors copied exactly from the available palette. Never invent a color.",
     ].join("\n"),
   };
 }
@@ -79,6 +81,8 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       `Style: ${spec.brief}`,
       `Colors: use only these colors (plus white or near-black if needed): ${palette}`,
       "",
+      "Set consistency: flat solid fills and no outlines, the same level of detail as the reference below, so this asset sits well next to the rest of its set.",
+      "",
       "Technical rules:",
       `- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="${spec.viewBox}">.`,
       "- Use simple <path>, <rect>, <circle>, <ellipse>, <polygon> elements and <g> groups. Keep it under 60 shapes in total.",
@@ -87,6 +91,10 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       "- Use short coordinates (integers, at most one decimal) and keep every shape inside the viewBox.",
       "- Organize the drawing into a few <g> groups with short descriptive id attributes (for example id=\"leaf\", id=\"body\"), so it is easy to edit as a layered vector.",
       ...SAFETY_RULES.map((rule) => `- ${rule}`),
+      "",
+      "",
+      "Reference for quality and structure only (grouped shapes with ids, flat fills, clean geometry). Do NOT copy its subject; draw the concept above:",
+      SVG_EXAMPLES[input.style],
       "",
       "Output the complete SVG now.",
     ].join("\n"),

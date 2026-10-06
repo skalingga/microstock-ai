@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
 import { createClient } from "@/lib/supabase/server";
+import { withPresetPalettes } from "@/lib/settings/palettes";
 import { STYLES, toPalettes, type StyleId } from "@/lib/settings/schema";
 import { GenerateForm } from "./generate-form";
 
@@ -53,7 +54,7 @@ export default async function HalamanGenerate() {
       <GenerateForm
         userId={user.id}
         defaultStyle={defaultStyle}
-        palettes={settings ? toPalettes(settings.palettes) : []}
+        palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
         bannedWords={settings?.banned_words ?? []}
       />
     </div>
