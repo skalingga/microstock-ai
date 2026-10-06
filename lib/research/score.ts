@@ -12,6 +12,8 @@ export type ScoreInput = {
   adobeResultCount?: number | null;
   /** The model's own guess of competition, 0-100. Used only when no count is known. */
   aiCompetition?: number | null;
+  /** Days left until the upload deadline; negative when it has passed. Null for evergreen themes. */
+  daysLeft?: number | null;
 };
 
 export type Scores = {
@@ -21,6 +23,28 @@ export type Scores = {
   /** True when competition comes from real data rather than a guess or nothing. */
   competitionKnown: boolean;
 };
+
+/** Opportunity multiplier by time left: a missed deadline halves it, a tight one trims it. */
+export function timingFactor(daysLeft: number | null | undefined): number {
+  if (daysLeft === null || daysLeft === undefined) return 1;
+  if (daysLeft < 0) return 0.5;
+  if (daysLeft < 14) return 0.85;
+  return 1;
+}
+
+export type DeadlineStatus = "terlewat" | "mendesak" | "cukup";
+
+export function deadlineStatus(daysLeft: number | null | undefined): DeadlineStatus | null {
+  if (daysLeft === null || daysLeft === undefined) return null;
+  if (daysLeft < 0) return "terlewat";
+  return daysLeft < 14 ? "mendesak" : "cukup";
+}
+
+/** Whole days from today (UTC date) to an ISO date; negative when the date is past. */
+export function daysUntil(isoDate: string, now: number = Date.now()): number {
+  const today = Math.floor(now / 86_400_000);
+  return Math.floor(Date.parse(`${isoDate}T00:00:00Z`) / 86_400_000) - today;
+}
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -51,6 +75,6 @@ export function scoreTheme(input: ScoreInput): Scores {
     : (input.aiCompetition ?? null);
 
   // Unknown competition counts as middling so a theme is neither rewarded nor punished for it.
-  const opportunity = clamp((demand * (100 - (competition ?? 50))) / 100);
+  const opportunity = clamp(((demand * (100 - (competition ?? 50))) / 100) * timingFactor(input.daysLeft));
   return { demand, competition, opportunity, competitionKnown: hasCount };
 }

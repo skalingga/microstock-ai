@@ -13,10 +13,10 @@ Tahap 1, 2, dan 3 selesai dan terverifikasi (12 aset sudah dikirim ke Adobe Stoc
 - [2026-10-07] Login: tombol intip password, lupa password (email -> /auth/callback -> /reset-password). Perlu Redirect URLs di Supabase, lihat catatan
 
 ## Sedang dikerjakan
-- Tahap 8 (riset tema) sudah dikode di branch `dev`, belum diverifikasi pengguna. Migrasi `20261008000000_research_themes.sql` HARUS diterapkan ke Supabase sebelum `/riset` dipakai. File: `lib/research/*` (kalender, skor, Trends), `app/api/research/{themes,trends}`, `app/(app)/riset/*`.
+- Tahap 8 (riset tema) sudah dikode di branch `dev`; migrasi sudah diterapkan ke Supabase (2026-10-07). Uji di preview: alur jalan, tapi Google Trends tidak tersedia dari Vercel (semua permintaan berlabel perkiraan). Perbaikan setelah uji: peluang diturunkan bila batas upload sudah lewat, judul tema tanpa kata gaya. Belum dicentang di `CLAUDE.md`. File: `lib/research/*` (kalender, skor, Trends), `app/api/research/{themes,trends}`, `app/(app)/riset/*`.
 
 ## Langkah berikutnya
-1. Terapkan migrasi Tahap 8 ke Supabase, deploy preview dari `dev`, jalankan satu riset di `/riset`, lalu kabari hasilnya. Centang Tahap 8 di `CLAUDE.md` setelah diverifikasi.
+1. Verifikasi ulang `/riset` di preview `dev` (badge batas upload, judul tema), putuskan soal Google Trends (lihat catatan), lalu centang Tahap 8 di `CLAUDE.md`.
 2. Tunggu hasil review Adobe untuk 12 file; catat diterima/ditolak dan alasannya (data untuk Tahap 6).
 3. Tahap berikutnya: 5 (Gemini cadangan) atau 6 (uji unggah Adobe dan penyetelan ambang QC).
 

@@ -157,7 +157,7 @@ export function themesPrompt(input: ThemesInput): { system: string; user: string
       "",
       `Propose exactly ${input.count} distinct, specific theme ideas that buyers in this market will search for around these events or in this season. Mix event themes and a few evergreen themes.`,
       "Each theme must be drawable as simple flat vector shapes. Prefer specific themes (\"autumn harvest pumpkins\") over vague ones (\"autumn\").",
-      "Theme titles and keywords are in English.",
+      "Theme titles and keywords are in English. A title names the SUBJECT only (e.g. \"Easter egg hunt\"); never put an asset style such as icons, seamless pattern, flat vector, set, or background in a title.",
       ...SAFETY_RULES,
       "Never use event names that are trademarked brands. Do not reference real news events.",
       "",

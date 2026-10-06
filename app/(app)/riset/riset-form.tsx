@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { postJson, type ThemesResponse, type TrendsResponse } from "@/lib/generate/client";
 import { REGIONS } from "@/lib/research/calendar";
 import { MAX_THEMES } from "@/lib/research/schemas";
-import { scoreTheme } from "@/lib/research/score";
+import { daysUntil, deadlineStatus, scoreTheme } from "@/lib/research/score";
 import { createClient } from "@/lib/supabase/client";
 import { selectClass } from "@/lib/ui";
 
@@ -32,8 +32,11 @@ export type ThemeRow = {
 const TRENDS_BATCH = 4;
 const day = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 
+const daysLeftOf = (row: ThemeRow) => (row.uploadBy ? daysUntil(row.uploadBy) : null);
+
 function scoresOf(row: ThemeRow) {
   return scoreTheme({
+    daysLeft: daysLeftOf(row),
     eventWeight: row.eventWeight,
     trendScore: row.trendScore,
     aiDemand: row.demandGuess,
@@ -250,6 +253,14 @@ export function RisetForm({
                         {row.event || "Tema sepanjang tahun"}
                         {row.uploadBy ? ` · upload sebelum ${row.uploadBy}` : ""}
                       </p>
+                      {deadlineStatus(daysLeftOf(row)) === "terlewat" && (
+                        <p className="text-xs text-destructive">
+                          Batas upload sudah lewat; peluang diturunkan. Masih bisa dikejar bila Anda siap upload cepat.
+                        </p>
+                      )}
+                      {deadlineStatus(daysLeftOf(row)) === "mendesak" && (
+                        <p className="text-xs text-amber-600">Batas upload kurang dari 14 hari lagi.</p>
+                      )}
                     </div>
                     <Link href={generateHref} className={buttonVariants({ size: "sm" })}>
                       Generate dari tema ini

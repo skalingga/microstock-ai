@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { competitionFromCount, demandFromRatio, scoreTheme } from "@/lib/research/score";
+import { competitionFromCount, daysUntil, deadlineStatus, demandFromRatio, scoreTheme, timingFactor } from "@/lib/research/score";
 
 describe("competitionFromCount", () => {
   it("is 0 for small niches and 100 for huge ones", () => {
@@ -39,4 +39,26 @@ describe("scoreTheme", () => {
   it("stays within 0-100", () => {
     expect(scoreTheme({ trendScore: 100, eventWeight: 3 }).demand).toBe(100);
   });
+});
+
+describe("deadline timing", () => {
+  const now = Date.parse("2026-10-06T08:00:00Z");
+  it("counts days from today", () => {
+    expect(daysUntil("2026-10-06", now)).toBe(0);
+    expect(daysUntil("2026-08-25", now)).toBe(-42);
+    expect(daysUntil("2026-10-11", now)).toBe(5);
+  });
+  it("classifies the deadline", () => {
+    expect(deadlineStatus(-1)).toBe("terlewat");
+    expect(deadlineStatus(5)).toBe("mendesak");
+    expect(deadlineStatus(30)).toBe("cukup");
+    expect(deadlineStatus(null)).toBeNull();
+  });
+  it("lowers opportunity once the deadline has passed", () => {
+    const open = scoreTheme({ trendScore: 80, adobeResultCount: 5_000, daysLeft: 40 });
+    const missed = scoreTheme({ trendScore: 80, adobeResultCount: 5_000, daysLeft: -10 });
+    expect(missed.opportunity).toBe(Math.round(open.opportunity * timingFactor(-10)));
+    expect(missed.opportunity).toBeLessThan(open.opportunity);
+  });
+  it("leaves evergreen themes alone", () => expect(timingFactor(null)).toBe(1));
 });
