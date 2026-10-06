@@ -105,14 +105,14 @@ describe("runWithFallback", () => {
   ];
 
   it("returns the first provider's result and logs it", async () => {
-    const log = vi.fn(async (_e: UsageEntry) => {});
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
     const result = await runWithFallback(order, "svg", async () => ({ model: "primary" }), log);
     expect(result).toMatchObject({ provider: "kenari", model: "primary" });
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari", ok: true, kind: "svg" }));
   });
 
   it("logs a failed call and does not hide a rate limit when the next provider is not built yet", async () => {
-    const log = vi.fn(async (_e: UsageEntry) => {});
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
     await expect(
       runWithFallback(order, "svg", async () => {
         throw new ProviderError("rate_limit", "limit", { retryAfterSec: 9 });
@@ -123,7 +123,7 @@ describe("runWithFallback", () => {
   });
 
   it("does not fall back on errors another provider cannot fix", async () => {
-    const log = vi.fn(async (_e: UsageEntry) => {});
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
     await expect(
       runWithFallback(order, "svg", async () => {
         throw new ProviderError("bad_output", "no svg");

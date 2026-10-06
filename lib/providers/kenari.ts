@@ -6,7 +6,6 @@ import type {
   AssetMetadata,
   Concept,
   ConceptInput,
-  MetadataInput,
   RateLimit,
   SvgInput,
   SvgProvider,
@@ -81,7 +80,7 @@ export class KenariProvider implements SvgProvider {
     return { svg, model: this.model, rateLimit };
   }
 
-  async generateMetadata(_input: MetadataInput): Promise<AssetMetadata> {
+  async generateMetadata(): Promise<AssetMetadata> {
     throw new ProviderError("not_implemented", "Metadata AI baru tersedia di Tahap 3.");
   }
 
