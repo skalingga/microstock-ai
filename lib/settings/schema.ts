@@ -54,6 +54,7 @@ export const settingsSchema = z.object({
     .max(500, "Maksimal 500 kata terlarang."),
   default_style: z.enum(styleValues),
   palettes: palettesSchema,
+  kenari_text_model: z.string().trim().max(120, "Nama model terlalu panjang."),
   kenari_monthly_budget_idr: z
     .number({ error: "Batas biaya Kenari harus berupa angka." })
     .int("Batas biaya Kenari harus bilangan bulat.")

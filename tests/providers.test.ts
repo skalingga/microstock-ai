@@ -219,3 +219,25 @@ describe("runWithFallback", () => {
     ).rejects.toMatchObject({ code: "not_implemented" });
   });
 });
+
+import { orderForKind } from "@/lib/providers";
+
+describe("orderForKind", () => {
+  const order = [
+    { provider: "kenari" as const, model: "deepseek-v4-flash" },
+    { provider: "gemini" as const, model: "g" },
+  ];
+
+  it("uses the text model for concepts and metadata on Kenari only", () => {
+    expect(orderForKind(order, "metadata", "gpt-oss-120b")).toEqual([
+      { provider: "kenari", model: "gpt-oss-120b" },
+      { provider: "gemini", model: "g" },
+    ]);
+    expect(orderForKind(order, "concepts", " gpt-oss-120b ")[0].model).toBe("gpt-oss-120b");
+  });
+
+  it("keeps the order for SVG calls and when no text model is set", () => {
+    expect(orderForKind(order, "svg", "gpt-oss-120b")).toBe(order);
+    expect(orderForKind(order, "metadata", "  ")).toBe(order);
+  });
+});

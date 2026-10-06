@@ -96,6 +96,19 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
               placeholder="Model bawaan"
             />
           </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="kenari_text_model">Model Kenari untuk konsep dan metadata</Label>
+            <Input
+              id="kenari_text_model"
+              name="kenari_text_model"
+              defaultValue={settings.kenari_text_model}
+              placeholder="Sama dengan model utama"
+            />
+            <p className="text-muted-foreground text-xs">
+              Konsep dan metadata hanya berupa teks, jadi bisa memakai model yang lebih murah. Gambar SVG tetap
+              memakai model utama. Kosongkan untuk memakai model yang sama.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

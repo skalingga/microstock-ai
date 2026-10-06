@@ -38,6 +38,15 @@ Buka http://localhost:3000. Halaman selain `/login` hanya bisa dibuka setelah ma
 
 Model berakhiran `:free` tidak dihitung. Model berbayar dicatat per panggilan di `provider_usage.cost_idr` (token dari respons dikali harga katalog Kenari), dan berhenti otomatis saat pengeluaran bulan berjalan (zona WIB) mencapai batas di **Pengaturan** (bawaan Rp20.000). Pengeluaran bulan ini tampil di halaman Generate.
 
+Di **Pengaturan** ada isian opsional "Model Kenari untuk konsep dan metadata". Kosong berarti memakai model utama. Uji Oktober 2026: `gpt-oss-120b` dan `gpt-oss-20b` sekitar 3 kali lebih murah untuk teks, tetapi judul lebih pendek, konsep lebih tipis, dan kadang mengarang warna; `deepseek-v4-flash` tetap disarankan.
+
+## Peningkatan kualitas generate (Tahap 3b)
+
+- Palet bawaan per tema (Halloween, Musim gugur, Natal, dan lainnya) tampil di halaman Generate di bawah palet milikmu.
+- Satu batch adalah satu set: konsep hanya boleh memakai warna dari palet yang dipilih.
+- Gaya pola memakai satu contoh SVG yang menunjukkan cara menyambung tepi tile. Gaya lain tidak, karena contoh menaikkan biaya per SVG sekitar 3 kali tanpa perbaikan yang terukur.
+- Aset yang Gagal QC (tile tidak menyambung, kosong, terpotong, ada teks, latar tidak transparan, terlalu rumit) dibuat ulang sekali secara otomatis dengan catatan masalahnya.
+
 ## QC otomatis dan ekspor
 
 Setiap aset melewati pemeriksaan di browser: validitas render, teks, kerumitan, isi di dalam kanvas, tidak kosong, latar transparan (ikon), uji tile 2x2 (pola), kemiripan (perceptual hash), dan metadata (kata terlarang, judul, keyword, kategori). Hasilnya Lolos, Perlu Cek, atau Gagal. Aset yang belum punya QC atau metadata bisa diproses massal lewat tombol di halaman Aset.
@@ -59,6 +68,7 @@ Migrasi ada di `supabase/migrations/` dan harus dijalankan berurutan sesuai nama
 4. `..._asset_concept_usage_ok.sql`: kolom `assets.concept` dan `provider_usage.ok`
 5. `..._kenari_cost_budget.sql`: kolom biaya Rupiah, batas bulanan Kenari, dan fungsi `provider_cost_since`
 6. `..._export_files_bucket.sql`: bucket menerima ZIP dan CSV untuk riwayat ekspor
+7. `..._kenari_text_model.sql`: model Kenari opsional untuk konsep dan metadata
 
 **Cara 1, Supabase CLI** (disarankan):
 
@@ -68,7 +78,7 @@ npx supabase link --project-ref <ref-proyek>
 npx supabase db push
 ```
 
-**Cara 2, tanpa CLI**: buka Supabase, SQL Editor, lalu tempel dan jalankan isi ketiga file itu satu per satu sesuai urutan.
+**Cara 2, tanpa CLI**: buka Supabase, SQL Editor, lalu tempel dan jalankan isi file-file itu satu per satu sesuai urutan.
 
 Setelah mengubah skema, buat ulang tipe TypeScript di `lib/database.types.ts`:
 

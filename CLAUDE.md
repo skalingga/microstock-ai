@@ -85,6 +85,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 1. Fondasi: Next.js, Supabase Auth, skema database + RLS, deploy ke Vercel
 - [x] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
 - [x] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
+- [ ] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [ ] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider

@@ -17,6 +17,16 @@ export type UsageEntry = {
 /** Runs just before a provider is called; throws a ProviderError to refuse the call (e.g. budget). */
 export type CallGuard = (info: { provider: ProviderId; model: string }) => Promise<void>;
 
+/**
+ * Concepts and metadata are text only, so Kenari may use a cheaper model for them (user setting).
+ * SVG calls and other providers keep the model from the provider order.
+ */
+export function orderForKind(order: ProviderEntry[], kind: UsageKind, kenariTextModel: string): ProviderEntry[] {
+  const textModel = kenariTextModel.trim();
+  if (kind === "svg" || !textModel) return order;
+  return order.map((entry) => (entry.provider === "kenari" ? { ...entry, model: textModel } : entry));
+}
+
 /** The only place that turns a provider name into an adapter (CLAUDE.md rule 4). */
 export function resolveProvider(entry: ProviderEntry): { provider: SvgProvider; model: string } {
   switch (entry.provider) {

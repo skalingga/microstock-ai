@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { formatIdr, startOfMonthWib } from "@/lib/budget";
 import { ProviderError, httpStatusFor } from "@/lib/providers/errors";
 import { isFreeModel } from "@/lib/providers/kenari-pricing";
-import { runWithFallback, type UsageKind } from "@/lib/providers";
+import { orderForKind, runWithFallback, type UsageKind } from "@/lib/providers";
 import type { SvgProvider } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
 import { toProviderOrder } from "@/lib/settings/schema";
@@ -61,7 +61,7 @@ export async function handleGenerate<
 
   try {
     const result = await runWithFallback(
-      toProviderOrder(settings.provider_order),
+      orderForKind(toProviderOrder(settings.provider_order), opts.kind, settings.kenari_text_model),
       opts.kind,
       (provider) => opts.run(provider, input, { bannedWords: settings.banned_words }),
       async (entry) => {

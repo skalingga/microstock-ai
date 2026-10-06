@@ -275,6 +275,7 @@ export type Database = {
           created_at: string
           default_style: string
           kenari_monthly_budget_idr: number
+          kenari_text_model: string
           palettes: Json
           provider_order: Json
           recraft_monthly_budget_usd: number
@@ -286,6 +287,7 @@ export type Database = {
           created_at?: string
           default_style?: string
           kenari_monthly_budget_idr?: number
+          kenari_text_model?: string
           palettes?: Json
           provider_order?: Json
           recraft_monthly_budget_usd?: number
@@ -297,6 +299,7 @@ export type Database = {
           created_at?: string
           default_style?: string
           kenari_monthly_budget_idr?: number
+          kenari_text_model?: string
           palettes?: Json
           provider_order?: Json
           recraft_monthly_budget_usd?: number
