@@ -33,7 +33,7 @@ export default async function HalamanAset({
 
   let query = supabase
     .from("assets")
-    .select("id, preview_path, title, concept, provider, qc_status, created_at, exported_at", { count: "exact" })
+    .select("id, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
   if (job) query = query.eq("job_id", job);
@@ -142,6 +142,8 @@ export default async function HalamanAset({
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <QcBadge status={asset.qc_status} />
                     {asset.exported_at && <span className="text-muted-foreground">Diekspor</span>}
+                    {asset.adobe_status === "diterima" && <span className="font-medium text-emerald-700">Diterima Adobe</span>}
+                    {asset.adobe_status === "ditolak" && <span className="font-medium text-red-700">Ditolak Adobe</span>}
                   </p>
                 </li>
               );

@@ -83,3 +83,36 @@ export async function simpanMetadata(id: string, input: unknown): Promise<SaveMe
   revalidatePath("/aset");
   return { ok: true, status: verdict.status };
 }
+
+export type AdobeResult = { ok: true } | { ok: false; error: string };
+
+const adobeSchema = z.object({
+  status: z.enum(["belum", "diterima", "ditolak"]),
+  reason: z.string().trim().max(500, "Alasan maksimal 500 karakter."),
+});
+
+/** Records Adobe Stock's decision for one asset (stage 6). "belum" clears it. */
+export async function simpanHasilAdobe(id: string, input: unknown): Promise<AdobeResult> {
+  if (!UUID_RE.test(id)) return { ok: false, error: "ID aset tidak valid." };
+  const parsed = adobeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
+  const { status, reason } = parsed.data;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("assets")
+    .update({
+      adobe_status: status === "belum" ? null : status,
+      adobe_reason: status === "ditolak" && reason ? reason : null,
+      adobe_reviewed_at: status === "belum" ? null : new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("id");
+  if (error) return { ok: false, error: "Gagal menyimpan hasil review. Coba lagi." };
+  if (!data || data.length === 0) return { ok: false, error: "Aset tidak ditemukan." };
+
+  revalidatePath(`/aset/${id}`);
+  revalidatePath("/aset");
+  revalidatePath("/ekspor");
+  return { ok: true };
+}

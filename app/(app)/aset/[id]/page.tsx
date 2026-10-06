@@ -6,6 +6,7 @@ import { parseNotes, type NoteStatus } from "@/lib/qc/types";
 import { STYLES, type StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { AdobeResultForm } from "./adobe-result-form";
 import { AssetActions } from "./asset-actions";
 import { DeleteButton } from "./delete-button";
 import { MetadataForm } from "./metadata-form";
@@ -153,6 +154,13 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
               category={asset.category}
               needsRelease={asset.needs_release}
             />
+          </section>
+
+          <section className="space-y-3" aria-labelledby="adobe-heading">
+            <h2 id="adobe-heading" className="font-medium">
+              Hasil review Adobe
+            </h2>
+            <AdobeResultForm key={`${asset.adobe_status}-${asset.adobe_reason}`} id={asset.id} status={asset.adobe_status} reason={asset.adobe_reason} />
           </section>
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">

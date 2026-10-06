@@ -13,6 +13,7 @@ Tahap 1, 2, dan 3 selesai dan terverifikasi (12 aset sudah dikirim ke Adobe Stoc
 - [2026-10-07] Login: tombol intip password, lupa password (email -> /auth/callback -> /reset-password). Perlu Redirect URLs di Supabase, lihat catatan
 
 ## Sedang dikerjakan
+- Tahap 6 (uji ke Adobe): alat pencatatan sudah dikode di `dev` dan migrasi `20261009000000_adobe_review_result.sql` sudah diterapkan. Tiap aset punya kolom keputusan Adobe (diterima/ditolak + alasan), diisi di `/aset/[id]`; laporan tingkat penerimaan per provider/model, gaya, status QC, dan jumlah bentuk ada di `/ekspor` (`lib/adobe/stats.ts`). Bagian yang tersisa dikerjakan pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan, lalu setel `lib/qc/config.ts`. Belum dicentang.
 - Tahap 8 (riset tema) sudah dikode di branch `dev`; migrasi sudah diterapkan ke Supabase (2026-10-07). Uji di preview: alur jalan; Google Trends sempat gagal sekali lalu berhasil di percobaan berikutnya (tidak diblokir permanen), jadi dipertahankan dengan retry sekali. Perbaikan setelah uji: peluang diturunkan bila batas upload sudah lewat, judul tema tanpa kata gaya. Tahap 8 dicentang di `CLAUDE.md` setelah pengguna menguji di preview. File: `lib/research/*` (kalender, skor, Trends), `app/api/research/{themes,trends}`, `app/(app)/riset/*`.
 
 ## Langkah berikutnya
