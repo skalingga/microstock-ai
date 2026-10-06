@@ -120,6 +120,9 @@ Simpan nilai asli di `.env.local` (tidak di-commit) dan di environment variable 
 - Jelaskan hasil kepada pengguna dalam Bahasa Indonesia sederhana: apa yang jadi, cara mencobanya, dan apa yang belum.
 - Pengguna meminta Claude yang mengelola penulisan kode. Beri penjelasan singkat untuk konsep atau pilihan penting, tanpa jargon berlebihan.
 
+## Aturan sinkronisasi PC ↔ cloud
+@SYNC.md
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

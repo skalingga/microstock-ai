@@ -1,15 +1,11 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import { credentialsSchema, emailSchema } from "@/lib/auth/schema";
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthState = { error?: string; info?: string; email?: string };
-
-const credentialsSchema = z.object({
-  email: z.string().trim().email("Format email tidak valid."),
-  password: z.string().min(8, "Password minimal 8 karakter."),
-});
 
 function parseCredentials(formData: FormData) {
   return credentialsSchema.safeParse({
@@ -65,6 +61,28 @@ export async function daftar(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   redirect("/generate");
+}
+
+export async function lupaPassword(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const parsed = emailSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message, email: emailOf(formData) };
+
+  const origin = (await headers()).get("origin");
+  if (!origin) return { error: "Terjadi kesalahan. Coba lagi.", email: parsed.data.email };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${origin}/auth/callback`,
+  });
+  if (error && (error.code === "over_request_rate_limit" || error.code === "over_email_send_rate_limit")) {
+    return { error: authErrorMessage(error.code), email: parsed.data.email };
+  }
+
+  // The same answer whether or not the email has an account, so this cannot reveal who is registered.
+  return {
+    info: "Jika email itu terdaftar, tautan untuk membuat password baru sudah dikirim. Buka tautannya di browser ini.",
+    email: parsed.data.email,
+  };
 }
 
 // Echoed back so the email field keeps its value after a failed attempt.
