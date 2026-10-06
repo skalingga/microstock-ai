@@ -27,13 +27,15 @@ export function GenerateForm({
   defaultStyle,
   palettes,
   bannedWords,
+  initialTheme = "",
 }: {
   userId: string;
   defaultStyle: StyleId;
   palettes: Palette[];
   bannedWords: string[];
+  initialTheme?: string;
 }) {
-  const [theme, setTheme] = useState("");
+  const [theme, setTheme] = useState(initialTheme);
   const [style, setStyle] = useState<StyleId>(defaultStyle);
   const [paletteIndex, setPaletteIndex] = useState(palettes.length > 0 ? "0" : "");
   const [count, setCount] = useState(10);

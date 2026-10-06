@@ -78,19 +78,19 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 
 ## Halaman
 
-`/login`, `/riset` (placeholder sampai Tahap 8), `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
+`/login`, `/riset`, `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
 
 ## Roadmap (kerjakan berurutan, satu tahap per sesi)
 
 - [x] 1. Fondasi: Next.js, Supabase Auth, skema database + RLS, deploy ke Vercel
 - [x] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
 - [x] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
-- [ ] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
+- [x] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [ ] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
 - [ ] 7. Recraft: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan
-- [ ] 8. Riset tema: kalender event, Google Trends, skor peluang
+- [x] 8. Riset tema: kalender event, Google Trends, skor peluang
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 
 Centang tahap setelah selesai dan diverifikasi pengguna.

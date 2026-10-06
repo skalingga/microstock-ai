@@ -2,7 +2,7 @@ import { z } from "zod";
 import { extractJson, extractSvg } from "@/lib/svg/extract";
 import { ProviderError } from "./errors";
 import { computeCostIdr, createPriceLookup, type PriceLookup } from "./kenari-pricing";
-import { conceptsPrompt, metadataPrompt, svgPrompt } from "./prompts";
+import { conceptsPrompt, metadataPrompt, svgPrompt, themesPrompt } from "./prompts";
 import type {
   Concept,
   ConceptInput,
@@ -10,6 +10,8 @@ import type {
   RateLimit,
   SvgInput,
   SvgProvider,
+  ThemeIdea,
+  ThemesInput,
 } from "./types";
 
 const DEFAULT_BASE_URL = "https://kenari.id/v1";
@@ -39,6 +41,20 @@ const conceptsSchema = z.object({
       subject: z.string().trim().min(1).max(200),
       composition: z.string().trim().min(1).max(300),
       palette: z.array(z.string()).optional().default([]),
+    }),
+  ),
+});
+
+const score = z.coerce.number().min(0).max(100).catch(50);
+
+const themesSchema = z.object({
+  themes: z.array(
+    z.object({
+      title: z.string().trim().min(2).max(120),
+      event: z.string().trim().max(80).optional().default(""),
+      keywords: z.union([z.array(z.string()), z.string()]).optional().default([]),
+      demand_guess: score,
+      competition_guess: score,
     }),
   ),
 });
@@ -113,6 +129,31 @@ export class KenariProvider implements SvgProvider {
       costIdr,
       rateLimit,
     };
+  }
+
+  async generateThemes(input: ThemesInput) {
+    const { system, user } = themesPrompt(input);
+    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 6000, temperature: 0.8 });
+
+    const parsed = themesSchema.safeParse(extractJson(content));
+    if (!parsed.success) {
+      throw new ProviderError("bad_output", "Balasan model bukan daftar tema yang valid.");
+    }
+
+    const themes: ThemeIdea[] = parsed.data.themes.slice(0, input.count).map((t) => ({
+      title: t.title,
+      event: t.event,
+      keywords: (Array.isArray(t.keywords) ? t.keywords : t.keywords.split(","))
+        .map((k) => k.trim())
+        .filter(Boolean)
+        .slice(0, 10),
+      demandGuess: Math.round(t.demand_guess),
+      competitionGuess: Math.round(t.competition_guess),
+    }));
+    if (themes.length === 0) {
+      throw new ProviderError("bad_output", "Model tidak menghasilkan tema.");
+    }
+    return { themes, model: this.model, costIdr, rateLimit };
   }
 
   private async chat(system: string, user: string, opts: { maxTokens: number; temperature: number }) {

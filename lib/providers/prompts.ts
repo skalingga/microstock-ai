@@ -1,7 +1,7 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import type { StyleId } from "@/lib/settings/schema";
 import { SVG_EXAMPLES } from "./examples";
-import type { ConceptInput, MetadataInput, SvgInput } from "./types";
+import type { ConceptInput, MetadataInput, SvgInput, ThemesInput } from "./types";
 
 // Prompts to the AI are in English (CLAUDE.md).
 
@@ -136,5 +136,35 @@ export function metadataPrompt(input: MetadataInput): { system: string; user: st
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","needs_release":false}',
     ].join("\n"),
+  };
+}
+
+export function themesPrompt(input: ThemesInput): { system: string; user: string } {
+  const events =
+    input.events.length > 0
+      ? input.events.map((e) => `- ${e.name} (${e.date}, importance ${e.weight}/3)`).join("\n")
+      : "- (no dated events in this period)";
+
+  return {
+    system:
+      "You are a stock-content market analyst advising a contributor who sells flat vector assets (icons, seamless patterns, flat illustrations, badges, abstract backgrounds) on Adobe Stock. " +
+      "You answer with a single JSON object and nothing else.",
+    user: [
+      `Market: ${input.region}`,
+      input.category ? `Focus: ${input.category}` : "",
+      "Upcoming events in the chosen period:",
+      events,
+      "",
+      `Propose exactly ${input.count} distinct, specific theme ideas that buyers in this market will search for around these events or in this season. Mix event themes and a few evergreen themes.`,
+      "Each theme must be drawable as simple flat vector shapes. Prefer specific themes (\"autumn harvest pumpkins\") over vague ones (\"autumn\").",
+      "Theme titles and keywords are in English. A title names the SUBJECT only (e.g. \"Easter egg hunt\"); never put an asset style such as icons, seamless pattern, flat vector, set, or background in a title.",
+      ...SAFETY_RULES,
+      "Never use event names that are trademarked brands. Do not reference real news events.",
+      "",
+      'Reply with JSON: {"themes":[{"title":"...","event":"<exact event name from the list, or empty string>","keywords":["5 to 10 search keywords, most important first"],"demand_guess":0-100,"competition_guess":0-100}]}',
+      "demand_guess is how much buyers search for it; competition_guess is how crowded Adobe Stock likely is. These are rough estimates.",
+    ]
+      .filter((line) => line !== "")
+      .join("\n"),
   };
 }

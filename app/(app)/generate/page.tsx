@@ -5,7 +5,12 @@ import { withPresetPalettes } from "@/lib/settings/palettes";
 import { STYLES, toPalettes, type StyleId } from "@/lib/settings/schema";
 import { GenerateForm } from "./generate-form";
 
-export default async function HalamanGenerate() {
+export default async function HalamanGenerate({
+  searchParams,
+}: {
+  searchParams: Promise<{ tema?: string }>;
+}) {
+  const { tema } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -56,6 +61,7 @@ export default async function HalamanGenerate() {
         defaultStyle={defaultStyle}
         palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
         bannedWords={settings?.banned_words ?? []}
+        initialTheme={tema?.slice(0, 120) ?? ""}
       />
     </div>
   );

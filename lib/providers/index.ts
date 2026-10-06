@@ -3,7 +3,7 @@ import { ProviderError, canFallBack } from "./errors";
 import { KenariProvider } from "./kenari";
 import type { ProviderId, SvgProvider } from "./types";
 
-export type UsageKind = "concepts" | "svg" | "metadata";
+export type UsageKind = "concepts" | "svg" | "metadata" | "themes";
 
 export type UsageEntry = {
   provider: ProviderId;
