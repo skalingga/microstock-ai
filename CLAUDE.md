@@ -1,0 +1,116 @@
+# MicroStock Vector AI
+
+Aplikasi web untuk membuat aset vektor SVG siap upload ke Adobe Stock dari satu tema: generate variasi, QC otomatis, metadata AI, ekspor ZIP + CSV. Versi 1 dipakai sendiri oleh satu pengguna; arsitektur disiapkan agar nanti bisa dijual (multi-user, langganan).
+
+Spesifikasi lengkap ada di `docs/PRD.md`. Baca file itu sebelum mengerjakan tahap apa pun. Bila PRD dan berkas ini berbeda, PRD yang menang; tanyakan ke pengguna bila ada yang tidak jelas.
+
+## Bahasa
+
+- Antarmuka aplikasi dan pesan error: Bahasa Indonesia.
+- Metadata aset (judul, keyword) dan prompt ke AI: Bahasa Inggris.
+- Kode, nama variabel, nama tabel, komentar singkat: Bahasa Inggris.
+- Jawaban dan penjelasan kepada pengguna: Bahasa Indonesia, singkat dan jelas.
+
+## Stack
+
+- Next.js (App Router) + TypeScript, Tailwind CSS, shadcn/ui
+- Backend: Next.js Route Handlers di Vercel (paket Hobby, non-komersial)
+- Login, database, file: Supabase (Auth, Postgres dengan Row Level Security, Storage)
+- Olah SVG: DOMPurify (sanitasi), SVGO (optimasi), canvas di browser (render + perceptual hash)
+- Ekspor: JSZip + pembuat CSV di browser
+- AI: tiga provider lewat satu antarmuka (lihat bagian Provider)
+
+## Aturan wajib
+
+1. **API key hanya di server.** Semua key provider dibaca dari environment variable di Route Handler. Jangan pernah mengirim key ke browser, menulisnya di kode, atau meng-commit `.env*` (kecuali `.env.example` tanpa nilai).
+2. **Satu panggilan AI per aset per request.** Antrean batch berjalan di browser, satu aset sekali jalan, dengan jeda dan retry saat kena rate limit. Jangan memproses batch besar dalam satu request server.
+3. **Batas durasi Vercel.** Anggap batas fungsi paket Hobby 60 detik per request (sumber di internet berbeda-beda, ada yang menyebut 10 detik dan ada 300 detik). Set `export const maxDuration = 60` di route generate, beri timeout pada panggilan provider, dan pindah ke model atau provider cadangan saat timeout. Cek dokumentasi Vercel terbaru sebelum mengubah angka ini.
+4. **Semua provider lewat satu antarmuka.** Kode aplikasi tidak boleh memanggil API provider langsung dari UI atau dari logika bisnis; selalu lewat adapter.
+5. **Semua tabel punya `user_id` dan RLS.** Pengguna hanya bisa membaca dan menulis barisnya sendiri. Service role key hanya dipakai di server dan hanya bila benar-benar perlu.
+6. **SVG dari AI tidak dipercaya.** Setiap SVG disanitasi dulu (hapus `script`, `foreignObject`, link eksternal, gambar raster tertanam) sebelum disimpan atau ditampilkan.
+7. **Jangan menambah fitur di luar tahap yang sedang dikerjakan.** Lihat Roadmap.
+
+## Provider AI
+
+Antarmuka tunggal, mis. `lib/providers/types.ts`:
+
+```ts
+export interface SvgProvider {
+  id: "kenari" | "gemini" | "recraft";
+  generateConcepts(input: ConceptInput): Promise<Concept[]>;
+  generateSvg(input: SvgInput): Promise<{ svg: string; model: string; costUsd?: number }>;
+  generateMetadata(input: MetadataInput): Promise<AssetMetadata>;
+}
+```
+
+| Provider | Peran | Catatan |
+| --- | --- | --- |
+| Kenari (default) | Volume besar: ikon, pola, ilustrasi flat | OpenAI-compatible, base URL `https://kenari.id/v1`, key berawalan `kn-`. Pakai model chat yang menulis kode SVG. Model `:free` tersedia; batas pemakaiannya belum dicek |
+| Gemini direct (cadangan) | Pengganti otomatis saat Kenari kena limit atau model hilang | Model teks lewat Google AI Studio. Jangan pakai API gambar Gemini (raster, tanpa free tier publik). Cek apakah bisa berbagi adapter OpenAI-compatible dengan Kenari |
+| Recraft (premium) | Ilustrasi kompleks atau ulang aset gagal QC | Model vektor V4.1, sekitar $0.08 per SVG, hasil SVG native. Adapter sendiri. **Baru dibangun di Tahap 7** |
+
+- Urutan provider dan model cadangan disimpan di pengaturan (database), bukan di kode, supaya bisa diubah tanpa deploy.
+- **Anggaran Recraft maksimal $10 per bulan.** Hanya jalan lewat tombol eksplisit yang menampilkan estimasi biaya sebelum proses. Pengeluaran bulan berjalan dicatat di tabel `provider_usage`; saat mencapai $10 tombol terkunci sampai bulan berikutnya. Jangan pernah memanggil Recraft otomatis.
+- Catat provider dan model di setiap aset (`assets.provider`, `assets.model`) dan catat setiap panggilan di `provider_usage`.
+- Pilihan model gratis Kenari terbaik ditentukan lewat uji banding di Tahap 4. Sebelum itu, buat model default bisa diatur lewat environment variable atau pengaturan.
+
+## Aturan Adobe Stock yang dipaksakan aplikasi
+
+- Ekspor hanya file SVG (tipe Vector). Pengguna wajib mencentang "Created using generative AI tools" di portal Adobe untuk setiap aset; tampilkan sebagai checklist di halaman ekspor.
+- Vektor harus rapi dan mudah diedit: batasi jumlah path dan titik, tanpa elemen teks, tanpa gambar raster tertanam.
+- Ikon: latar transparan. Pola: harus seamless (uji tile 2x2).
+- Dilarang nama artis, orang terkenal, karakter fiksi, merek, atau IP lain di prompt, judul, dan keyword. Pakai daftar kata terlarang yang bisa diedit di pengaturan.
+- Judul tidak boleh menyiratkan peristiwa berita nyata.
+- Aset yang menggambarkan orang atau properti nyata ditandai "Perlu Release". Hindari orang realistis.
+- Keyword maksimal 49, urut dari yang terpenting (cek ulang batas ini di dokumentasi Adobe saat implementasi).
+- Aturan disimpan sebagai konfigurasi yang mudah diubah, karena kebijakan Adobe bisa berubah.
+
+## QC otomatis
+
+Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor tanpa konfirmasi manual. Pemeriksaan: validitas parse dan render, sanitasi, tanpa elemen teks, kompleksitas path, tidak kosong dan tidak keluar viewBox, latar transparan untuk ikon, uji tile untuk pola, kemiripan lewat perceptual hash terhadap batch dan riwayat, kata terlarang di metadata. Render dan hash berjalan di browser.
+
+## Model data (7 tabel, semua dengan RLS)
+
+`research_runs`, `themes`, `generation_jobs`, `assets` (termasuk `provider`, `model`, `svg_path`, `preview_path`, `path_count`, `phash`, `qc_status`, `qc_notes`, `title`, `keywords`, `category`, `needs_release`, `exported_at`), `exports`, `provider_usage`, serta pengaturan pengguna. Detail kolom ada di PRD bagian Model data.
+
+## Halaman
+
+`/login`, `/riset` (placeholder sampai Tahap 8), `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
+
+## Roadmap (kerjakan berurutan, satu tahap per sesi)
+
+- [ ] 1. Fondasi: Next.js, Supabase Auth, skema database + RLS, deploy ke Vercel
+- [ ] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
+- [ ] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
+- [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
+- [ ] 5. Gemini direct sebagai cadangan otomatis
+- [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
+- [ ] 7. Recraft: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan
+- [ ] 8. Riset tema: kalender event, Google Trends, skor peluang
+- [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
+
+Centang tahap setelah selesai dan diverifikasi pengguna.
+
+## Environment variable
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=      # server saja
+KENARI_API_KEY=                 # server saja, berawalan kn-
+KENARI_BASE_URL=https://kenari.id/v1
+GEMINI_API_KEY=                 # server saja, mulai Tahap 5
+RECRAFT_API_KEY=                # server saja, mulai Tahap 7
+RECRAFT_MONTHLY_BUDGET_USD=10
+```
+
+Simpan nilai asli di `.env.local` (tidak di-commit) dan di environment variable Vercel. Selalu perbarui `.env.example` saat menambah variabel.
+
+## Cara bekerja
+
+- Mulai setiap tahap dengan rencana singkat (file yang akan dibuat atau diubah) dan tunggu persetujuan pengguna bila ada pilihan desain yang berdampak.
+- Jangan menebak fakta yang bisa berubah (batas Vercel, harga model, aturan Adobe, nama model Kenari). Cek dokumentasi resmi atau tanya pengguna.
+- Sebelum menyatakan tahap selesai, jalankan `npm run lint`, `npx tsc --noEmit`, dan `npm run build`. Laporkan hasilnya apa adanya, termasuk yang gagal.
+- Commit kecil dan sering dengan pesan commit yang jelas. Jangan commit rahasia.
+- Jelaskan hasil kepada pengguna dalam Bahasa Indonesia sederhana: apa yang jadi, cara mencobanya, dan apa yang belum.
+- Pengguna meminta Claude yang mengelola penulisan kode. Beri penjelasan singkat untuk konsep atau pilihan penting, tanpa jargon berlebihan.
