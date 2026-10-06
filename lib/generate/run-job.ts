@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
 import type { Concept } from "@/lib/providers/types";
 import { combine, type Verdict } from "@/lib/qc/evaluate";
-import { fetchHashPool, runVisualQc, saveVerdict } from "@/lib/qc/store";
+import { applyMetadata, fetchHashPool, runVisualQc } from "@/lib/qc/store";
 import type { HashPoolEntry, QcNote, QcStatus } from "@/lib/qc/types";
 import type { StyleId } from "@/lib/settings/schema";
 import { renderPreviewPng } from "@/lib/svg/preview";
@@ -285,15 +285,7 @@ async function makeMetadata(p: RunJobParams, asset: MadeAsset, concept: Concept,
   );
   gate.update(res.rateLimit);
 
-  const { title, keywords, category, needsRelease } = res.metadata;
-  const verdict = combine(asset.notes, { title, keywords, category, needsRelease }, p.bannedWords);
-
-  const update = await p.supabase
-    .from("assets")
-    .update({ title, keywords, category, needs_release: needsRelease })
-    .eq("id", asset.assetId);
-  if (update.error) throw new ApiError("storage", "Gagal menyimpan metadata.");
-
-  await saveVerdict(p.supabase, asset.assetId, verdict);
+  const verdict = await applyMetadata(p.supabase, asset.assetId, asset.notes, res.metadata, p.bannedWords);
+  if (!verdict) throw new ApiError("storage", "Gagal menyimpan metadata.");
   return verdict;
 }

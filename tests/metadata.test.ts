@@ -59,3 +59,16 @@ describe("normalizeMetadata", () => {
     expect(normalizeMetadata({ ...raw, needsRelease: true }, []).metadata.needsRelease).toBe(true);
   });
 });
+
+import { formatKeywordText, parseKeywordText } from "@/lib/metadata/keywords";
+
+describe("parseKeywordText", () => {
+  it("accepts lines and commas, lowercases, and drops duplicates", () => {
+    expect(parseKeywordText("Pumpkin, autumn\nHarvest\n\n pumpkin ,  ")).toEqual(["pumpkin", "autumn", "harvest"]);
+  });
+
+  it("round-trips through formatKeywordText", () => {
+    const list = ["a", "b c", "d"];
+    expect(parseKeywordText(formatKeywordText(list))).toEqual(list);
+  });
+});

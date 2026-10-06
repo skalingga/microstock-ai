@@ -93,3 +93,21 @@ export async function rerunQc(
   const verdict = combine(visual, metadataOf(asset), bannedWords);
   return (await saveVerdict(supabase, asset.id, verdict, phash)) ? verdict : null;
 }
+
+/** Stores metadata on an asset and re-judges it: visual notes stay, metadata notes are recomputed. */
+export async function applyMetadata(
+  supabase: Client,
+  assetId: string,
+  visualNotes: QcNote[],
+  meta: { title: string; keywords: string[]; category: string; needsRelease: boolean },
+  bannedWords: string[],
+): Promise<Verdict | null> {
+  const update = await supabase
+    .from("assets")
+    .update({ title: meta.title, keywords: meta.keywords, category: meta.category, needs_release: meta.needsRelease })
+    .eq("id", assetId);
+  if (update.error) return null;
+
+  const verdict = combine(visualNotes, meta, bannedWords);
+  return (await saveVerdict(supabase, assetId, verdict)) ? verdict : null;
+}
