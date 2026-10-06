@@ -158,6 +158,32 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
 
       <Card>
         <CardHeader>
+          <CardTitle>Batas biaya Kenari</CardTitle>
+          <CardDescription>
+            Batas pengeluaran model berbayar Kenari per bulan, dalam Rupiah. Setelah tercapai, model berbayar berhenti
+            sampai bulan berikutnya. Model gratis (berakhiran :free) tidak dihitung dan tidak pernah diblokir. Isi 0
+            untuk melarang model berbayar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Label htmlFor="kenari_monthly_budget_idr" className="sr-only">
+            Batas biaya Kenari per bulan (Rupiah)
+          </Label>
+          <Input
+            id="kenari_monthly_budget_idr"
+            name="kenari_monthly_budget_idr"
+            type="number"
+            min={0}
+            max={1000000}
+            step={1000}
+            defaultValue={settings.kenari_monthly_budget_idr}
+            className="max-w-40"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Batas biaya Recraft</CardTitle>
           <CardDescription>
             Batas pengeluaran per bulan dalam dolar AS. Nilai tertinggi yang diizinkan adalah $10.

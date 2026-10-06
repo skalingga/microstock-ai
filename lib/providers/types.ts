@@ -35,7 +35,11 @@ export type AssetMetadata = { title: string; keywords: string[]; category: strin
 
 export interface SvgProvider {
   id: ProviderId;
-  generateConcepts(input: ConceptInput): Promise<{ concepts: Concept[]; model: string; rateLimit?: RateLimit }>;
-  generateSvg(input: SvgInput): Promise<{ svg: string; model: string; costUsd?: number; rateLimit?: RateLimit }>;
+  generateConcepts(
+    input: ConceptInput,
+  ): Promise<{ concepts: Concept[]; model: string; costIdr?: number; rateLimit?: RateLimit }>;
+  generateSvg(
+    input: SvgInput,
+  ): Promise<{ svg: string; model: string; costUsd?: number; costIdr?: number; rateLimit?: RateLimit }>;
   generateMetadata(input: MetadataInput): Promise<AssetMetadata>;
 }

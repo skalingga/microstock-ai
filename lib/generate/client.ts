@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | "bad_svg" // reply parsed, but sanitizing or rendering failed in the browser
   | "auth"
   | "model_unavailable"
+  | "budget_exceeded"
   | "not_implemented"
   | "storage"
   | "internal";
@@ -32,7 +33,13 @@ export class ApiError extends Error {
 
 /** Errors that make every later call fail too, so the whole queue should stop. */
 export function isFatal(code: ApiErrorCode): boolean {
-  return code === "unauthenticated" || code === "auth" || code === "model_unavailable" || code === "not_implemented";
+  return (
+    code === "unauthenticated" ||
+    code === "auth" ||
+    code === "model_unavailable" ||
+    code === "budget_exceeded" ||
+    code === "not_implemented"
+  );
 }
 
 export type ConceptsResponse = { concepts: Concept[]; model: string; provider: string; rateLimit?: RateLimit };

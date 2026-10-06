@@ -155,6 +155,7 @@ export type Database = {
       }
       provider_usage: {
         Row: {
+          cost_idr: number
           cost_usd: number
           created_at: string
           id: string
@@ -165,6 +166,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cost_idr?: number
           cost_usd?: number
           created_at?: string
           id?: string
@@ -175,6 +177,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          cost_idr?: number
           cost_usd?: number
           created_at?: string
           id?: string
@@ -271,6 +274,7 @@ export type Database = {
           banned_words: string[]
           created_at: string
           default_style: string
+          kenari_monthly_budget_idr: number
           palettes: Json
           provider_order: Json
           recraft_monthly_budget_usd: number
@@ -281,6 +285,7 @@ export type Database = {
           banned_words?: string[]
           created_at?: string
           default_style?: string
+          kenari_monthly_budget_idr?: number
           palettes?: Json
           provider_order?: Json
           recraft_monthly_budget_usd?: number
@@ -291,6 +296,7 @@ export type Database = {
           banned_words?: string[]
           created_at?: string
           default_style?: string
+          kenari_monthly_budget_idr?: number
           palettes?: Json
           provider_order?: Json
           recraft_monthly_budget_usd?: number
@@ -304,7 +310,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      provider_cost_since: {
+        Args: { p_provider: string; p_since: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

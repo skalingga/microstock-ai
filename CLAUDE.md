@@ -52,7 +52,8 @@ export interface SvgProvider {
 - Urutan provider dan model cadangan disimpan di pengaturan (database), bukan di kode, supaya bisa diubah tanpa deploy.
 - **Anggaran Recraft maksimal $10 per bulan.** Hanya jalan lewat tombol eksplisit yang menampilkan estimasi biaya sebelum proses. Pengeluaran bulan berjalan dicatat di tabel `provider_usage`; saat mencapai $10 tombol terkunci sampai bulan berikutnya. Jangan pernah memanggil Recraft otomatis.
 - Catat provider dan model di setiap aset (`assets.provider`, `assets.model`) dan catat setiap panggilan di `provider_usage`.
-- Pilihan model gratis Kenari terbaik ditentukan lewat uji banding di Tahap 4. Sebelum itu, buat model default bisa diatur lewat environment variable atau pengaturan.
+- Pilihan model Kenari ditentukan lewat uji banding. Hasil uji awal (Oktober 2026): `deepseek-v4-flash` terbaik (kualitas, keandalan, sekitar Rp6 per aset); model :free umumnya lambat atau lemah. Model default diatur lewat `KENARI_DEFAULT_MODEL` atau pengaturan.
+- **Anggaran Kenari berbayar**: model berakhiran `:free` tidak dihitung. Biaya model berbayar dicatat di `provider_usage.cost_idr` dan dibatasi per bulan (zona WIB) lewat `user_settings.kenari_monthly_budget_idr` (bawaan Rp20.000). Saat tercapai, panggilan berbayar ditolak sampai bulan berikutnya. Batas ini tidak berlaku untuk Recraft, yang punya batas USD sendiri.
 
 ## Aturan Adobe Stock yang dipaksakan aplikasi
 
@@ -80,7 +81,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 ## Roadmap (kerjakan berurutan, satu tahap per sesi)
 
 - [x] 1. Fondasi: Next.js, Supabase Auth, skema database + RLS, deploy ke Vercel
-- [ ] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
+- [x] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
 - [ ] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [ ] 5. Gemini direct sebagai cadangan otomatis

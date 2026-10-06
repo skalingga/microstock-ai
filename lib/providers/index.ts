@@ -11,7 +11,11 @@ export type UsageEntry = {
   kind: UsageKind;
   ok: boolean;
   costUsd?: number;
+  costIdr?: number;
 };
+
+/** Runs just before a provider is called; throws a ProviderError to refuse the call (e.g. budget). */
+export type CallGuard = (info: { provider: ProviderId; model: string }) => Promise<void>;
 
 /** The only place that turns a provider name into an adapter (CLAUDE.md rule 4). */
 export function resolveProvider(entry: ProviderEntry): { provider: SvgProvider; model: string } {
@@ -36,11 +40,12 @@ export function resolveProvider(entry: ProviderEntry): { provider: SvgProvider; 
  * something another provider could fix (limit, timeout, missing model, upstream error).
  * Every real call is logged, including failed ones, because they still use quota.
  */
-export async function runWithFallback<T extends { model: string; costUsd?: number }>(
+export async function runWithFallback<T extends { model: string; costUsd?: number; costIdr?: number }>(
   order: ProviderEntry[],
   kind: UsageKind,
   call: (provider: SvgProvider) => Promise<T>,
   log: (entry: UsageEntry) => Promise<void>,
+  guard?: CallGuard,
 ): Promise<T & { provider: ProviderId }> {
   let lastError: ProviderError | null = null;
 
@@ -58,8 +63,25 @@ export async function runWithFallback<T extends { model: string; costUsd?: numbe
     }
 
     try {
+      await guard?.({ provider: entry.provider, model: resolved.model });
+    } catch (err) {
+      // Refused before any call was made: nothing to log.
+      if (!(err instanceof ProviderError)) throw err;
+      if (!canFallBack(err.code)) throw err;
+      lastError = err;
+      continue;
+    }
+
+    try {
       const result = await call(resolved.provider);
-      await log({ provider: entry.provider, model: result.model, kind, ok: true, costUsd: result.costUsd });
+      await log({
+        provider: entry.provider,
+        model: result.model,
+        kind,
+        ok: true,
+        costUsd: result.costUsd,
+        costIdr: result.costIdr,
+      });
       return { ...result, provider: entry.provider };
     } catch (err) {
       if (!(err instanceof ProviderError)) throw err;

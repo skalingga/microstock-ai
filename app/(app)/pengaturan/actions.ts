@@ -34,6 +34,7 @@ export async function simpanPengaturan(formData: FormData): Promise<SaveResult> 
     banned_words: parseBannedWords(String(formData.get("banned_words") ?? "")),
     default_style: formData.get("default_style"),
     palettes: parsePalettes(String(formData.get("palettes") ?? "")),
+    kenari_monthly_budget_idr: Number(formData.get("kenari_monthly_budget_idr")),
     recraft_monthly_budget_usd: Number(formData.get("recraft_monthly_budget_usd")),
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };

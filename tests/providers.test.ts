@@ -92,6 +92,39 @@ describe("KenariProvider", () => {
     await expect(kenari((async () => reply("not json")) as unknown as typeof fetch).generateConcepts(conceptInput)).rejects.toMatchObject({ code: "bad_output" });
   });
 
+  it("reports the Rupiah cost of a call from token usage and the live price", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: SVG }, finish_reason: "stop" }],
+            usage: { prompt_tokens: 1000, completion_tokens: 2000 },
+          }),
+        ),
+    );
+    const provider = new KenariProvider("paid-model", {
+      apiKey: "kn-test",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      priceLookup: async () => ({ inIdr: 0.001, outIdr: 0.005 }),
+    });
+    expect((await provider.generateSvg(svgInput)).costIdr).toBe(11); // 1000*0.001 + 2000*0.005
+  });
+
+  it("leaves the cost undefined when the price is unknown", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: SVG } }], usage: { prompt_tokens: 10, completion_tokens: 10 } }),
+        ),
+    );
+    const provider = new KenariProvider("mystery", {
+      apiKey: "kn-test",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      priceLookup: async () => null,
+    });
+    expect((await provider.generateSvg(svgInput)).costIdr).toBeUndefined();
+  });
+
   it("fails clearly without an api key", async () => {
     const provider = new KenariProvider("m", { apiKey: "", fetchImpl: vi.fn() as unknown as typeof fetch });
     await expect(provider.generateSvg(svgInput)).rejects.toMatchObject({ code: "auth" });
@@ -129,6 +162,32 @@ describe("runWithFallback", () => {
         throw new ProviderError("bad_output", "no svg");
       }, log),
     ).rejects.toMatchObject({ code: "bad_output" });
+  });
+
+  it("refuses the call when the guard says the budget is used up, without logging", async () => {
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
+    const call = vi.fn(async () => ({ model: "paid" }));
+    await expect(
+      runWithFallback(
+        order,
+        "svg",
+        call,
+        log,
+        async () => {
+          throw new ProviderError("budget_exceeded", "habis");
+        },
+      ),
+    ).rejects.toMatchObject({ code: "budget_exceeded" });
+    expect(call).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("passes the model to the guard and records the cost of a successful call", async () => {
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
+    const guard = vi.fn(async () => {});
+    await runWithFallback(order, "svg", async () => ({ model: "primary", costIdr: 6.5 }), log, guard);
+    expect(guard).toHaveBeenCalledWith({ provider: "kenari", model: "primary" });
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ ok: true, costIdr: 6.5 }));
   });
 
   it("explains when no provider is usable", async () => {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { z } from "zod";
+import { formatIdr, startOfMonthWib } from "@/lib/budget";
 import { ProviderError, httpStatusFor } from "@/lib/providers/errors";
+import { isFreeModel } from "@/lib/providers/kenari-pricing";
 import { runWithFallback, type UsageKind } from "@/lib/providers";
 import type { SvgProvider } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
@@ -9,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type Ctx = { bannedWords: string[] };
 
-type Options<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number }> = {
+type Options<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number; costIdr?: number }> = {
   request: Request;
   schema: S;
   kind: UsageKind;
@@ -26,7 +28,10 @@ function fail(status: number, code: string, message: string, extra?: Record<stri
  * Shared shell for the generate endpoints: login check, input validation, banned-word filter,
  * provider fallback and usage logging. One AI call per request (CLAUDE.md rule 2).
  */
-export async function handleGenerate<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number }>(
+export async function handleGenerate<
+  S extends z.ZodTypeAny,
+  R extends { model: string; costUsd?: number; costIdr?: number },
+>(
   opts: Options<S, R>,
 ): Promise<Response> {
   const supabase = await createClient();
@@ -69,8 +74,28 @@ export async function handleGenerate<S extends z.ZodTypeAny, R extends { model: 
             kind: entry.kind,
             ok: entry.ok,
             cost_usd: entry.costUsd ?? 0,
+            cost_idr: entry.costIdr ?? 0,
           })
           .then(() => undefined, () => undefined);
+      },
+      // Paid Kenari models stop once this month's spending reaches the cap. Free models never do.
+      async ({ provider, model }) => {
+        if (provider !== "kenari" || isFreeModel(model)) return;
+        const budget = settings.kenari_monthly_budget_idr;
+        const { data, error } = await supabase.rpc("provider_cost_since", {
+          p_provider: "kenari",
+          p_since: startOfMonthWib(),
+        });
+        // Fail closed: when the spend cannot be read, a paid call must not slip through.
+        if (error) {
+          throw new ProviderError("budget_exceeded", "Batas biaya Kenari tidak bisa diperiksa saat ini. Coba lagi.");
+        }
+        if (Number(data ?? 0) >= budget) {
+          throw new ProviderError(
+            "budget_exceeded",
+            `Batas biaya Kenari bulan ini (${formatIdr(budget)}) sudah tercapai. Naikkan batas di Pengaturan atau pakai model gratis.`,
+          );
+        }
       },
     );
     return NextResponse.json(result);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { extractJson, extractSvg } from "@/lib/svg/extract";
 import { ProviderError } from "./errors";
+import { computeCostIdr, createPriceLookup, type PriceLookup } from "./kenari-pricing";
 import { conceptsPrompt, svgPrompt } from "./prompts";
 import type {
   AssetMetadata,
@@ -12,7 +13,8 @@ import type {
 } from "./types";
 
 const DEFAULT_BASE_URL = "https://kenari.id/v1";
-const DEFAULT_TIMEOUT_MS = 45_000; // below the 60s Vercel function limit (CLAUDE.md rule 3)
+// Stays below the 60s Vercel function limit (CLAUDE.md rule 3). deepseek-v4-flash needs about 35s per SVG.
+const DEFAULT_TIMEOUT_MS = 55_000;
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 export type KenariConfig = {
@@ -20,6 +22,8 @@ export type KenariConfig = {
   baseUrl?: string;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /** Looks up Rupiah-per-token prices; replaced in tests. */
+  priceLookup?: PriceLookup;
 };
 
 const conceptsSchema = z.object({
@@ -40,6 +44,7 @@ export class KenariProvider implements SvgProvider {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly priceLookup: PriceLookup;
 
   constructor(model: string, config: KenariConfig = {}) {
     this.model = model;
@@ -47,11 +52,12 @@ export class KenariProvider implements SvgProvider {
     this.baseUrl = (config.baseUrl ?? process.env.KENARI_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.fetchImpl = config.fetchImpl ?? fetch;
+    this.priceLookup = config.priceLookup ?? createPriceLookup({ baseUrl: this.baseUrl });
   }
 
   async generateConcepts(input: ConceptInput) {
     const { system, user } = conceptsPrompt(input);
-    const { content, rateLimit } = await this.chat(system, user, { maxTokens: 6000, temperature: 0.9 });
+    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 6000, temperature: 0.9 });
 
     const parsed = conceptsSchema.safeParse(extractJson(content));
     if (!parsed.success) {
@@ -66,18 +72,18 @@ export class KenariProvider implements SvgProvider {
     if (concepts.length === 0) {
       throw new ProviderError("bad_output", "Model tidak menghasilkan konsep.");
     }
-    return { concepts, model: this.model, rateLimit };
+    return { concepts, model: this.model, costIdr, rateLimit };
   }
 
   async generateSvg(input: SvgInput) {
     const { system, user } = svgPrompt(input);
-    const { content, rateLimit } = await this.chat(system, user, { maxTokens: 12_000, temperature: 0.7 });
+    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 12_000, temperature: 0.7 });
 
     const svg = extractSvg(content);
     if (!svg) {
       throw new ProviderError("bad_output", "Balasan model tidak berisi SVG yang utuh.");
     }
-    return { svg, model: this.model, rateLimit };
+    return { svg, model: this.model, costIdr, rateLimit };
   }
 
   async generateMetadata(): Promise<AssetMetadata> {
@@ -119,6 +125,7 @@ export class KenariProvider implements SvgProvider {
 
     const body = (await res.json().catch(() => null)) as {
       choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     } | null;
     const content = body?.choices?.[0]?.message?.content?.trim();
     if (!content) {
@@ -128,7 +135,14 @@ export class KenariProvider implements SvgProvider {
         truncated ? "Jawaban model terpotong sebelum selesai." : "Model mengirim balasan kosong.",
       );
     }
-    return { content, rateLimit };
+    return { content, rateLimit, costIdr: await this.costOf(body?.usage) };
+  }
+
+  /** Rupiah cost of one call, or undefined when the price or token usage is unknown. */
+  private async costOf(usage?: { prompt_tokens?: number; completion_tokens?: number }) {
+    if (!usage) return undefined;
+    const price = await this.priceLookup(this.model);
+    return price ? computeCostIdr(price, usage) : undefined;
   }
 }
 

@@ -54,6 +54,11 @@ export const settingsSchema = z.object({
     .max(500, "Maksimal 500 kata terlarang."),
   default_style: z.enum(styleValues),
   palettes: palettesSchema,
+  kenari_monthly_budget_idr: z
+    .number({ error: "Batas biaya Kenari harus berupa angka." })
+    .int("Batas biaya Kenari harus bilangan bulat.")
+    .min(0, "Batas biaya tidak boleh negatif.")
+    .max(1_000_000, "Batas biaya Kenari maksimal Rp1.000.000 per bulan."),
   recraft_monthly_budget_usd: z
     .number({ error: "Batas biaya harus berupa angka." })
     .min(0, "Batas biaya tidak boleh negatif.")

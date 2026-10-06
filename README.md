@@ -24,7 +24,7 @@ Buka http://localhost:3000. Halaman selain `/login` hanya bisa dibuka setelah ma
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase: Project Settings, API Keys (kunci `anon` atau `publishable`, aman terlihat di browser) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase: Project Settings, API Keys (`service_role`). **Rahasia**, hanya untuk server dan script uji |
 | `KENARI_API_KEY` | Kunci Kenari (berawalan `kn-`). **Rahasia**, hanya dibaca server |
-| `KENARI_DEFAULT_MODEL` | Model dipakai bila kolom model di Pengaturan kosong, mis. `agnes-3-0-flash:free`. Daftar model: https://kenari.id/v1/models |
+| `KENARI_DEFAULT_MODEL` | Model dipakai bila kolom model di Pengaturan kosong, mis. `deepseek-v4-flash` (hasil uji banding: kualitas terbaik, sekitar Rp6 per aset). Daftar model: https://kenari.id/v1/models |
 | `GEMINI_API_KEY`, `RECRAFT_API_KEY` | Belum dipakai. Boleh dikosongkan |
 
 `.env.local` sudah masuk `.gitignore`. Jangan pernah meng-commit file `.env*` selain `.env.example`.
@@ -34,6 +34,10 @@ Buka http://localhost:3000. Halaman selain `/login` hanya bisa dibuka setelah ma
 1. **Authentication, Sign In / Providers, Email**: matikan **Confirm email** agar akun langsung aktif setelah daftar (email bawaan Supabase dibatasi jumlahnya).
 2. Setelah akunmu dibuat: **Authentication, Sign In / Providers**, matikan **Allow new signups** supaya orang lain tidak bisa mendaftar.
 
+## Biaya model Kenari
+
+Model berakhiran `:free` tidak dihitung. Model berbayar dicatat per panggilan di `provider_usage.cost_idr` (token dari respons dikali harga katalog Kenari), dan berhenti otomatis saat pengeluaran bulan berjalan (zona WIB) mencapai batas di **Pengaturan** (bawaan Rp20.000). Pengeluaran bulan ini tampil di halaman Generate.
+
 ## Menerapkan migrasi database
 
 Migrasi ada di `supabase/migrations/` dan harus dijalankan berurutan sesuai nama file:
@@ -41,6 +45,8 @@ Migrasi ada di `supabase/migrations/` dan harus dijalankan berurutan sesuai nama
 1. `..._init_schema.sql`: tujuh tabel, indeks, RLS, dan trigger pembuat baris `user_settings`
 2. `..._storage.sql`: bucket privat `assets` dan kebijakan aksesnya
 3. `..._fk_indexes.sql`: indeks untuk foreign key gabungan
+4. `..._asset_concept_usage_ok.sql`: kolom `assets.concept` dan `provider_usage.ok`
+5. `..._kenari_cost_budget.sql`: kolom biaya Rupiah, batas bulanan Kenari, dan fungsi `provider_cost_since`
 
 **Cara 1, Supabase CLI** (disarankan):
 
