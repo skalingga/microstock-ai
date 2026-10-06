@@ -79,7 +79,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 
 ## Roadmap (kerjakan berurutan, satu tahap per sesi)
 
-- [ ] 1. Fondasi: Next.js, Supabase Auth, skema database + RLS, deploy ke Vercel
+- [x] 1. Fondasi: Next.js, Supabase Auth, skema database + RLS, deploy ke Vercel
 - [ ] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
 - [ ] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
