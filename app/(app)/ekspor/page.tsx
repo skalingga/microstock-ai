@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AI_LABEL_REMINDER } from "@/lib/adobe/rules";
 import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { createClient } from "@/lib/supabase/server";
+import type { ReviewedAsset } from "@/lib/adobe/stats";
+import { AcceptanceReport } from "./acceptance-report";
 import { ExportPanel, type Candidate } from "./export-panel";
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {
@@ -27,7 +29,7 @@ export default async function HalamanEkspor() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: assets }, { data: history }, waiting, failed] = await Promise.all([
+  const [{ data: assets }, { data: history }, waiting, failed, { data: reviewed }, awaiting] = await Promise.all([
     supabase
       .from("assets")
       .select("id, title, qc_status, exported_at, preview_path")
@@ -38,7 +40,37 @@ export default async function HalamanEkspor() {
     supabase.from("exports").select("id, asset_count, created_at, zip_path, csv_path").order("created_at", { ascending: false }).limit(10),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "menunggu"),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "gagal"),
+    supabase
+      .from("assets")
+      .select("provider, model, qc_status, path_count, adobe_status, adobe_reason, job_id")
+      .not("adobe_status", "is", null)
+      .limit(2000),
+    supabase
+      .from("assets")
+      .select("id", { count: "exact", head: true })
+      .not("exported_at", "is", null)
+      .is("adobe_status", null),
   ]);
+
+  // Style lives on the job, not the asset.
+  const jobIds = [...new Set((reviewed ?? []).map((r) => r.job_id))];
+  const { data: jobs } = jobIds.length > 0 ? await supabase.from("generation_jobs").select("id, style").in("id", jobIds) : { data: [] };
+  const styleByJob = new Map((jobs ?? []).map((j) => [j.id, j.style]));
+  const reviewedRows: ReviewedAsset[] = (reviewed ?? []).flatMap((r) =>
+    r.adobe_status === "diterima" || r.adobe_status === "ditolak"
+      ? [
+          {
+            provider: r.provider,
+            model: r.model,
+            style: styleByJob.get(r.job_id) ?? "icon_set",
+            qcStatus: r.qc_status,
+            pathCount: r.path_count,
+            adobeStatus: r.adobe_status,
+            adobeReason: r.adobe_reason,
+          },
+        ]
+      : [],
+  );
 
   const storage = supabase.storage.from("assets");
   const thumbPaths = (assets ?? []).flatMap((a) => (a.preview_path ? [a.preview_path] : []));
@@ -82,6 +114,8 @@ export default async function HalamanEkspor() {
       </div>
 
       <ExportPanel userId={user.id} candidates={candidates} />
+
+      <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
 
       <section className="space-y-3 rounded-lg border p-4" aria-labelledby="checklist-heading">
         <h2 id="checklist-heading" className="font-medium">
