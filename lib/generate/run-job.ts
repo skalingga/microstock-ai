@@ -5,6 +5,7 @@ import type { StyleId } from "@/lib/settings/schema";
 import { renderPreviewPng } from "@/lib/svg/preview";
 import { sanitizeSvg } from "@/lib/svg/sanitize";
 import { analyzeSvg } from "@/lib/svg/stats";
+import { describeConcept } from "./concept";
 import { ApiError, isFatal, postJson, type ConceptsResponse, type SvgResponse } from "./client";
 import { RateGate, callWithRetry } from "./queue";
 
@@ -61,18 +62,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
   let created = 0;
 
   try {
-    // A typed theme becomes a theme row without a research run.
-    const theme = await p.supabase.from("themes").insert({ title: p.theme }).select("id").single();
-    if (theme.error) throw new ApiError("internal", "Gagal menyimpan tema.");
-
-    const job = await p.supabase
-      .from("generation_jobs")
-      .insert({ theme_id: theme.data.id, style: p.style, palette: p.palette, count: p.count, status: "berjalan" })
-      .select("id")
-      .single();
-    if (job.error) throw new ApiError("internal", "Gagal membuat job generate.");
-    jobId = job.data.id;
-    emit({ phase: "konsep", jobId, message: "Menyusun konsep variasi..." });
+    emit({ phase: "konsep", message: "Menyusun konsep variasi..." });
 
     const conceptsRes = await callWithRetry(
       () =>
@@ -86,6 +76,19 @@ export async function runJob(p: RunJobParams): Promise<void> {
         }),
       retryOpts((message) => emit({ message })),
     );
+
+    // A typed theme becomes a theme row without a research run.
+    const theme = await p.supabase.from("themes").insert({ title: p.theme }).select("id").single();
+    if (theme.error) throw new ApiError("internal", "Gagal menyimpan tema.");
+
+    const job = await p.supabase
+      .from("generation_jobs")
+      .insert({ theme_id: theme.data.id, style: p.style, palette: p.palette, count: p.count, status: "berjalan" })
+      .select("id")
+      .single();
+    if (job.error) throw new ApiError("internal", "Gagal membuat job generate.");
+    jobId = job.data.id;
+    emit({ jobId });
 
     emit({
       phase: "antrean",
@@ -119,10 +122,15 @@ export async function runJob(p: RunJobParams): Promise<void> {
     emit({
       phase: p.signal.aborted ? "dihentikan" : state.items.some((i) => i.status === "menunggu") ? "gagal" : "selesai",
       message: p.signal.aborted ? "Dihentikan. Aset yang sudah jadi tetap tersimpan." : state.message,
+      items: state.items.map((it) => (it.status === "berjalan" ? { ...it, status: "menunggu" as const } : it)),
     });
   } catch (err) {
     if (p.signal.aborted) {
-      emit({ phase: "dihentikan", message: "Dihentikan. Aset yang sudah jadi tetap tersimpan." });
+      emit({
+        phase: "dihentikan",
+        message: "Dihentikan. Aset yang sudah jadi tetap tersimpan.",
+        items: state.items.map((it) => (it.status === "berjalan" ? { ...it, status: "menunggu" as const } : it)),
+      });
     } else {
       const message = err instanceof ApiError ? err.message : "Terjadi kesalahan tak terduga.";
       emit({ phase: "gagal", message });
@@ -177,8 +185,8 @@ async function makeAsset(p: RunJobParams, jobId: string, concept: Concept, gate:
     model: res.model,
     svg_path: svgPath,
     preview_path: previewPath,
-    path_count: stats.pathCount,
-    concept: `${concept.subject}. ${concept.composition}`,
+    path_count: stats.shapeCount, // all drawing shapes, not only <path>: that is what makes an SVG complex
+    concept: describeConcept(concept),
     qc_status: "menunggu",
   });
   if (insert.error) {

@@ -2,7 +2,7 @@
 
 Aplikasi web untuk membuat aset vektor SVG siap upload ke Adobe Stock dari satu tema. Spesifikasi lengkap ada di [docs/PRD.md](docs/PRD.md), aturan kerja di [CLAUDE.md](CLAUDE.md).
 
-Status: **Tahap 1 (Fondasi)**. Sudah ada login, kerangka halaman, skema database dengan RLS, bucket Storage, dan halaman pengaturan. Generate, QC, ekspor, dan riset belum dikerjakan.
+Status: **Tahap 2 (Generate + galeri dengan Kenari)**. Sudah ada login, pengaturan, generate SVG lewat Kenari (antrean di browser, sanitasi, preview PNG), dan galeri aset. Pemeriksaan QC, metadata AI, dan ekspor belum dikerjakan.
 
 ## Menjalankan di komputer sendiri
 
@@ -23,7 +23,9 @@ Buka http://localhost:3000. Halaman selain `/login` hanya bisa dibuka setelah ma
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase: Project Settings, API, Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase: Project Settings, API Keys (kunci `anon` atau `publishable`, aman terlihat di browser) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase: Project Settings, API Keys (`service_role`). **Rahasia**, hanya untuk server dan script uji |
-| `KENARI_API_KEY`, `GEMINI_API_KEY`, `RECRAFT_API_KEY` | Belum dipakai di Tahap 1. Boleh dikosongkan |
+| `KENARI_API_KEY` | Kunci Kenari (berawalan `kn-`). **Rahasia**, hanya dibaca server |
+| `KENARI_DEFAULT_MODEL` | Model dipakai bila kolom model di Pengaturan kosong, mis. `agnes-3-0-flash:free`. Daftar model: https://kenari.id/v1/models |
+| `GEMINI_API_KEY`, `RECRAFT_API_KEY` | Belum dipakai. Boleh dikosongkan |
 
 `.env.local` sudah masuk `.gitignore`. Jangan pernah meng-commit file `.env*` selain `.env.example`.
 
@@ -71,6 +73,7 @@ Butuh `SUPABASE_SERVICE_ROLE_KEY` di `.env.local`. Jalankan hanya terhadap proye
 ```bash
 npm run lint
 npx tsc --noEmit
+npm test
 npm run build
 ```
 

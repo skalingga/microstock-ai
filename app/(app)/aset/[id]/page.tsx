@@ -28,7 +28,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
     ["Status QC", QC_LABEL[asset.qc_status] ?? asset.qc_status],
     ["Provider", asset.provider],
     ["Model", asset.model],
-    ["Jumlah path", asset.path_count === null ? "-" : String(asset.path_count)],
+    ["Jumlah bentuk", asset.path_count === null ? "-" : String(asset.path_count)],
     ["Dibuat", dateFormat.format(new Date(asset.created_at))],
   ];
 

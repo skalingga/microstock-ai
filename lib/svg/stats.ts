@@ -1,7 +1,7 @@
 export type SvgStats = {
-  /** Number of <path> elements; stored in assets.path_count for the stage 3 complexity check. */
+  /** Number of <path> elements. */
   pathCount: number;
-  /** Basic shapes plus paths. */
+  /** Paths plus basic shapes; stored in assets.path_count for the stage 3 complexity check. */
   shapeCount: number;
   hasText: boolean;
 };
