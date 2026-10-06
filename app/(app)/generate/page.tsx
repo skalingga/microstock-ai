@@ -54,6 +54,7 @@ export default async function HalamanGenerate() {
         userId={user.id}
         defaultStyle={defaultStyle}
         palettes={settings ? toPalettes(settings.palettes) : []}
+        bannedWords={settings?.banned_words ?? []}
       />
     </div>
   );

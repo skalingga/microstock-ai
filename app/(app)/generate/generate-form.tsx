@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { QcBadge } from "@/components/qc-badge";
 import { Label } from "@/components/ui/label";
 import { MAX_VARIATIONS } from "@/lib/generate/schemas";
 import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
@@ -25,10 +26,12 @@ export function GenerateForm({
   userId,
   defaultStyle,
   palettes,
+  bannedWords,
 }: {
   userId: string;
   defaultStyle: StyleId;
   palettes: Palette[];
+  bannedWords: string[];
 }) {
   const [theme, setTheme] = useState("");
   const [style, setStyle] = useState<StyleId>(defaultStyle);
@@ -78,6 +81,7 @@ export function GenerateForm({
       style,
       palette,
       count,
+      bannedWords,
       signal: controller.signal,
       onState: (next) => {
         for (const item of next.items) {
@@ -235,6 +239,8 @@ export function GenerateForm({
                     )}
                   </div>
                   <p className="line-clamp-2 text-muted-foreground">{item.concept.subject}</p>
+                  {item.qc && <QcBadge status={item.qc} />}
+                  {item.note && <p className="text-amber-700 dark:text-amber-400">{item.note}</p>}
                   {item.error && <p className="text-destructive">{item.error}</p>}
                 </li>
               ))}

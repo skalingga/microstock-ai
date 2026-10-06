@@ -2,11 +2,11 @@ import { z } from "zod";
 import { extractJson, extractSvg } from "@/lib/svg/extract";
 import { ProviderError } from "./errors";
 import { computeCostIdr, createPriceLookup, type PriceLookup } from "./kenari-pricing";
-import { conceptsPrompt, svgPrompt } from "./prompts";
+import { conceptsPrompt, metadataPrompt, svgPrompt } from "./prompts";
 import type {
-  AssetMetadata,
   Concept,
   ConceptInput,
+  MetadataInput,
   RateLimit,
   SvgInput,
   SvgProvider,
@@ -25,6 +25,13 @@ export type KenariConfig = {
   /** Looks up Rupiah-per-token prices; replaced in tests. */
   priceLookup?: PriceLookup;
 };
+
+const metadataSchema = z.object({
+  title: z.string().trim().min(1),
+  keywords: z.union([z.array(z.string()), z.string()]),
+  category: z.string().trim().default(""),
+  needs_release: z.boolean().optional().default(false),
+});
 
 const conceptsSchema = z.object({
   concepts: z.array(
@@ -86,8 +93,26 @@ export class KenariProvider implements SvgProvider {
     return { svg, model: this.model, costIdr, rateLimit };
   }
 
-  async generateMetadata(): Promise<AssetMetadata> {
-    throw new ProviderError("not_implemented", "Metadata AI baru tersedia di Tahap 3.");
+  async generateMetadata(input: MetadataInput) {
+    const { system, user } = metadataPrompt(input);
+    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 4000, temperature: 0.4 });
+
+    const parsed = metadataSchema.safeParse(extractJson(content));
+    if (!parsed.success) {
+      throw new ProviderError("bad_output", "Balasan model bukan metadata yang valid.");
+    }
+    const { title, keywords, category, needs_release } = parsed.data;
+    return {
+      metadata: {
+        title,
+        keywords: Array.isArray(keywords) ? keywords : keywords.split(","),
+        category,
+        needsRelease: needs_release,
+      },
+      model: this.model,
+      costIdr,
+      rateLimit,
+    };
   }
 
   private async chat(system: string, user: string, opts: { maxTokens: number; temperature: number }) {

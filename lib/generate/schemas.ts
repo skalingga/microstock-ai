@@ -28,3 +28,11 @@ export const svgRequestSchema = z.object({
 
 export type ConceptsRequest = z.infer<typeof conceptsRequestSchema>;
 export type SvgRequest = z.infer<typeof svgRequestSchema>;
+
+export const metadataRequestSchema = z.object({
+  theme,
+  style,
+  concept: z.string().trim().min(1, "Deskripsi konsep kosong.").max(500, "Deskripsi konsep terlalu panjang."),
+});
+
+export type MetadataRequest = z.infer<typeof metadataRequestSchema>;

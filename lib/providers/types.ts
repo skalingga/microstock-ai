@@ -29,8 +29,8 @@ export type SvgInput = {
   concept: Concept;
 };
 
-// Filled in at stage 3.
-export type MetadataInput = { theme: string; concept: string };
+export type MetadataInput = { theme: string; style: StyleId; concept: string };
+/** Raw model output. lib/metadata/postprocess.ts cleans it before it is stored. */
 export type AssetMetadata = { title: string; keywords: string[]; category: string; needsRelease: boolean };
 
 export interface SvgProvider {
@@ -41,5 +41,7 @@ export interface SvgProvider {
   generateSvg(
     input: SvgInput,
   ): Promise<{ svg: string; model: string; costUsd?: number; costIdr?: number; rateLimit?: RateLimit }>;
-  generateMetadata(input: MetadataInput): Promise<AssetMetadata>;
+  generateMetadata(
+    input: MetadataInput,
+  ): Promise<{ metadata: AssetMetadata; model: string; costIdr?: number; rateLimit?: RateLimit }>;
 }

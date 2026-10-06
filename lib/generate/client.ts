@@ -43,6 +43,14 @@ export function isFatal(code: ApiErrorCode): boolean {
 }
 
 export type ConceptsResponse = { concepts: Concept[]; model: string; provider: string; rateLimit?: RateLimit };
+export type MetadataResponse = {
+  metadata: { title: string; keywords: string[]; category: string; needsRelease: boolean };
+  /** What the server tidied or dropped, e.g. "2 keyword terlarang dibuang". */
+  notes: string[];
+  model: string;
+  provider: string;
+  rateLimit?: RateLimit;
+};
 export type SvgResponse = { svg: string; model: string; provider: string; rateLimit?: RateLimit };
 
 export async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {

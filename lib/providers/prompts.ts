@@ -1,5 +1,6 @@
+import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import type { StyleId } from "@/lib/settings/schema";
-import type { ConceptInput, SvgInput } from "./types";
+import type { ConceptInput, MetadataInput, SvgInput } from "./types";
 
 // Prompts to the AI are in English (CLAUDE.md).
 
@@ -88,6 +89,28 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       ...SAFETY_RULES.map((rule) => `- ${rule}`),
       "",
       "Output the complete SVG now.",
+    ].join("\n"),
+  };
+}
+
+export function metadataPrompt(input: MetadataInput): { system: string; user: string } {
+  return {
+    system:
+      "You write search metadata for Adobe Stock vector assets. " +
+      "You answer with a single JSON object and nothing else.",
+    user: [
+      `Theme: ${input.theme}`,
+      `Asset style: ${input.style}`,
+      `What the vector shows: ${input.concept}`,
+      "",
+      "Write the metadata a buyer would search for.",
+      `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters.`,
+      `- keywords: 25 to 35 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, colors, style words such as "flat vector" or "icon", and likely use cases. No brand, artist, character, or celebrity names.`,
+      `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
+      "- needs_release: true only if the picture shows a realistic person or a real private property, otherwise false.",
+      "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters.",
+      "",
+      'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","needs_release":false}',
     ].join("\n"),
   };
 }

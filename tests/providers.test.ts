@@ -125,6 +125,29 @@ describe("KenariProvider", () => {
     expect((await provider.generateSvg(svgInput)).costIdr).toBeUndefined();
   });
 
+  it("parses metadata JSON, accepting keywords as a comma separated string", async () => {
+    const json = JSON.stringify({ title: "Orange pumpkin", keywords: "pumpkin, autumn, harvest", category: "Graphic resources", needs_release: false });
+    const out = await kenari((async () => reply(`Here you go:
+${json}`)) as unknown as typeof fetch).generateMetadata({
+      theme: "autumn",
+      style: "icon_set",
+      concept: "A pumpkin.",
+    });
+    expect(out.metadata).toEqual({
+      title: "Orange pumpkin",
+      keywords: ["pumpkin", " autumn", " harvest"],
+      category: "Graphic resources",
+      needsRelease: false,
+    });
+  });
+
+  it("reports unusable metadata as bad_output", async () => {
+    const provider = kenari((async () => reply("{\"title\": \"\"}")) as unknown as typeof fetch);
+    await expect(provider.generateMetadata({ theme: "a", style: "icon_set", concept: "b" })).rejects.toMatchObject({
+      code: "bad_output",
+    });
+  });
+
   it("fails clearly without an api key", async () => {
     const provider = new KenariProvider("m", { apiKey: "", fetchImpl: vi.fn() as unknown as typeof fetch });
     await expect(provider.generateSvg(svgInput)).rejects.toMatchObject({ code: "auth" });

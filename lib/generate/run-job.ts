@@ -1,15 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database, Json } from "@/lib/database.types";
 import type { Concept } from "@/lib/providers/types";
+import { combine, type Verdict } from "@/lib/qc/evaluate";
+import { fetchHashPool, runVisualQc, saveVerdict } from "@/lib/qc/store";
+import type { HashPoolEntry, QcNote, QcStatus } from "@/lib/qc/types";
 import type { StyleId } from "@/lib/settings/schema";
 import { renderPreviewPng } from "@/lib/svg/preview";
 import { sanitizeSvg } from "@/lib/svg/sanitize";
 import { analyzeSvg } from "@/lib/svg/stats";
 import { describeConcept } from "./concept";
-import { ApiError, isFatal, postJson, type ConceptsResponse, type SvgResponse } from "./client";
+import {
+  ApiError,
+  isFatal,
+  postJson,
+  type ConceptsResponse,
+  type MetadataResponse,
+  type SvgResponse,
+} from "./client";
 import { RateGate, callWithRetry } from "./queue";
 
 // The whole job runs in the browser, one asset at a time (CLAUDE.md rule 2).
+// Per asset: SVG (1 AI call) -> sanitize -> visual QC -> metadata (1 AI call) -> final QC verdict.
 
 export type ItemStatus = "menunggu" | "berjalan" | "selesai" | "gagal";
 
@@ -20,6 +31,10 @@ export type JobItem = {
   error?: string;
   assetId?: string;
   previewUrl?: string; // local object URL, revoked by the page
+  /** Verdict once QC (and metadata) finished. "menunggu" = metadata still missing. */
+  qc?: QcStatus | "menunggu";
+  /** Shown under the thumbnail when something needs attention, e.g. metadata could not be made. */
+  note?: string;
 };
 
 export type JobPhase = "mulai" | "konsep" | "antrean" | "selesai" | "dihentikan" | "gagal";
@@ -39,6 +54,8 @@ export type RunJobParams = {
   style: StyleId;
   palette: string[];
   count: number;
+  /** From the user's settings: used to judge the generated metadata. */
+  bannedWords: string[];
   signal: AbortSignal;
   onState: (state: JobState) => void;
 };
@@ -90,6 +107,9 @@ export async function runJob(p: RunJobParams): Promise<void> {
     jobId = job.data.id;
     emit({ jobId });
 
+    // Hashes of everything already stored, so the similarity check also sees earlier batches.
+    const pool = await fetchHashPool(p.supabase);
+
     emit({
       phase: "antrean",
       message: undefined,
@@ -100,14 +120,12 @@ export async function runJob(p: RunJobParams): Promise<void> {
       if (p.signal.aborted) break;
       patchItem(item.index, { status: "berjalan" });
 
+      let made: Awaited<ReturnType<typeof makeAsset>>;
       try {
-        const made = await callWithRetry(
-          () => makeAsset(p, jobId!, item.concept, gate),
+        made = await callWithRetry(
+          () => makeAsset(p, jobId!, item.concept, gate, pool),
           retryOpts((message) => emit({ message })),
         );
-        created += 1;
-        emit({ message: undefined, providerNote: `${made.provider} · ${made.model}` });
-        patchItem(item.index, { status: "selesai", assetId: made.assetId, previewUrl: made.previewUrl });
       } catch (err) {
         if (p.signal.aborted) break;
         const apiErr = err instanceof ApiError ? err : new ApiError("internal", "Terjadi kesalahan tak terduga.");
@@ -115,6 +133,36 @@ export async function runJob(p: RunJobParams): Promise<void> {
         if (isFatal(apiErr.code)) {
           emit({ message: apiErr.message });
           break; // every later call would fail the same way
+        }
+        continue;
+      }
+
+      created += 1;
+      pool.push({ id: made.assetId, phash: made.phash });
+      emit({ message: undefined, providerNote: `${made.provider} · ${made.model}` });
+      patchItem(item.index, {
+        status: "selesai",
+        assetId: made.assetId,
+        previewUrl: made.previewUrl,
+        qc: made.verdict.status,
+      });
+
+      // An asset that already failed QC gets no metadata: it cannot be exported, so skip the cost.
+      if (made.verdict.status === "gagal") continue;
+
+      try {
+        const verdict = await callWithRetry(
+          () => makeMetadata(p, made, item.concept, gate),
+          retryOpts((message) => emit({ message })),
+        );
+        patchItem(item.index, { qc: verdict.status, note: undefined });
+      } catch (err) {
+        if (p.signal.aborted) break;
+        const apiErr = err instanceof ApiError ? err : new ApiError("internal", "Terjadi kesalahan tak terduga.");
+        patchItem(item.index, { note: `Metadata belum dibuat: ${apiErr.message}` });
+        if (isFatal(apiErr.code)) {
+          emit({ message: apiErr.message });
+          break;
         }
       }
     }
@@ -146,7 +194,24 @@ export async function runJob(p: RunJobParams): Promise<void> {
   }
 }
 
-async function makeAsset(p: RunJobParams, jobId: string, concept: Concept, gate: RateGate) {
+type MadeAsset = {
+  assetId: string;
+  provider: string;
+  model: string;
+  previewUrl: string;
+  phash: string;
+  /** Visual QC notes, kept so the final verdict can be recomputed once metadata exists. */
+  notes: QcNote[];
+  verdict: Verdict;
+};
+
+async function makeAsset(
+  p: RunJobParams,
+  jobId: string,
+  concept: Concept,
+  gate: RateGate,
+  pool: HashPoolEntry[],
+): Promise<MadeAsset> {
   const res = await postJson<SvgResponse>("/api/generate/svg", { theme: p.theme, style: p.style, concept }, p.signal);
   gate.update(res.rateLimit);
 
@@ -155,14 +220,19 @@ async function makeAsset(p: RunJobParams, jobId: string, concept: Concept, gate:
   if (!clean.ok) throw new ApiError("bad_svg", clean.reason);
 
   const stats = analyzeSvg(clean.svg);
+  const assetId = crypto.randomUUID();
+
   let png: Blob;
+  let qc: { notes: QcNote[]; phash: string };
   try {
     png = await renderPreviewPng(clean.svg);
+    qc = await runVisualQc({ svg: clean.svg, style: p.style, sanitizeNotes: clean.notes, pool, selfId: assetId });
   } catch {
     throw new ApiError("bad_svg", "SVG tidak bisa dirender.");
   }
+  // Without metadata the asset waits, unless a visual check already failed it.
+  const verdict = combine(qc.notes, null, p.bannedWords);
 
-  const assetId = crypto.randomUUID();
   const svgPath = `${p.userId}/svg/${assetId}.svg`;
   const previewPath = `${p.userId}/preview/${assetId}.png`;
   const storage = p.supabase.storage.from(BUCKET);
@@ -187,12 +257,43 @@ async function makeAsset(p: RunJobParams, jobId: string, concept: Concept, gate:
     preview_path: previewPath,
     path_count: stats.shapeCount, // all drawing shapes, not only <path>: that is what makes an SVG complex
     concept: describeConcept(concept),
-    qc_status: "menunggu",
+    qc_status: verdict.status,
+    qc_notes: verdict.notes as unknown as Json,
+    phash: qc.phash,
   });
   if (insert.error) {
     await storage.remove([svgPath, previewPath]);
     throw new ApiError("storage", "Gagal menyimpan data aset.");
   }
 
-  return { assetId, provider: res.provider, model: res.model, previewUrl: URL.createObjectURL(png) };
+  return {
+    assetId,
+    provider: res.provider,
+    model: res.model,
+    previewUrl: URL.createObjectURL(png),
+    phash: qc.phash,
+    notes: qc.notes,
+    verdict,
+  };
+}
+
+async function makeMetadata(p: RunJobParams, asset: MadeAsset, concept: Concept, gate: RateGate): Promise<Verdict> {
+  const res = await postJson<MetadataResponse>(
+    "/api/generate/metadata",
+    { theme: p.theme, style: p.style, concept: describeConcept(concept) },
+    p.signal,
+  );
+  gate.update(res.rateLimit);
+
+  const { title, keywords, category, needsRelease } = res.metadata;
+  const verdict = combine(asset.notes, { title, keywords, category, needsRelease }, p.bannedWords);
+
+  const update = await p.supabase
+    .from("assets")
+    .update({ title, keywords, category, needs_release: needsRelease })
+    .eq("id", asset.assetId);
+  if (update.error) throw new ApiError("storage", "Gagal menyimpan metadata.");
+
+  await saveVerdict(p.supabase, asset.assetId, verdict);
+  return verdict;
 }
