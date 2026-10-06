@@ -69,6 +69,7 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
 
 export function svgPrompt(input: SvgInput): { system: string; user: string } {
   const spec = STYLE_SPECS[input.style];
+  const example = SVG_EXAMPLES[input.style];
   const palette = input.concept.palette.length > 0 ? input.concept.palette.join(", ") : "harmonious flat colors";
 
   return {
@@ -81,7 +82,7 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       `Style: ${spec.brief}`,
       `Colors: use only these colors (plus white or near-black if needed): ${palette}`,
       "",
-      "Set consistency: flat solid fills and no outlines, the same level of detail as the reference below, so this asset sits well next to the rest of its set.",
+      "Set consistency: flat solid fills and no outlines, so this asset sits well next to the rest of its set.",
       "",
       "Technical rules:",
       `- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="${spec.viewBox}">.`,
@@ -92,9 +93,12 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       "- Organize the drawing into a few <g> groups with short descriptive id attributes (for example id=\"leaf\", id=\"body\"), so it is easy to edit as a layered vector.",
       ...SAFETY_RULES.map((rule) => `- ${rule}`),
       "",
-      "",
-      "Reference for quality and structure only (grouped shapes with ids, flat fills, clean geometry). Do NOT copy its subject; draw the concept above:",
-      SVG_EXAMPLES[input.style],
+      ...(example
+        ? ["", "Reference for structure only (how shapes crossing an edge are repeated on the opposite edge). Do NOT copy its subject; draw the concept above:", example]
+        : []),
+      ...(input.feedback
+        ? ["", `Your previous attempt was rejected by the quality check: ${input.feedback} Fix this in the new version.`]
+        : []),
       "",
       "Output the complete SVG now.",
     ].join("\n"),

@@ -27,6 +27,8 @@ export type SvgInput = {
   theme: string;
   style: StyleId;
   concept: Concept;
+  /** Set on the single automatic retry: what was wrong with the previous attempt. */
+  feedback?: string;
 };
 
 export type MetadataInput = { theme: string; style: StyleId; concept: string };

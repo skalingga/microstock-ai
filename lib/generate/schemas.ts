@@ -24,6 +24,7 @@ export const svgRequestSchema = z.object({
     composition: z.string().trim().min(1).max(300),
     palette: z.array(hex).max(5),
   }),
+  feedback: z.string().trim().max(600).optional(),
 });
 
 export type ConceptsRequest = z.infer<typeof conceptsRequestSchema>;

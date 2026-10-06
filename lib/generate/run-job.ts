@@ -18,6 +18,7 @@ import {
   type SvgResponse,
 } from "./client";
 import { RateGate, callWithRetry } from "./queue";
+import { retryFeedback } from "./retry";
 
 // The whole job runs in the browser, one asset at a time (CLAUDE.md rule 2).
 // Per asset: SVG (1 AI call) -> sanitize -> visual QC -> metadata (1 AI call) -> final QC verdict.
@@ -212,26 +213,20 @@ async function makeAsset(
   gate: RateGate,
   pool: HashPoolEntry[],
 ): Promise<MadeAsset> {
-  const res = await postJson<SvgResponse>("/api/generate/svg", { theme: p.theme, style: p.style, concept }, p.signal);
-  gate.update(res.rateLimit);
-
-  // Never trust the model output: sanitize before it is rendered, stored, or shown.
-  const clean = sanitizeSvg(res.svg);
-  if (!clean.ok) throw new ApiError("bad_svg", clean.reason);
-
-  const stats = analyzeSvg(clean.svg);
   const assetId = crypto.randomUUID();
 
-  let png: Blob;
-  let qc: { notes: QcNote[]; phash: string };
-  try {
-    png = await renderPreviewPng(clean.svg);
-    qc = await runVisualQc({ svg: clean.svg, style: p.style, sanitizeNotes: clean.notes, pool, selfId: assetId });
-  } catch {
-    throw new ApiError("bad_svg", "SVG tidak bisa dirender.");
+  let draft = await draftSvg(p, concept, gate, pool, assetId);
+
+  // One automatic retry when QC failed on something a new drawing can fix. A failed retry keeps the first draft.
+  const feedback = draft.verdict.status === "gagal" ? retryFeedback(draft.qc.notes) : null;
+  if (feedback) {
+    try {
+      draft = await draftSvg(p, concept, gate, pool, assetId, feedback);
+    } catch (err) {
+      if (p.signal.aborted) throw err;
+    }
   }
-  // Without metadata the asset waits, unless a visual check already failed it.
-  const verdict = combine(qc.notes, null, p.bannedWords);
+  const { res, clean, stats, png, qc, verdict } = draft;
 
   const svgPath = `${p.userId}/svg/${assetId}.svg`;
   const previewPath = `${p.userId}/preview/${assetId}.png`;
@@ -275,6 +270,50 @@ async function makeAsset(
     notes: qc.notes,
     verdict,
   };
+}
+
+type Draft = {
+  res: SvgResponse;
+  clean: { svg: string };
+  stats: ReturnType<typeof analyzeSvg>;
+  png: Blob;
+  qc: { notes: QcNote[]; phash: string };
+  verdict: Verdict;
+};
+
+/** One AI call for the SVG, then sanitize, render, and the visual QC. Nothing is stored yet. */
+async function draftSvg(
+  p: RunJobParams,
+  concept: Concept,
+  gate: RateGate,
+  pool: HashPoolEntry[],
+  assetId: string,
+  feedback?: string,
+): Promise<Draft> {
+  const res = await postJson<SvgResponse>(
+    "/api/generate/svg",
+    { theme: p.theme, style: p.style, concept, ...(feedback ? { feedback } : {}) },
+    p.signal,
+  );
+  gate.update(res.rateLimit);
+
+  // Never trust the model output: sanitize before it is rendered, stored, or shown.
+  const clean = sanitizeSvg(res.svg);
+  if (!clean.ok) throw new ApiError("bad_svg", clean.reason);
+
+  const stats = analyzeSvg(clean.svg);
+
+  let png: Blob;
+  let qc: { notes: QcNote[]; phash: string };
+  try {
+    png = await renderPreviewPng(clean.svg);
+    qc = await runVisualQc({ svg: clean.svg, style: p.style, sanitizeNotes: clean.notes, pool, selfId: assetId });
+  } catch {
+    throw new ApiError("bad_svg", "SVG tidak bisa dirender.");
+  }
+  // Without metadata the asset waits, unless a visual check already failed it.
+  const verdict = combine(qc.notes, null, p.bannedWords);
+  return { res, clean, stats, png, qc, verdict };
 }
 
 async function makeMetadata(p: RunJobParams, asset: MadeAsset, concept: Concept, gate: RateGate): Promise<Verdict> {
