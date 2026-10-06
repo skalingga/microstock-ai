@@ -1,0 +1,123 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import JSZip from "jszip";
+import { categoryNumber } from "@/lib/adobe/rules";
+import type { Database } from "@/lib/database.types";
+import { applyArtboard } from "./artboard";
+import { buildAdobeCsv, csvProblems, type CsvRow } from "./csv";
+import { makeFilename } from "./slug";
+
+type Client = SupabaseClient<Database>;
+
+export type ExportAsset = {
+  id: string;
+  title: string;
+  keywords: string[];
+  category: string | null;
+  svg_path: string;
+};
+
+export type ExportResult = {
+  zip: Blob;
+  csv: string;
+  included: { id: string; filename: string }[];
+  skipped: { id: string; title: string; reason: string }[];
+  problems: string[];
+};
+
+/**
+ * Browser only. Downloads each SVG, gives it Adobe's artboard size, and packs the files into a ZIP plus the
+ * upload CSV. Assets that cannot be exported are skipped with a reason instead of failing the whole batch.
+ */
+export async function buildExport(
+  supabase: Client,
+  assets: ExportAsset[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<ExportResult> {
+  const zip = new JSZip();
+  const used = new Set<string>();
+  const rows: CsvRow[] = [];
+  const included: ExportResult["included"] = [];
+  const skipped: ExportResult["skipped"] = [];
+
+  for (const [i, asset] of assets.entries()) {
+    onProgress?.(i, assets.length);
+
+    const file = await supabase.storage.from("assets").download(asset.svg_path);
+    if (file.error || !file.data) {
+      skipped.push({ id: asset.id, title: asset.title, reason: "File SVG tidak bisa diunduh dari penyimpanan." });
+      continue;
+    }
+
+    const prepared = applyArtboard(await file.data.text());
+    if (!prepared) {
+      skipped.push({ id: asset.id, title: asset.title, reason: "SVG tidak punya viewBox yang valid." });
+      continue;
+    }
+    if (!prepared.artboard.ok) {
+      skipped.push({ id: asset.id, title: asset.title, reason: prepared.artboard.reason ?? "Ukuran artboard tidak memenuhi syarat." });
+      continue;
+    }
+
+    const filename = makeFilename(asset.title, asset.id, used);
+    zip.file(filename, prepared.svg);
+    included.push({ id: asset.id, filename });
+    rows.push({ filename, title: asset.title, keywords: asset.keywords, categoryNumber: categoryNumber(asset.category) });
+  }
+  onProgress?.(assets.length, assets.length);
+
+  const csv = buildAdobeCsv(rows);
+  return {
+    zip: await zip.generateAsync({ type: "blob", compression: "DEFLATE" }),
+    csv,
+    included,
+    skipped,
+    problems: csvProblems(csv, rows.length),
+  };
+}
+
+/** Local time as YYYY-MM-DD_HHmm, for file names without spaces (Adobe asks for that). */
+export function exportStamp(date: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}_${p(date.getHours())}${p(date.getMinutes())}`;
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Keeps the files for the export history and marks the assets as exported. */
+export async function saveExport(supabase: Client, userId: string, result: ExportResult): Promise<boolean> {
+  const exportId = crypto.randomUUID();
+  const zipPath = `${userId}/exports/${exportId}.zip`;
+  const csvPath = `${userId}/exports/${exportId}.csv`;
+  const storage = supabase.storage.from("assets");
+
+  const zipUpload = await storage.upload(zipPath, result.zip, { contentType: "application/zip" });
+  if (zipUpload.error) return false;
+  const csvUpload = await storage.upload(csvPath, new Blob([result.csv], { type: "text/csv" }), { contentType: "text/csv" });
+  if (csvUpload.error) {
+    await storage.remove([zipPath]);
+    return false;
+  }
+
+  const insert = await supabase
+    .from("exports")
+    .insert({ id: exportId, zip_path: zipPath, csv_path: csvPath, asset_count: result.included.length });
+  if (insert.error) {
+    await storage.remove([zipPath, csvPath]);
+    return false;
+  }
+
+  await supabase
+    .from("assets")
+    .update({ exported_at: new Date().toISOString() })
+    .in("id", result.included.map((i) => i.id));
+  return true;
+}
