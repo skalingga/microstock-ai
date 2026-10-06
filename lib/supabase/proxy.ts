@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
-// Refreshes the Supabase session cookie and gates every page except /login.
+// Refreshes the Supabase session cookie and gates every page except /login and the reset callback.
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -31,6 +31,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname === "/login";
+  // The reset email link arrives here before the user has a session.
+  const isPublic = isLoginPage || request.nextUrl.pathname === "/auth/callback";
 
   if (!user && request.nextUrl.pathname.startsWith("/api/")) {
     // Fetch calls need a machine-readable answer, not a redirect to the login page.
@@ -40,7 +42,7 @@ export async function updateSession(request: NextRequest) {
     );
   }
 
-  if (!user && !isLoginPage) {
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";

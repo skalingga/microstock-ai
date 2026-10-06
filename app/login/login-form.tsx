@@ -4,21 +4,33 @@ import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { daftar, masuk, type AuthState } from "./actions";
+import { PasswordInput } from "@/components/password-input";
+import { daftar, lupaPassword, masuk, type AuthState } from "./actions";
 
 const initialState: AuthState = {};
 
-export function LoginForm() {
-  const [mode, setMode] = useState<"masuk" | "daftar">("masuk");
+type Mode = "masuk" | "daftar" | "lupa";
+
+export function LoginForm({ notice }: { notice?: string }) {
+  const [mode, setMode] = useState<Mode>("masuk");
   const [masukState, masukAction, masukPending] = useActionState(masuk, initialState);
   const [daftarState, daftarAction, daftarPending] = useActionState(daftar, initialState);
+  const [lupaState, lupaAction, lupaPending] = useActionState(lupaPassword, initialState);
 
   const isMasuk = mode === "masuk";
-  const state = isMasuk ? masukState : daftarState;
-  const pending = isMasuk ? masukPending : daftarPending;
+  const isLupa = mode === "lupa";
+  const state = isLupa ? lupaState : isMasuk ? masukState : daftarState;
+  const pending = isLupa ? lupaPending : isMasuk ? masukPending : daftarPending;
+  const action = isLupa ? lupaAction : isMasuk ? masukAction : daftarAction;
 
   return (
-    <form action={isMasuk ? masukAction : daftarAction} className="space-y-4">
+    // The key remounts the form per mode so each mode starts with its own fields.
+    <form key={mode} action={action} className="space-y-4">
+      {notice && mode === "masuk" && !state.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {notice}
+        </p>
+      )}
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -30,20 +42,34 @@ export function LoginForm() {
           required
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete={isMasuk ? "current-password" : "new-password"}
-          minLength={8}
-          required
-        />
-        {!isMasuk && (
-          <p className="text-xs text-muted-foreground">Minimal 8 karakter.</p>
-        )}
-      </div>
+      {isLupa ? (
+        <p className="text-xs text-muted-foreground">
+          Kami kirim tautan untuk membuat password baru. Buka tautannya di browser yang sama dengan yang kamu pakai sekarang.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            {isMasuk && (
+              <button
+                type="button"
+                onClick={() => setMode("lupa")}
+                className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Lupa password?
+              </button>
+            )}
+          </div>
+          <PasswordInput
+            id="password"
+            name="password"
+            autoComplete={isMasuk ? "current-password" : "new-password"}
+            minLength={8}
+            required
+          />
+          {!isMasuk && <p className="text-xs text-muted-foreground">Minimal 8 karakter.</p>}
+        </div>
+      )}
 
       {state.error && (
         <p role="alert" className="text-sm text-destructive">
@@ -53,18 +79,30 @@ export function LoginForm() {
       {state.info && <p className="text-sm text-muted-foreground">{state.info}</p>}
 
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Memproses..." : isMasuk ? "Masuk" : "Buat akun"}
+        {pending ? "Memproses..." : isLupa ? "Kirim tautan" : isMasuk ? "Masuk" : "Buat akun"}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
-        {isMasuk ? "Belum punya akun?" : "Sudah punya akun?"}{" "}
-        <button
-          type="button"
-          onClick={() => setMode(isMasuk ? "daftar" : "masuk")}
-          className="font-medium text-foreground underline underline-offset-4"
-        >
-          {isMasuk ? "Daftar" : "Masuk"}
-        </button>
+        {isLupa ? (
+          <button
+            type="button"
+            onClick={() => setMode("masuk")}
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Kembali ke halaman masuk
+          </button>
+        ) : (
+          <>
+            {isMasuk ? "Belum punya akun?" : "Sudah punya akun?"}{" "}
+            <button
+              type="button"
+              onClick={() => setMode(isMasuk ? "daftar" : "masuk")}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              {isMasuk ? "Daftar" : "Masuk"}
+            </button>
+          </>
+        )}
       </p>
     </form>
   );
