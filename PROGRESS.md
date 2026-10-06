@@ -13,15 +13,15 @@ Tahap 1, 2, dan 3 selesai dan terverifikasi (12 aset sudah dikirim ke Adobe Stoc
 - [2026-10-07] Login: tombol intip password, lupa password (email -> /auth/callback -> /reset-password). Perlu Redirect URLs di Supabase, lihat catatan
 
 ## Sedang dikerjakan
-- Tahap 8 (riset tema) sudah dikode di branch `dev`; migrasi sudah diterapkan ke Supabase (2026-10-07). Uji di preview: alur jalan, tapi Google Trends tidak tersedia dari Vercel (semua permintaan berlabel perkiraan). Perbaikan setelah uji: peluang diturunkan bila batas upload sudah lewat, judul tema tanpa kata gaya. Belum dicentang di `CLAUDE.md`. File: `lib/research/*` (kalender, skor, Trends), `app/api/research/{themes,trends}`, `app/(app)/riset/*`.
+- Tahap 8 (riset tema) sudah dikode di branch `dev`; migrasi sudah diterapkan ke Supabase (2026-10-07). Uji di preview: alur jalan; Google Trends sempat gagal sekali lalu berhasil di percobaan berikutnya (tidak diblokir permanen), jadi dipertahankan dengan retry sekali. Perbaikan setelah uji: peluang diturunkan bila batas upload sudah lewat, judul tema tanpa kata gaya. Tahap 8 dicentang di `CLAUDE.md` setelah pengguna menguji di preview. File: `lib/research/*` (kalender, skor, Trends), `app/api/research/{themes,trends}`, `app/(app)/riset/*`.
 
 ## Langkah berikutnya
-1. Verifikasi ulang `/riset` di preview `dev` (badge batas upload, judul tema), putuskan soal Google Trends (lihat catatan), lalu centang Tahap 8 di `CLAUDE.md`.
+1. Merge `dev` ke `main` bila siap rilis ke produksi (migrasi Tahap 8 sudah ada di database).
 2. Tunggu hasil review Adobe untuk 12 file; catat diterima/ditolak dan alasannya (data untuk Tahap 6).
 3. Tahap berikutnya: 5 (Gemini cadangan) atau 6 (uji unggah Adobe dan penyetelan ambang QC).
 
 ## Catatan penting
-- Tahap 8: permintaan memakai Google Trends tidak resmi (`google-trends-api`, dibandingkan dengan kata jangkar "wallpaper", cache 6 jam di memori). Bisa diblokir kapan saja; bila gagal skor jatuh ke perkiraan AI + bobot event. Persaingan: input manual jumlah hasil Adobe per tema. Pengambilan otomatis dari Adobe BELUM dibuat: ketentuan dan robots.txt Adobe belum bisa dicek dari sandbox, jadi perlu dicek dulu. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) di `lib/research/calendar.ts` hanya perkiraan sampai 2029; cek lagi.
+- Tahap 8: permintaan memakai Google Trends tidak resmi (`google-trends-api`, dibandingkan dengan kata jangkar "wallpaper", cache 6 jam di memori). Bisa gagal sesekali atau diblokir kapan saja; bila gagal skor jatuh ke perkiraan AI + bobot event. Persaingan: input manual jumlah hasil Adobe per tema. Pengambilan otomatis dari Adobe BELUM dibuat: ketentuan dan robots.txt Adobe belum bisa dicek dari sandbox, jadi perlu dicek dulu. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) di `lib/research/calendar.ts` hanya perkiraan sampai 2029; cek lagi.
 - QC pola belum menangkap motif tunggal besar (mis. wreath di tengah tile) atau pola yang terlalu sederhana (pita bergelombang); keduanya Lolos tapi meragukan untuk Adobe. Bahan penyetelan ambang di Tahap 6. Alasan persis Gagal (`qc_notes`) belum dicek di database.
 - Lupa password butuh pengaturan Supabase (Authentication, URL Configuration, Redirect URLs): `https://microstock-ai-ruddy.vercel.app/auth/callback` dan `http://localhost:3000/auth/callback`. Tautan harus dibuka di browser yang sama dengan yang meminta reset (PKCE). Email bawaan Supabase dibatasi per jam.
 - Aturan Adobe: maksimal 3 iterasi aset AI serupa per tema. Jangan terus membuat tema yang sama (pemeriksa kemiripan sudah menandainya).

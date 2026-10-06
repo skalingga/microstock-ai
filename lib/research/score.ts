@@ -48,10 +48,10 @@ export function daysUntil(isoDate: string, now: number = Date.now()): number {
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
-/** Maps an Adobe result count to 0-100 on a log scale: 1k results = 0, 1M+ = 100. */
+/** Maps an Adobe result count to 0-100 on a log scale: 1k results = 0, 10M+ = 100 (broad words reach millions). */
 export function competitionFromCount(count: number): number {
   if (count <= 1_000) return 0;
-  return clamp(((Math.log10(count) - 3) / 3) * 100);
+  return clamp(((Math.log10(count) - 3) / 4) * 100);
 }
 
 /**

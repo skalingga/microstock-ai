@@ -133,20 +133,29 @@ export function RisetForm({
       for (let i = 0; i < list.length; i += TRENDS_BATCH) {
         setStatus(`Mengambil tren pencarian (${Math.min(i + TRENDS_BATCH, list.length)}/${list.length})...`);
         const batch = list.slice(i, i + TRENDS_BATCH);
-        try {
-          const res = await postJson<TrendsResponse>("/api/research/trends", {
-            region,
-            terms: batch.map((t) => t.keywords[0] ?? t.title),
-          });
-          if (res.unavailable) missing = true;
+        const terms = batch.map((t) => t.keywords[0] ?? t.title);
+        // Google Trends fails now and then; one retry after a pause recovers most of those.
+        let res: TrendsResponse | null = null;
+        for (let attempt = 0; attempt < 2 && !res; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 2500));
+          try {
+            const r = await postJson<TrendsResponse>("/api/research/trends", { region, terms });
+            if (!r.unavailable && Object.keys(r.scores).length > 0) res = r;
+          } catch {
+            // try again, then fall back to the AI estimate
+          }
+        }
+        if (!res) {
+          missing = true;
+        } else {
+          const scores = res.scores;
           list = list.map((row) => {
             const term = row.keywords[0] ?? row.title;
-            return term in res.scores ? { ...row, trendScore: res.scores[term] } : row;
+            return term in scores ? { ...row, trendScore: scores[term] } : row;
           });
           setRows(list);
-        } catch {
-          missing = true;
         }
+        await new Promise((r) => setTimeout(r, 800)); // gentle pacing between batches
       }
       if (list.every((r) => r.trendScore === null)) missing = true;
       setTrendsMissing(missing);

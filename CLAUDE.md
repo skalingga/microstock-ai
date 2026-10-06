@@ -78,7 +78,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 
 ## Halaman
 
-`/login`, `/riset` (placeholder sampai Tahap 8), `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
+`/login`, `/riset`, `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
 
 ## Roadmap (kerjakan berurutan, satu tahap per sesi)
 
@@ -90,7 +90,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [ ] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
 - [ ] 7. Recraft: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan
-- [ ] 8. Riset tema: kalender event, Google Trends, skor peluang
+- [x] 8. Riset tema: kalender event, Google Trends, skor peluang
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 
 Centang tahap setelah selesai dan diverifikasi pengguna.

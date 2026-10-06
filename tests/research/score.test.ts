@@ -4,8 +4,9 @@ import { competitionFromCount, daysUntil, deadlineStatus, demandFromRatio, score
 describe("competitionFromCount", () => {
   it("is 0 for small niches and 100 for huge ones", () => {
     expect(competitionFromCount(500)).toBe(0);
-    expect(competitionFromCount(1_000_000)).toBe(100);
+    expect(competitionFromCount(10_000_000)).toBe(100);
     expect(competitionFromCount(30_000_000)).toBe(100);
+    expect(competitionFromCount(1_000_000)).toBeLessThan(competitionFromCount(8_000_000));
   });
   it("grows with the count", () => {
     expect(competitionFromCount(10_000)).toBeLessThan(competitionFromCount(100_000));
