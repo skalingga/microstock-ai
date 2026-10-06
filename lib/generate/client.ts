@@ -84,3 +84,16 @@ export async function postJson<T>(url: string, body: unknown, signal?: AbortSign
   if (res.status === 504) throw new ApiError("timeout", "Server terlalu lama menjawab.");
   throw new ApiError("upstream", `Server mengembalikan error ${res.status}.`);
 }
+
+export type ResearchThemeResult = {
+  title: string;
+  event: string;
+  eventDate: string | null;
+  uploadBy: string | null;
+  eventWeight: 1 | 2 | 3;
+  keywords: string[];
+  demandGuess: number;
+  competitionGuess: number;
+};
+export type ThemesResponse = { themes: ResearchThemeResult[]; model: string; provider: string };
+export type TrendsResponse = { scores: Record<string, number>; unavailable?: boolean };

@@ -35,6 +35,27 @@ export type MetadataInput = { theme: string; style: StyleId; concept: string };
 /** Raw model output. lib/metadata/postprocess.ts cleans it before it is stored. */
 export type AssetMetadata = { title: string; keywords: string[]; category: string; needsRelease: boolean };
 
+export type ThemeEventInput = { name: string; date: string; weight: number };
+
+export type ThemesInput = {
+  /** Human-readable market, e.g. "Indonesia". */
+  region: string;
+  events: ThemeEventInput[];
+  /** Optional focus, e.g. "icons" or "food". */
+  category?: string;
+  count: number;
+};
+
+export type ThemeIdea = {
+  title: string;
+  /** Name of one of the supplied events, or "" for an evergreen theme. */
+  event: string;
+  keywords: string[];
+  /** The model's rough guess, 0-100. Real data (Trends, Adobe counts) replaces it when available. */
+  demandGuess: number;
+  competitionGuess: number;
+};
+
 export interface SvgProvider {
   id: ProviderId;
   generateConcepts(
@@ -46,4 +67,7 @@ export interface SvgProvider {
   generateMetadata(
     input: MetadataInput,
   ): Promise<{ metadata: AssetMetadata; model: string; costIdr?: number; rateLimit?: RateLimit }>;
+  generateThemes(
+    input: ThemesInput,
+  ): Promise<{ themes: ThemeIdea[]; model: string; costIdr?: number; rateLimit?: RateLimit }>;
 }

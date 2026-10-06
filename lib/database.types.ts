@@ -228,6 +228,8 @@ export type Database = {
           run_id: string | null
           seed_keywords: string[]
           title: string
+          trend_score: number | null
+          adobe_result_count: number | null
           upload_by: string | null
           user_id: string
         }
@@ -242,6 +244,8 @@ export type Database = {
           run_id?: string | null
           seed_keywords?: string[]
           title: string
+          trend_score?: number | null
+          adobe_result_count?: number | null
           upload_by?: string | null
           user_id?: string
         }
@@ -256,6 +260,8 @@ export type Database = {
           run_id?: string | null
           seed_keywords?: string[]
           title?: string
+          trend_score?: number | null
+          adobe_result_count?: number | null
           upload_by?: string | null
           user_id?: string
         }

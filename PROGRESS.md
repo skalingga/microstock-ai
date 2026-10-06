@@ -13,13 +13,15 @@ Tahap 1, 2, dan 3 selesai dan terverifikasi (12 aset sudah dikirim ke Adobe Stoc
 - [2026-10-07] Login: tombol intip password, lupa password (email -> /auth/callback -> /reset-password). Perlu Redirect URLs di Supabase, lihat catatan
 
 ## Sedang dikerjakan
-- Tidak ada.
+- Tahap 8 (riset tema) sudah dikode di branch `dev`, belum diverifikasi pengguna. Migrasi `20261008000000_research_themes.sql` HARUS diterapkan ke Supabase sebelum `/riset` dipakai. File: `lib/research/*` (kalender, skor, Trends), `app/api/research/{themes,trends}`, `app/(app)/riset/*`.
 
 ## Langkah berikutnya
-1. Tunggu hasil review Adobe untuk 12 file; catat diterima/ditolak dan alasannya (data untuk Tahap 6).
-2. Pilih tahap berikutnya: 5 (Gemini cadangan), 6 (uji unggah Adobe dan penyetelan ambang QC), atau 8 (riset tema, bernilai paling besar untuk pendapatan).
+1. Terapkan migrasi Tahap 8 ke Supabase, deploy preview dari `dev`, jalankan satu riset di `/riset`, lalu kabari hasilnya. Centang Tahap 8 di `CLAUDE.md` setelah diverifikasi.
+2. Tunggu hasil review Adobe untuk 12 file; catat diterima/ditolak dan alasannya (data untuk Tahap 6).
+3. Tahap berikutnya: 5 (Gemini cadangan) atau 6 (uji unggah Adobe dan penyetelan ambang QC).
 
 ## Catatan penting
+- Tahap 8: permintaan memakai Google Trends tidak resmi (`google-trends-api`, dibandingkan dengan kata jangkar "wallpaper", cache 6 jam di memori). Bisa diblokir kapan saja; bila gagal skor jatuh ke perkiraan AI + bobot event. Persaingan: input manual jumlah hasil Adobe per tema. Pengambilan otomatis dari Adobe BELUM dibuat: ketentuan dan robots.txt Adobe belum bisa dicek dari sandbox, jadi perlu dicek dulu. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) di `lib/research/calendar.ts` hanya perkiraan sampai 2029; cek lagi.
 - QC pola belum menangkap motif tunggal besar (mis. wreath di tengah tile) atau pola yang terlalu sederhana (pita bergelombang); keduanya Lolos tapi meragukan untuk Adobe. Bahan penyetelan ambang di Tahap 6. Alasan persis Gagal (`qc_notes`) belum dicek di database.
 - Lupa password butuh pengaturan Supabase (Authentication, URL Configuration, Redirect URLs): `https://microstock-ai-ruddy.vercel.app/auth/callback` dan `http://localhost:3000/auth/callback`. Tautan harus dibuka di browser yang sama dengan yang meminta reset (PKCE). Email bawaan Supabase dibatasi per jam.
 - Aturan Adobe: maksimal 3 iterasi aset AI serupa per tema. Jangan terus membuat tema yang sama (pemeriksa kemiripan sudah menandainya).
