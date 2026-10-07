@@ -1,9 +1,10 @@
 # Progress
 
 ## Status terakhir
-Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, gaya Siluet dan Line art) sudah di `main` setelah diuji pengguna di aplikasi. Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
+Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model utama Gemini 3.5 Flash-Lite, cadangan Kenari deepseek-v4-flash (disetujui pengguna). Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
 
 ## Sudah selesai
+- [2026-10-07] Tahap 4 (di `main`): halaman `/uji-model` (`lib/generate/benchmark.ts`, migrasi `20261011000000_model_benchmarks.sql`), uji 5 tema × 8 model; pilihan: Gemini 3.5 Flash-Lite utama, deepseek-v4-flash cadangan (hasil di Catatan)
 - [2026-10-06] Tahap 1: fondasi (Next.js, Supabase Auth, skema + RLS, deploy Vercel)
 - [2026-10-06] Tahap 2: generate + galeri dengan Kenari, antrean di browser, biaya dan batas bulanan Kenari
 - [2026-10-06] Tahap 3: QC otomatis, metadata AI, ekspor ZIP + CSV Adobe, checklist upload; metadata tidak lagi menyebut clipart sebagai "icon"
@@ -17,14 +18,12 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 - [2026-10-07] Tahap 5 (di `main`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
 
 ## Sedang dikerjakan
-- Tahap 4 (uji banding model): halaman `/uji-model` jadi (`lib/generate/benchmark.ts`, `app/(app)/uji-model/`, migrasi `20261011000000_model_benchmarks.sql` sudah diterapkan) dan uji penuh sudah jalan di lokal (lihat Catatan). Menunggu pengguna: setujui pilihan model, lalu Tahap 4 dicentang dan di-merge ke `main`.
-- Perbandingan kualitas Gemini vs Kenari lewat dropdown `/generate` belum dilakukan pengguna.
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-1. Bandingkan model, termasuk Gemini (grup "Gemini (free tier)" di dropdown): buat batch kecil (5 aset) dengan tema, gaya, dan palet sama memakai model berbeda lewat dropdown di `/generate`, bandingkan di galeri dan biaya. Satu-satunya model yang sudah teruji: `deepseek-v4-flash`.
-2. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
-3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
+1. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
+2. Tahap 6: unggah batch 50-100 aset (boleh termasuk Siluet/Line art dan aset uji model yang bagus setelah dibuatkan metadata), catat keputusan Adobe, lalu setel ambang QC (terutama pemeriksa kemiripan).
+3. Opsional: ulangi `/uji-model` sesekali, karena daftar dan kecepatan model gratis Kenari berubah.
 
 ## Catatan penting
 - Hasil uji Tahap 4 (7 Okt 2026 22.10-22.35 WIB, akun adminproject, 5 tema satu per gaya teks × 8 model, satu percobaan, timeout 55 dtk). Skor = (Lolos + ½ Perlu cek) ÷ 5:

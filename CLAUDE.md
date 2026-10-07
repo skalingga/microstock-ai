@@ -87,7 +87,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
 - [x] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
 - [x] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
-- [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
+- [x] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [x] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
 - [x] 7. Gambar Kenari + konversi SVG: gaya Siluet dan Line art, adapter `gpt-image-2`, konversi di server, harga per gambar (Recraft jadi opsional)
