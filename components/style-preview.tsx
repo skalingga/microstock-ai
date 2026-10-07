@@ -1,0 +1,124 @@
+"use client";
+
+import { useId } from "react";
+import { STYLES, type StyleId } from "@/lib/settings/schema";
+
+// Hand-drawn examples of each style for the Generate page, so the style picker is not text only.
+// They show the shape of the output, not a real AI result.
+
+const DEFAULT_COLORS = ["#D35400", "#F39C12", "#7E5109", "#27AE60", "#FDF2E0"];
+
+const DESCRIPTIONS: Record<StyleId, string> = {
+  icon_set:
+    "Satu objek di tengah, latar transparan (kotak-kotak = transparan). Cocok untuk clipart, presentasi, dan stiker.",
+  seamless_pattern:
+    "Satu ubin yang bisa disambung terus tanpa terlihat batasnya (garis putus = satu ubin). Cocok untuk kertas kado, kain, dan wallpaper.",
+  flat_illustration:
+    "Satu adegan sederhana dengan latar, mendatar 4:3. Tanpa orang realistis. Cocok untuk artikel, poster, dan media sosial.",
+  badge_label:
+    "Bentuk lencana, pita, perisai, atau stempel tanpa huruf dan angka; pembeli menambah tulisannya sendiri. Cocok untuk label kemasan dan promo.",
+  abstract_background:
+    "Bentuk geometris penuh sampai tepi dengan ruang kosong untuk teks, mendatar 3:2. Cocok untuk slide, banner, dan poster.",
+};
+
+function lightness(hex: string): number {
+  const full = hex.length === 4 ? hex.replace(/^#(.)(.)(.)$/, "#$1$1$2$2$3$3") : hex;
+  const n = parseInt(full.slice(1), 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+}
+
+/** Five colors from the chosen palette (padded with the default autumn colors); the lightest goes last, as background. */
+function pickColors(palette: string[]): string[] {
+  const colors = palette.slice(0, 5);
+  for (const c of DEFAULT_COLORS) {
+    if (colors.length >= 5) break;
+    if (!colors.includes(c)) colors.push(c);
+  }
+  const lightest = colors.reduce((best, c) => (lightness(c) > lightness(best) ? c : best));
+  return [...colors.filter((c) => c !== lightest), lightest];
+}
+
+export function StylePreview({ style, palette }: { style: StyleId; palette: string[] }) {
+  const patternId = useId();
+  const [a, b, c, d, bg] = pickColors(palette);
+  const transparent = style === "icon_set" || style === "badge_label";
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center">
+      <div className={`w-full max-w-48 shrink-0 overflow-hidden rounded-md border ${transparent ? "bg-checker" : ""}`}>
+        <svg viewBox={VIEWBOX[style]} className="block h-auto w-full" role="img" aria-label={`Contoh gaya ${STYLES.find((s) => s.value === style)?.label ?? style}`}>
+          {style === "icon_set" && (
+            <>
+              <ellipse cx="256" cy="300" rx="150" ry="125" fill={a} />
+              <ellipse cx="256" cy="300" rx="60" ry="125" fill={b} />
+              <path d="M246 180 Q250 130 280 110 L292 124 Q270 140 268 180Z" fill={c} />
+              <path d="M272 140 Q330 100 360 140 Q320 160 272 140Z" fill={d} />
+            </>
+          )}
+          {style === "seamless_pattern" && (
+            <>
+              <defs>
+                <pattern id={patternId} width="128" height="128" patternUnits="userSpaceOnUse">
+                  <rect width="128" height="128" fill={bg} />
+                  <path d="M30 70 Q30 30 70 25 Q72 65 30 70Z" fill={a} />
+                  <path d="M90 120 Q92 90 120 86 Q118 116 90 120Z" fill={b} />
+                  <circle cx="100" cy="35" r="7" fill={c} />
+                  <circle cx="20" cy="112" r="5" fill={d} />
+                </pattern>
+              </defs>
+              <rect width="512" height="512" fill={`url(#${patternId})`} />
+              <rect x="1" y="1" width="255" height="255" fill="none" stroke={c} strokeDasharray="8 8" strokeWidth="3" />
+            </>
+          )}
+          {style === "flat_illustration" && (
+            <>
+              <rect width="800" height="600" fill={bg} />
+              <circle cx="620" cy="140" r="70" fill={b} />
+              <path d="M0 420 Q200 320 420 400 T800 380 V600 H0Z" fill={b} opacity="0.6" />
+              <path d="M0 480 Q250 420 500 470 T800 460 V600 H0Z" fill={a} />
+              <rect x="170" y="300" width="18" height="140" fill={c} />
+              <circle cx="179" cy="270" r="70" fill={d} />
+              <ellipse cx="420" cy="500" rx="55" ry="42" fill={b} />
+              <ellipse cx="520" cy="510" rx="40" ry="30" fill={c} />
+            </>
+          )}
+          {style === "badge_label" && (
+            <>
+              <path d="M150 330 L110 450 L170 420 L200 470 L230 350Z" fill={c} />
+              <path d="M362 330 L402 450 L342 420 L312 470 L282 350Z" fill={c} />
+              <circle cx="256" cy="230" r="150" fill={a} />
+              <circle cx="256" cy="230" r="118" fill="none" stroke={bg} strokeWidth="10" strokeDasharray="4 14" />
+              <path d="M256 150 Q300 200 256 310 Q212 200 256 150Z" fill={b} />
+              <path d="M256 175 V295" stroke={c} strokeWidth="6" />
+            </>
+          )}
+          {style === "abstract_background" && (
+            <>
+              <rect width="1500" height="1000" fill={bg} />
+              <circle cx="1350" cy="120" r="380" fill={b} />
+              <circle cx="150" cy="950" r="320" fill={a} />
+              <path d="M0 0 H520 L0 420Z" fill={b} opacity="0.6" />
+              <path d="M1500 1000 H950 L1500 560Z" fill={c} />
+              <rect x="1150" y="620" width="140" height="140" rx="20" fill={d} />
+            </>
+          )}
+        </svg>
+      </div>
+      <div className="space-y-1 text-sm">
+        <p className="text-muted-foreground">{DESCRIPTIONS[style]}</p>
+        <p className="text-xs text-muted-foreground">
+          Gambar contoh untuk menunjukkan bentuknya, bukan hasil AI. Warnanya mengikuti palet yang dipilih.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Same canvas shapes as the generate prompts (lib/providers/prompts.ts).
+const VIEWBOX: Record<StyleId, string> = {
+  icon_set: "0 0 512 512",
+  seamless_pattern: "0 0 512 512",
+  flat_illustration: "0 0 800 600",
+  badge_label: "0 0 512 512",
+  abstract_background: "0 0 1500 1000",
+};

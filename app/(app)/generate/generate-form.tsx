@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { QcBadge } from "@/components/qc-badge";
+import { StylePreview } from "@/components/style-preview";
 import { Label } from "@/components/ui/label";
 import { MAX_VARIATIONS } from "@/lib/generate/schemas";
 import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
@@ -262,6 +263,8 @@ export function GenerateForm({
                 />
               </div>
             </div>
+
+            <StylePreview style={style} palette={palette} />
 
             <p className="text-sm text-muted-foreground">
               Perkiraan waktu: sekitar {estimatedMinutes} menit bila batas model gratis 5 permintaan per menit.
