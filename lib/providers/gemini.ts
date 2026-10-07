@@ -3,8 +3,9 @@ import { OpenAiCompatProvider, clampRetryAfter } from "./openai-compat";
 
 // Google's OpenAI-compatible endpoint for the Gemini API (AI Studio key).
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
-// Used when neither the setting nor GEMINI_DEFAULT_MODEL names a model. Uji Oktober 2026: about 25s per SVG.
-export const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
+// Used when neither the setting nor GEMINI_DEFAULT_MODEL names a model. Free tier (AI Studio, Oktober 2026):
+// 3.5 Flash-Lite allows 15 RPM / 500 RPD and draws an SVG in about 5s; 3.5 Flash only 5 RPM / 20 RPD.
+export const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 export const GEMINI_TIMEOUT_MS = 55_000;
 
 export type GeminiConfig = {
@@ -33,7 +34,7 @@ export class GeminiProvider extends OpenAiCompatProvider {
     });
   }
 
-  // Without a limit, Gemini 3.x thinks long enough to miss the 60s window. "low" keeps an SVG near 25s.
+  // Without a limit, Gemini 3.x thinks long enough to miss the 60s window. "low" keeps an SVG well under it.
   protected extraBody() {
     return { reasoning_effort: "low" };
   }
@@ -64,6 +65,10 @@ export class GeminiProvider extends OpenAiCompatProvider {
 
 // Model ids that are not text chat models (speech, images, embeddings, live audio, robotics...).
 const NOT_TEXT = /tts|image|embedding|live|audio|transcribe|robotics|computer-use|customtools|nano-banana|omni|veo|imagen/i;
+// Text models that always fail on the free tier, checked in AI Studio (Oktober 2026): Pro has a quota of 0,
+// 3.8 Flash and the "-latest" aliases take longer than the 60s Vercel window. Gemma is filtered by the
+// "gemini-" prefix (over 90s per SVG).
+const UNUSABLE = /-pro\b|^gemini-3\.8-flash$|-latest$/i;
 const TTL_MS = 6 * 60 * 60 * 1000;
 let catalogCache: { at: number; models: string[] } | null = null;
 
@@ -87,7 +92,7 @@ export async function fetchGeminiModels(
     const body = (await res.json()) as { data?: { id?: string }[] };
     const models = (body.data ?? [])
       .map((m) => (m.id ?? "").replace(/^models\//, ""))
-      .filter((id) => id.startsWith("gemini-") && !NOT_TEXT.test(id))
+      .filter((id) => id.startsWith("gemini-") && !NOT_TEXT.test(id) && !UNUSABLE.test(id))
       .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
     if (!injected) catalogCache = { at: now(), models };
     return models;

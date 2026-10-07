@@ -24,7 +24,14 @@ Tahap 1, 2, 3, 3b, 5, dan 8 selesai. Tahap 5 (Gemini cadangan) sudah di `main` d
 3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
 
 ## Catatan penting
-- Gemini (Tahap 5): free tier saja, biaya dicatat 0. Model bawaan `GEMINI_DEFAULT_MODEL`, kosong = `gemini-3.5-flash`, dikirim dengan `reasoning_effort: "low"` (tanpa itu Gemini 3.x berpikir terlalu lama). `gemini-3.8-flash` lebih dari 60 dtk (tidak cocok); `gemini-3.5-flash-lite` sekitar 4 dtk. Batas free tier tidak dipublikasikan, cek di AI Studio. Error Gemini berbentuk array `[{error}]`; jeda 429 dibaca dari `retryDelay` di body.
+- Gemini (Tahap 5): free tier saja, biaya dicatat 0. Model bawaan `GEMINI_DEFAULT_MODEL`, kosong = `gemini-3.5-flash-lite`, dikirim dengan `reasoning_effort: "low"` (tanpa itu Gemini 3.x berpikir terlalu lama). Error Gemini berbentuk array `[{error}]`; jeda 429 dibaca dari `retryDelay` di body.
+- Batas free tier Gemini (AI Studio, menu Rate Limit, project "Default Gemini Project", dicek 2026-10-07; batas per project, RPD reset tengah malam Pasifik = sekitar 14.00-15.00 WIB):
+  - 3.5 Flash-Lite: 15 RPM, 500 RPD, SVG sekitar 5 dtk -> dipakai sebagai bawaan (sekitar 170-250 aset per hari)
+  - 3.1 Flash-Lite: 15 RPM, 500 RPD, SVG sekitar 2 dtk tapi terlalu sederhana
+  - 3.5/3.6/3.7/3.8 Flash, 3 Flash, 2.5 Flash: 5 RPM, 20 RPD (sekitar 7 aset per hari); 3.8 Flash juga lebih dari 60 dtk per SVG
+  - 2.5 Flash-Lite: 10 RPM, 20 RPD. 2.5 Pro dan 3.1 Pro: 0 (tidak tersedia di free tier)
+  - Gemma 4 26B/31B: 30 RPM, 14.400 RPD, tapi lebih dari 90 dtk per SVG (tidak cocok untuk Vercel)
+  - Dropdown `/generate` menyembunyikan Pro, 3.8 Flash, alias `-latest`, dan Gemma (`UNUSABLE` di `lib/providers/gemini.ts`).
 - Fallback dan batas 60 dtk: tiap request punya tenggat 57 dtk. Gagal cepat (limit, 5xx, model hilang, anggaran) langsung pindah ke cadangan di request yang sama. Bila sisa waktu kurang dari 15 dtk (mis. Kenari timeout 55 dtk), server membalas timeout dan browser mengulang dengan `skipPrimary`, sehingga cadangan mendapat jendela penuh. Model yang dipilih di dropdown tetap jalan sendirian tanpa cadangan.
 - Pilih model per generate: `/generate` punya dropdown model (daftar dari katalog Kenari lewat `/api/models`, gratis dan berbayar dengan perkiraan harga). Berlaku hanya untuk panggilan SVG; model terpilih jalan sendirian tanpa fallback; konsep dan metadata tetap dari Pengaturan. Model berbayar tetap kena batas biaya Kenari bulanan. Bila katalog gagal dimuat, kolom jadi teks bebas.
 - Tahap 8: permintaan memakai Google Trends tidak resmi (`google-trends-api`, dibandingkan dengan kata jangkar "wallpaper", cache 6 jam di memori). Bisa gagal sesekali atau diblokir kapan saja; bila gagal skor jatuh ke perkiraan AI + bobot event. Persaingan: input manual jumlah hasil Adobe per tema. Pengambilan otomatis dari Adobe BELUM dibuat: ketentuan dan robots.txt Adobe belum bisa dicek dari sandbox, jadi perlu dicek dulu. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) di `lib/research/calendar.ts` hanya perkiraan sampai 2029; cek lagi.
