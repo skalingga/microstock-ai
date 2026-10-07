@@ -79,8 +79,13 @@ export type RetryOptions = {
   sleepImpl?: Sleep;
 };
 
+export type AttemptContext = {
+  /** True after a timeout: the server then starts at the backup provider, which gets the full time window. */
+  skipPrimary: boolean;
+};
+
 /** Runs one provider call through the rate gate, retrying the failures worth retrying. */
-export async function callWithRetry<T>(fn: () => Promise<T>, opts: RetryOptions): Promise<T> {
+export async function callWithRetry<T>(fn: (ctx: AttemptContext) => Promise<T>, opts: RetryOptions): Promise<T> {
   const maxAttempts = opts.maxAttempts ?? 3;
   const maxRateLimitWaits = opts.maxRateLimitWaits ?? 6;
   const retryDelayMs = opts.retryDelayMs ?? 3000;
@@ -88,11 +93,12 @@ export async function callWithRetry<T>(fn: () => Promise<T>, opts: RetryOptions)
 
   let attempts = 0;
   let rateLimitWaits = 0;
+  let skipPrimary = false;
 
   for (;;) {
     await opts.gate.acquire(opts.signal, (ms) => opts.onStatus?.(`Menunggu kuota provider (${Math.ceil(ms / 1000)} dtk)...`));
     try {
-      return await fn();
+      return await fn({ skipPrimary });
     } catch (err) {
       if (opts.signal?.aborted || !(err instanceof ApiError)) throw err;
 
@@ -102,6 +108,7 @@ export async function callWithRetry<T>(fn: () => Promise<T>, opts: RetryOptions)
         continue;
       }
 
+      if (err.code === "timeout") skipPrimary = true;
       const retryable = err.code === "timeout" || err.code === "upstream" || err.code === "network" || err.code === "bad_output" || err.code === "bad_svg";
       attempts += 1;
       if (!retryable || isFatal(err.code) || attempts >= maxAttempts) throw err;

@@ -98,6 +98,22 @@ describe("callWithRetry", () => {
     expect(calls).toBe(3);
   });
 
+  it("asks the server to skip the primary provider after a timeout", async () => {
+    const { gate, base } = setup();
+    const seen: boolean[] = [];
+    const result = await callWithRetry(
+      async ({ skipPrimary }) => {
+        seen.push(skipPrimary);
+        if (seen.length === 1) throw new ApiError("upstream", "502");
+        if (seen.length === 2) throw new ApiError("timeout", "slow");
+        return "ok";
+      },
+      { gate, maxAttempts: 3, ...base },
+    );
+    expect(result).toBe("ok");
+    expect(seen).toEqual([false, false, true]);
+  });
+
   it("does not retry errors that retrying cannot fix", async () => {
     const { gate, base } = setup();
     for (const code of ["banned_words", "auth", "model_unavailable", "storage"] as const) {

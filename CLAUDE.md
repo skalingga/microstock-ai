@@ -87,7 +87,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
 - [x] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
-- [ ] 5. Gemini direct sebagai cadangan otomatis
+- [x] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
 - [ ] 7. Recraft: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan
 - [x] 8. Riset tema: kalender event, Google Trends, skor peluang
@@ -105,6 +105,7 @@ KENARI_API_KEY=                 # server saja, berawalan kn-
 KENARI_BASE_URL=https://kenari.id/v1
 KENARI_DEFAULT_MODEL=            # model bawaan bila pengaturan kosong, mis. model :free
 GEMINI_API_KEY=                 # server saja, mulai Tahap 5
+GEMINI_DEFAULT_MODEL=           # model Gemini bila pengaturan kosong; kosong = gemini-3.5-flash
 RECRAFT_API_KEY=                # server saja, mulai Tahap 7
 RECRAFT_MONTHLY_BUDGET_USD=10
 ```

@@ -45,9 +45,10 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
         <CardHeader>
           <CardTitle>Urutan provider AI</CardTitle>
           <CardDescription>
-            Aplikasi memakai provider utama dulu, lalu pindah ke cadangan bila kena limit atau model hilang.
-            Kosongkan nama model untuk memakai model bawaan dari environment. Recraft tidak masuk daftar ini
-            karena hanya jalan lewat tombol eksplisit.
+            Aplikasi memakai provider utama dulu, lalu pindah ke cadangan bila kena limit, terlalu lama, error, atau
+            model hilang. Kosongkan nama model untuk memakai model bawaan dari environment (Gemini: gemini-3.5-flash
+            bila GEMINI_DEFAULT_MODEL kosong). Gemini memakai free tier; batasnya hanya terlihat di Google AI Studio.
+            Recraft tidak masuk daftar ini karena hanya jalan lewat tombol eksplisit.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 sm:grid-cols-2">

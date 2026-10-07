@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ProviderError } from "@/lib/providers/errors";
-import { runWithFallback, type UsageEntry } from "@/lib/providers";
+import { resolveProvider, runWithFallback, type UsageEntry } from "@/lib/providers";
+import { GeminiProvider, fetchGeminiModels } from "@/lib/providers/gemini";
 import { KenariProvider, readRateLimit } from "@/lib/providers/kenari";
-import type { ConceptInput, SvgInput } from "@/lib/providers/types";
+import type { ConceptInput, SvgInput, SvgProvider } from "@/lib/providers/types";
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10z"/></svg>';
 
@@ -167,15 +168,50 @@ describe("runWithFallback", () => {
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari", ok: true, kind: "svg" }));
   });
 
-  it("logs a failed call and does not hide a rate limit when the next provider is not built yet", async () => {
+  it("falls back to Gemini on a rate limit and logs both calls", async () => {
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
+    const call = vi.fn(async (p: SvgProvider) => {
+      if (p.id === "kenari") throw new ProviderError("rate_limit", "limit", { retryAfterSec: 9 });
+      return { model: "gemini-model" };
+    });
+    const result = await runWithFallback(order, "svg", call, log);
+    expect(result).toMatchObject({ provider: "gemini", model: "gemini-model" });
+    expect(log).toHaveBeenNthCalledWith(1, expect.objectContaining({ provider: "kenari", ok: false }));
+    expect(log).toHaveBeenNthCalledWith(2, expect.objectContaining({ provider: "gemini", ok: true }));
+  });
+
+  it("keeps the last rate limit when every provider is limited", async () => {
     const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
     await expect(
       runWithFallback(order, "svg", async () => {
         throw new ProviderError("rate_limit", "limit", { retryAfterSec: 9 });
       }, log),
     ).rejects.toMatchObject({ code: "rate_limit", retryAfterSec: 9 });
-    expect(log).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari", ok: false }));
+    expect(log).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips the backup when too little request time is left, so the browser retries", async () => {
+    let clock = 0;
+    const call = vi.fn(async (p: SvgProvider) => {
+      if (p.id === "kenari") {
+        clock = 50_000; // the primary used most of the window before failing
+        throw new ProviderError("timeout", "Kenari terlalu lama menjawab.");
+      }
+      return { model: "g" };
+    });
+    await expect(
+      runWithFallback(order, "svg", call, async () => {}, undefined, { deadline: 57_000, now: () => clock }),
+    ).rejects.toMatchObject({ code: "timeout" });
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it("still tries the backup when a fast failure leaves enough time", async () => {
+    const call = vi.fn(async (p: SvgProvider) => {
+      if (p.id === "kenari") throw new ProviderError("upstream", "502");
+      return { model: "g" };
+    });
+    const result = await runWithFallback(order, "svg", call, async () => {}, undefined, { deadline: 57_000, now: () => 1_000 });
+    expect(result.provider).toBe("gemini");
   });
 
   it("does not fall back on errors another provider cannot fix", async () => {
@@ -214,13 +250,19 @@ describe("runWithFallback", () => {
   });
 
   it("explains when no provider is usable", async () => {
-    await expect(
-      runWithFallback([{ provider: "gemini", model: "" }], "svg", async () => ({ model: "x" }), async () => {}),
-    ).rejects.toMatchObject({ code: "not_implemented" });
+    const before = process.env.KENARI_DEFAULT_MODEL;
+    delete process.env.KENARI_DEFAULT_MODEL;
+    try {
+      await expect(
+        runWithFallback([{ provider: "kenari", model: "" }], "svg", async () => ({ model: "x" }), async () => {}),
+      ).rejects.toMatchObject({ code: "model_unavailable" });
+    } finally {
+      if (before !== undefined) process.env.KENARI_DEFAULT_MODEL = before;
+    }
   });
 });
 
-import { orderForKind } from "@/lib/providers";
+import { orderForKind, withoutPrimary } from "@/lib/providers";
 
 describe("orderForKind", () => {
   const order = [
@@ -239,5 +281,104 @@ describe("orderForKind", () => {
   it("keeps the order for SVG calls and when no text model is set", () => {
     expect(orderForKind(order, "svg", "gpt-oss-120b")).toBe(order);
     expect(orderForKind(order, "metadata", "  ")).toBe(order);
+  });
+});
+
+describe("withoutPrimary", () => {
+  it("drops the primary only when a backup exists", () => {
+    const one = [{ provider: "kenari" as const, model: "a" }];
+    const two = [...one, { provider: "gemini" as const, model: "" }];
+    expect(withoutPrimary(two)).toEqual([{ provider: "gemini", model: "" }]);
+    expect(withoutPrimary(one)).toBe(one);
+  });
+});
+
+describe("GeminiProvider", () => {
+  function gemini(fetchImpl: typeof fetch) {
+    return new GeminiProvider("gemini-test", { apiKey: "g-test", baseUrl: "https://gemini.test/openai/", fetchImpl });
+  }
+  const geminiError = (status: number, message: string, extra = "") =>
+    new Response(`[{"error": {"code": ${status}, "message": "${message}"${extra}}}]`, { status });
+
+  it("calls the OpenAI-compatible endpoint with low reasoning and costs nothing", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: SVG }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 100, completion_tokens: 900 },
+        }),
+      ),
+    );
+    const out = await gemini(fetchImpl as unknown as typeof fetch).generateSvg(svgInput);
+    expect(out).toMatchObject({ svg: SVG, model: "gemini-test", costIdr: undefined });
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://gemini.test/openai/chat/completions");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer g-test");
+    expect(JSON.parse(init.body as string)).toMatchObject({ model: "gemini-test", reasoning_effort: "low" });
+  });
+
+  it("reads the retry delay from a 429 body", async () => {
+    const body = ', "status": "RESOURCE_EXHAUSTED", "details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "42s"}]';
+    const provider = gemini((async () => geminiError(429, "quota", body)) as unknown as typeof fetch);
+    await expect(provider.generateSvg(svgInput)).rejects.toMatchObject({ code: "rate_limit", retryAfterSec: 42 });
+  });
+
+  it.each([
+    [404, "models/gemini-x is not found for API version v1main", "model_unavailable"],
+    [400, "Please pass a valid API key", "auth"],
+    [400, "Thinking level MINIMAL is not supported for this model.", "upstream"],
+    [503, "The model is overloaded.", "upstream"],
+  ])("maps HTTP %i (%s) to %s", async (status, message, code) => {
+    const provider = gemini((async () => geminiError(status, message)) as unknown as typeof fetch);
+    await expect(provider.generateSvg(svgInput)).rejects.toMatchObject({ code });
+  });
+
+  it("names GEMINI_API_KEY when the key is missing", async () => {
+    const provider = new GeminiProvider("m", { apiKey: "", fetchImpl: vi.fn() as unknown as typeof fetch });
+    await expect(provider.generateSvg(svgInput)).rejects.toMatchObject({
+      code: "auth",
+      message: expect.stringContaining("GEMINI_API_KEY"),
+    });
+  });
+
+  it("uses the built-in model when settings and env are empty", () => {
+    const before = process.env.GEMINI_DEFAULT_MODEL;
+    delete process.env.GEMINI_DEFAULT_MODEL;
+    try {
+      expect(resolveProvider({ provider: "gemini", model: "" }).model).toBe("gemini-3.5-flash");
+      expect(resolveProvider({ provider: "gemini", model: "gemini-3.5-flash-lite" }).model).toBe("gemini-3.5-flash-lite");
+    } finally {
+      if (before !== undefined) process.env.GEMINI_DEFAULT_MODEL = before;
+    }
+  });
+});
+
+describe("fetchGeminiModels", () => {
+  it("keeps only text models, without the models/ prefix, newest first", async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "models/gemini-2.5-flash" },
+            { id: "models/gemini-3.5-flash" },
+            { id: "models/gemini-3.8-flash-tts" },
+            { id: "models/gemini-3.1-flash-image" },
+            { id: "models/gemini-embedding-2" },
+            { id: "models/gemini-3.10-flash" },
+          ],
+        }),
+      )) as unknown as typeof fetch;
+    expect(await fetchGeminiModels({ apiKey: "k", fetchImpl })).toEqual([
+      "gemini-3.10-flash",
+      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+    ]);
+  });
+
+  it("returns nothing without a key", async () => {
+    const fetchImpl = vi.fn();
+    expect(await fetchGeminiModels({ apiKey: "", fetchImpl: fetchImpl as unknown as typeof fetch })).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
