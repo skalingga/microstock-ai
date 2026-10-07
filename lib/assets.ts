@@ -8,3 +8,6 @@ export const QC_LABEL: Record<string, string> = {
 };
 
 export const SIGNED_URL_TTL_SEC = 60 * 60;
+
+/** Assets deleted in one go from the gallery (one page holds 24). */
+export const MAX_BULK_DELETE = 100;

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { QcBadge } from "@/components/qc-badge";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
 
 const PAGE_SIZE = 24;
@@ -123,32 +123,16 @@ export default async function HalamanAset({
         </p>
       ) : assets && assets.length > 0 ? (
         <>
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {assets.map((asset) => {
-              const url = asset.preview_path ? urlByPath.get(asset.preview_path) : undefined;
-              return (
-                <li key={asset.id} className="space-y-1.5 text-xs">
-                  <Link href={`/aset/${asset.id}`} className="block">
-                    <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-md border transition-shadow hover:shadow-md">
-                      {url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={url} alt={asset.title ?? asset.concept ?? "Aset SVG"} className="size-full object-contain" loading="lazy" />
-                      ) : (
-                        <span className="text-muted-foreground">Tanpa preview</span>
-                      )}
-                    </div>
-                  </Link>
-                  <p className="line-clamp-2 font-medium">{asset.title ?? asset.concept}</p>
-                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <QcBadge status={asset.qc_status} />
-                    {asset.exported_at && <span className="text-muted-foreground">Diekspor</span>}
-                    {asset.adobe_status === "diterima" && <span className="font-medium text-emerald-700">Diterima Adobe</span>}
-                    {asset.adobe_status === "ditolak" && <span className="font-medium text-red-700">Ditolak Adobe</span>}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+          <AssetGrid
+            assets={assets.map((asset) => ({
+              id: asset.id,
+              previewUrl: (asset.preview_path && urlByPath.get(asset.preview_path)) || undefined,
+              label: asset.title ?? asset.concept ?? "Aset SVG",
+              qcStatus: asset.qc_status,
+              exported: Boolean(asset.exported_at),
+              adobeStatus: asset.adobe_status,
+            }))}
+          />
 
           {lastPage > 1 && (
             <nav aria-label="Halaman" className="flex items-center gap-4 text-sm">

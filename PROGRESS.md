@@ -4,6 +4,7 @@
 Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model utama Gemini 3.5 Flash-Lite, cadangan Kenari deepseek-v4-flash (disetujui pengguna). Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
 
 ## Sudah selesai
+- [2026-10-08] `/aset`: pilih banyak aset (centang, pilih semua di halaman) lalu hapus sekaligus dengan konfirmasi (`asset-grid.tsx`, aksi `hapusBanyakAset`, maks 100). Baris dihapus dulu, lalu file di Storage. Sel uji model yang asetnya dihapus tampil "Aset dihapus"
 - [2026-10-07] Tahap 4 (di `main`): halaman `/uji-model` (`lib/generate/benchmark.ts`, migrasi `20261011000000_model_benchmarks.sql`), uji 5 tema × 8 model; pilihan: Gemini 3.5 Flash-Lite utama, deepseek-v4-flash cadangan (hasil di Catatan)
 - [2026-10-06] Tahap 1: fondasi (Next.js, Supabase Auth, skema + RLS, deploy Vercel)
 - [2026-10-06] Tahap 2: generate + galeri dengan Kenari, antrean di browser, biaya dan batas bulanan Kenari

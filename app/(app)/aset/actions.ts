@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { normalizeCategory } from "@/lib/adobe/rules";
-import { UUID_RE } from "@/lib/assets";
+import { MAX_BULK_DELETE, UUID_RE } from "@/lib/assets";
 import type { Json } from "@/lib/database.types";
 import { parseKeywordText } from "@/lib/metadata/keywords";
 import { combine } from "@/lib/qc/evaluate";
@@ -34,7 +34,37 @@ export async function hapusAset(id: string): Promise<DeleteResult> {
   redirect("/aset");
 }
 
-export type SaveMetadataResult = { ok: true; status: string } | { ok: false; error: string };
+export type BulkDeleteResult = { ok: true; deleted: number; warning?: string } | { ok: false; error: string };
+
+/** Deletes several of the caller's assets: rows first, then their files, so no row is left pointing at a lost file. */
+export async function hapusBanyakAset(ids: string[]): Promise<BulkDeleteResult> {
+  const unique = [...new Set(Array.isArray(ids) ? ids : [])];
+  if (unique.length === 0) return { ok: false, error: "Belum ada aset yang dipilih." };
+  if (unique.length > MAX_BULK_DELETE) return { ok: false, error: `Maksimal ${MAX_BULK_DELETE} aset sekali hapus.` };
+  if (!unique.every((id) => typeof id === "string" && UUID_RE.test(id))) return { ok: false, error: "ID aset tidak valid." };
+
+  const supabase = await createClient();
+  // Row Level Security limits this to the caller's own assets; ids of other accounts simply match nothing.
+  const { data: deleted, error } = await supabase
+    .from("assets")
+    .delete()
+    .in("id", unique)
+    .select("svg_path, preview_path");
+  if (error) return { ok: false, error: "Gagal menghapus data aset. Coba lagi." };
+
+  const files = (deleted ?? []).flatMap((a) => [a.svg_path, a.preview_path]).filter((p): p is string => Boolean(p));
+  let warning: string | undefined;
+  if (files.length > 0) {
+    const removed = await supabase.storage.from("assets").remove(files);
+    // The assets are already gone from the app; leftover files only take storage space.
+    if (removed.error) warning = "Data aset terhapus, tapi sebagian file belum terhapus dari penyimpanan.";
+  }
+
+  revalidatePath("/aset");
+  return { ok: true, deleted: deleted?.length ?? 0, warning };
+}
+
+export type SaveMetadataResult ={ ok: true; status: string } | { ok: false; error: string };
 
 const metadataSchema = z.object({
   title: z.string().trim().max(300, "Judul terlalu panjang."),

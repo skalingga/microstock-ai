@@ -473,14 +473,21 @@ function CellView({ cell, preview }: { cell: BenchCell; preview?: string }) {
         <img src={preview} alt={cell.concept} className="size-full object-contain" />
       ) : (
         <span className="px-1 text-center text-muted-foreground">
-          {cell.status === "berjalan" ? "Dibuat..." : cell.status === "gagal" ? (ERROR_LABEL[cell.errorCode ?? ""] ?? "Gagal") : cell.status === "selesai" ? "" : "Menunggu"}
+          {cell.status === "berjalan"
+            ? "Dibuat..."
+            : cell.status === "gagal"
+              ? (ERROR_LABEL[cell.errorCode ?? ""] ?? "Gagal")
+              : cell.status === "selesai"
+                ? "Aset dihapus"
+                : "Menunggu"}
         </span>
       )}
     </div>
   );
   return (
     <div className="space-y-1">
-      {cell.assetId ? <Link href={`/aset/${cell.assetId}`}>{thumb}</Link> : thumb}
+      {/* A finished cell without a preview means the asset was deleted from the gallery: no dead link. */}
+      {cell.assetId && preview ? <Link href={`/aset/${cell.assetId}`}>{thumb}</Link> : thumb}
       <div className="flex flex-wrap items-center gap-1">
         {cell.qc && <QcBadge status={cell.qc} />}
         {cell.durationMs !== undefined && cell.status !== "berjalan" && (
