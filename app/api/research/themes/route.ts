@@ -7,6 +7,8 @@ import { findBannedWords } from "@/lib/settings/banned";
 // Stay under Vercel's 60s Hobby limit (CLAUDE.md rule 3); the provider call itself times out at 55s.
 export const maxDuration = 60;
 
+const MAX_EVENTS_IN_PROMPT = 12;
+
 export async function POST(request: Request) {
   return handleGenerate({
     request,
@@ -23,7 +25,11 @@ export async function POST(request: Request) {
 
       const result = await provider.generateThemes({
         region: region?.label ?? input.region,
-        events: events.map((e) => ({ name: e.name, date: e.date, weight: e.weight })),
+        // A long event list (market "Dunia") makes the answer long too; the biggest events are enough.
+        events: [...events]
+          .sort((a, b) => b.weight - a.weight || a.date.localeCompare(b.date))
+          .slice(0, MAX_EVENTS_IN_PROMPT)
+          .map((e) => ({ name: e.name, date: e.date, weight: e.weight })),
         category: input.category,
         count: input.count,
       });
