@@ -4,6 +4,7 @@
 Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model utama Gemini 3.5 Flash-Lite, cadangan Kenari deepseek-v4-flash (disetujui pengguna). Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
 
 ## Sudah selesai
+- [2026-10-08] Teks UI dipangkas sekitar separuh: subjudul sidebar dibuang, deskripsi halaman satu baris, penjelasan panjang pindah ke ikon ⓘ (`components/info-tip.tsx`), perkiraan waktu/biaya jadi chip, nama env var dan Recraft tidak lagi tampil (batas Recraft disimpan lewat input tersembunyi)
 - [2026-10-08] Rebuild UI "Studio Indigo" (skill ui-ux-pro-max): token warna indigo + amber + warna status di `app/globals.css`, font Plus Jakarta Sans, sidebar berikon (`components/app-nav.tsx`, menu geser di HP), `PageHeader`, `StatCard`, badge QC berwarna dengan titik, kartu aset, halaman login/reset dua kolom (`components/auth-shell.tsx`), tombol dan input lebih besar (36 px)
 - [2026-10-08] `/aset`: pilih banyak aset (centang, pilih semua di halaman) lalu hapus sekaligus dengan konfirmasi (`asset-grid.tsx`, aksi `hapusBanyakAset`, maks 100). Baris dihapus dulu, lalu file di Storage. Sel uji model yang asetnya dihapus tampil "Aset dihapus"
 - [2026-10-07] Tahap 4 (di `main`): halaman `/uji-model` (`lib/generate/benchmark.ts`, migrasi `20261011000000_model_benchmarks.sql`), uji 5 tema × 8 model; pilihan: Gemini 3.5 Flash-Lite utama, deepseek-v4-flash cadangan (hasil di Catatan)
@@ -28,7 +29,7 @@ Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model ut
 3. Opsional: ulangi `/uji-model` sesekali, karena daftar dan kecepatan model gratis Kenari berubah.
 
 ## Catatan penting
-- UI: pakai token semantik (`bg-success-soft`, `text-warning-foreground`, `bg-danger-soft`, dst.), jangan warna Tailwind mentah. Mode gelap belum diaktifkan (tidak ada tombol), tapi token `.dark` sudah disiapkan. Komponen bersama: `components/page-header.tsx`, `components/stat-card.tsx`, `components/brand.tsx`.
+- UI: label dulu, penjelasan maksimal satu baris; yang panjang masuk `InfoTip`. Peringatan yang mendorong tindakan tetap terlihat. Pakai token semantik (`bg-success-soft`, `text-warning-foreground`, `bg-danger-soft`, dst.), jangan warna Tailwind mentah. Mode gelap belum diaktifkan (tidak ada tombol), tapi token `.dark` sudah disiapkan. Komponen bersama: `components/page-header.tsx`, `components/stat-card.tsx`, `components/brand.tsx`.
 - Hasil uji Tahap 4 (7 Okt 2026 22.10-22.35 WIB, akun adminproject, 5 tema satu per gaya teks × 8 model, satu percobaan, timeout 55 dtk). Skor = (Lolos + ½ Perlu cek) ÷ 5:
   - gemini-3.5-flash-lite: 90%, 5/5 jadi (4 Lolos, 1 Perlu cek), median 5,9 dtk, Rp0
   - agnes-2-0-flash:free: 60%, 4/5 (1 timeout), 15 dtk

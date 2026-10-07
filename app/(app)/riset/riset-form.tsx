@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink, Search, Sparkles, TrendingUp } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -196,11 +197,14 @@ export function RisetForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Riset baru</CardTitle>
-          <CardDescription>
-            Periode maksimal 12 bulan. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) adalah perkiraan,
-            cek lagi sebelum menentukan batas upload.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="size-4 text-primary" />
+            Riset baru
+            <InfoTip align="start">
+              Periode maksimal 12 bulan. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) hanya perkiraan: cek lagi
+              sebelum menentukan batas upload.
+            </InfoTip>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={start} className="space-y-4">
@@ -243,12 +247,17 @@ export function RisetForm({
       {sorted.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Tema berdasarkan peluang</CardTitle>
-            <CardDescription>
-              Peluang = permintaan tinggi dan persaingan rendah. Isi “Hasil Adobe” (jumlah hasil pencarian di Adobe
-              Stock) agar skor persaingan memakai data nyata; tanpa itu dianggap sedang.
-              {trendsMissing && " Google Trends tidak tersedia, jadi permintaan memakai perkiraan AI dan bobot event."}
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="size-4 text-primary" />
+              Tema berdasarkan peluang
+              <InfoTip align="start">
+                Peluang tinggi = permintaan tinggi dan persaingan rendah. Isi “Hasil Adobe” (jumlah hasil pencarian di Adobe
+                Stock) agar skor persaingan memakai data nyata; kalau kosong dianggap sedang.
+              </InfoTip>
+            </CardTitle>
+            {trendsMissing && (
+              <CardDescription>Google Trends tidak tersedia: permintaan memakai perkiraan AI.</CardDescription>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {sorted.map((row, index) => {

@@ -52,7 +52,7 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
       <PageHeader
         icon={FlaskConical}
         title="Uji model"
-        description="Bandingkan model pembuat SVG dengan input yang sama: tiap tema mendapat konsep yang sama untuk semua model, lalu hasilnya dinilai QC otomatis. Aset hasil uji masuk ke galeri Aset tanpa metadata."
+        description="Konsep yang sama digambar beberapa model, lalu dinilai QC."
       />
 
       <BenchmarkRunner userId={user.id} bannedWords={settings?.banned_words ?? []} />

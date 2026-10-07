@@ -2,10 +2,10 @@ import { PackageCheck, ShieldCheck, Sparkles, Telescope } from "lucide-react";
 import { Brand } from "@/components/brand";
 
 const STEPS = [
-  { icon: Telescope, title: "Riset tema", text: "Event dan musim yang dicari pembeli, diurutkan menurut peluang." },
-  { icon: Sparkles, title: "Generate SVG", text: "Variasi ikon, pola, ilustrasi, siluet, dan line art dari satu tema." },
-  { icon: ShieldCheck, title: "QC otomatis", text: "Teks, kerumitan, tile pola, latar, dan kemiripan diperiksa sebelum diunggah." },
-  { icon: PackageCheck, title: "Siap Adobe Stock", text: "ZIP berisi SVG plus CSV judul dan keyword dalam satu klik." },
+  { icon: Telescope, title: "Riset tema berpeluang" },
+  { icon: Sparkles, title: "Generate variasi SVG" },
+  { icon: ShieldCheck, title: "QC otomatis" },
+  { icon: PackageCheck, title: "Ekspor ZIP + CSV untuk Adobe" },
 ];
 
 /** Split screen for the sign-in pages: what the app does on the left, the form on the right. */
@@ -20,25 +20,19 @@ export function AuthShell({ title, description, children }: { title: string; des
               Dari satu tema ke aset vektor{" "}
               <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">siap jual</span>.
             </h1>
-            <p className="text-[15px] leading-relaxed text-muted-foreground">
-              Buat, periksa, dan ekspor SVG untuk Adobe Stock tanpa pindah aplikasi.
-            </p>
           </div>
           <ul className="space-y-4">
-            {STEPS.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-3">
+            {STEPS.map(({ icon: Icon, title }) => (
+              <li key={title} className="flex items-center gap-3">
                 <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-card text-primary shadow-sm ring-1 ring-border">
                   <Icon className="size-5" />
                 </span>
-                <span>
-                  <span className="block text-sm font-semibold">{title}</span>
-                  <span className="block text-sm text-muted-foreground">{text}</span>
-                </span>
+                <span className="text-sm font-semibold">{title}</span>
               </li>
             ))}
           </ul>
         </div>
-        <p className="text-xs text-muted-foreground">Aset dibuat dengan AI: centang label generative AI saat mengunggah.</p>
+        <span />
       </section>
 
       <section className="flex items-center justify-center p-4 sm:p-8">

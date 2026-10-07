@@ -1,3 +1,5 @@
+import { BadgeCheck } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
 import { buildReport, type Group, type ReviewedAsset } from "@/lib/adobe/stats";
 import { STYLES } from "@/lib/settings/schema";
 import { QC_LABEL } from "@/lib/assets";
@@ -39,15 +41,16 @@ export function AcceptanceReport({ rows, awaiting }: { rows: ReviewedAsset[]; aw
   const styleLabel = (v: string) => STYLES.find((s) => s.value === v)?.label ?? v;
 
   return (
-    <section className="space-y-4 rounded-lg border p-4" aria-labelledby="acceptance-heading">
+    <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="acceptance-heading">
       <div className="space-y-1">
-        <h2 id="acceptance-heading" className="font-medium">
+        <h2 id="acceptance-heading" className="flex items-center gap-2 font-semibold">
+          <BadgeCheck className="size-4 text-primary" />
           Tingkat penerimaan Adobe
+          <InfoTip align="start">Isi keputusan Adobe di halaman detail tiap aset. Data ini dipakai untuk menyetel batas QC.</InfoTip>
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Isi keputusan Adobe di halaman detail tiap aset. Data ini dipakai untuk menyetel batas QC.
-          {awaiting > 0 && ` ${awaiting} aset sudah diekspor tapi belum ada keputusannya.`}
-        </p>
+        {awaiting > 0 && (
+          <p className="text-sm text-muted-foreground">{awaiting} aset diekspor, keputusan Adobe belum dicatat.</p>
+        )}
       </div>
 
       {report.overall.total === 0 ? (

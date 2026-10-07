@@ -9,20 +9,13 @@ import { STYLES, type StyleId } from "@/lib/settings/schema";
 const DEFAULT_COLORS = ["#D35400", "#F39C12", "#7E5109", "#27AE60", "#FDF2E0"];
 
 const DESCRIPTIONS: Record<StyleId, string> = {
-  icon_set:
-    "Satu objek di tengah, latar transparan (kotak-kotak = transparan). Cocok untuk clipart, presentasi, dan stiker.",
-  seamless_pattern:
-    "Satu ubin yang bisa disambung terus tanpa terlihat batasnya (garis putus = satu ubin). Cocok untuk kertas kado, kain, dan wallpaper.",
-  flat_illustration:
-    "Satu adegan sederhana dengan latar, mendatar 4:3. Tanpa orang realistis. Cocok untuk artikel, poster, dan media sosial.",
-  badge_label:
-    "Bentuk lencana, pita, perisai, atau stempel tanpa huruf dan angka; pembeli menambah tulisannya sendiri. Cocok untuk label kemasan dan promo.",
-  abstract_background:
-    "Bentuk geometris penuh sampai tepi dengan ruang kosong untuk teks, mendatar 3:2. Cocok untuk slide, banner, dan poster.",
-  silhouette:
-    "Siluet hitam padat, satu objek atau satu set 3-6 variasi, latar transparan. Dibuat model gambar AI lalu diubah ke vektor. Cocok untuk hewan, tanaman, dan benda dengan bentuk lengkung (mis. kelelawar).",
-  line_art:
-    "Garis hitam tegas dengan isi putih, latar transparan. Dibuat model gambar AI lalu diubah ke vektor. Cocok untuk kendaraan, bangunan, dan benda berdetail.",
+  icon_set: "Satu objek, latar transparan. Untuk clipart dan stiker.",
+  seamless_pattern: "Ubin yang menyambung tanpa batas. Untuk kain dan kertas kado.",
+  flat_illustration: "Adegan sederhana 4:3 dengan latar. Untuk artikel dan poster.",
+  badge_label: "Lencana atau pita tanpa tulisan. Untuk label dan promo.",
+  abstract_background: "Geometris penuh 3:2, ada ruang untuk teks. Untuk slide dan banner.",
+  silhouette: "Siluet hitam padat dari model gambar. Untuk bentuk lengkung seperti hewan.",
+  line_art: "Garis hitam isi putih dari model gambar. Untuk kendaraan dan benda berdetail.",
 };
 
 function lightness(hex: string): number {
@@ -46,11 +39,13 @@ export function StylePreview({ style, palette }: { style: StyleId; palette: stri
   const patternId = useId();
   const [a, b, c, d, bg] = pickColors(palette);
   const transparent = style === "icon_set" || style === "badge_label" || style === "silhouette" || style === "line_art";
-  const traced = style === "silhouette" || style === "line_art";
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center">
-      <div className={`w-full max-w-48 shrink-0 overflow-hidden rounded-md border ${transparent ? "bg-checker" : ""}`}>
+    <div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-3 sm:flex-row sm:items-center">
+      <div className={`relative w-full max-w-40 shrink-0 overflow-hidden rounded-lg border ${transparent ? "bg-checker" : ""}`}>
+        <span className="absolute top-1.5 left-1.5 rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-xs">
+          Contoh
+        </span>
         <svg viewBox={VIEWBOX[style]} className="block h-auto w-full" role="img" aria-label={`Contoh gaya ${STYLES.find((s) => s.value === style)?.label ?? style}`}>
           {style === "icon_set" && (
             <>
@@ -129,14 +124,7 @@ export function StylePreview({ style, palette }: { style: StyleId; palette: stri
           )}
         </svg>
       </div>
-      <div className="space-y-1 text-sm">
-        <p className="text-muted-foreground">{DESCRIPTIONS[style]}</p>
-        <p className="text-xs text-muted-foreground">
-          {traced
-            ? "Gambar contoh untuk menunjukkan bentuknya, bukan hasil AI. Gaya ini selalu hitam (palet diabaikan) dan memakai saldo Kenari, sekitar Rp125 per gambar."
-            : "Gambar contoh untuk menunjukkan bentuknya, bukan hasil AI. Warnanya mengikuti palet yang dipilih."}
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">{DESCRIPTIONS[style]}</p>
     </div>
   );
 }

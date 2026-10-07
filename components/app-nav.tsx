@@ -18,24 +18,24 @@ import { useEffect, useState } from "react";
 import { Brand } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; hint: string };
+type NavItem = { href: string; label: string; icon: LucideIcon };
 
 // Ordered like the work itself: find a theme, make assets, check them, ship them.
 const groups: { label: string; items: NavItem[] }[] = [
   {
     label: "Produksi",
     items: [
-      { href: "/riset", label: "Riset", icon: Telescope, hint: "Cari tema berpeluang" },
-      { href: "/generate", label: "Generate", icon: Sparkles, hint: "Buat variasi SVG" },
-      { href: "/aset", label: "Aset", icon: LayoutGrid, hint: "Galeri dan QC" },
-      { href: "/ekspor", label: "Ekspor", icon: PackageCheck, hint: "ZIP + CSV Adobe" },
+      { href: "/riset", label: "Riset", icon: Telescope },
+      { href: "/generate", label: "Generate", icon: Sparkles },
+      { href: "/aset", label: "Aset", icon: LayoutGrid },
+      { href: "/ekspor", label: "Ekspor", icon: PackageCheck },
     ],
   },
   {
     label: "Alat",
     items: [
-      { href: "/uji-model", label: "Uji model", icon: FlaskConical, hint: "Bandingkan model AI" },
-      { href: "/pengaturan", label: "Pengaturan", icon: Settings, hint: "Provider, palet, batas" },
+      { href: "/uji-model", label: "Uji model", icon: FlaskConical },
+      { href: "/pengaturan", label: "Pengaturan", icon: Settings },
     ],
   },
 ];
@@ -51,7 +51,7 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
         <div key={group.label} className="space-y-1">
           <p className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{group.label}</p>
           <ul className="space-y-0.5">
-            {group.items.map(({ href, label, icon: Icon, hint }) => {
+            {group.items.map(({ href, label, icon: Icon }) => {
               const active = isActive(pathname, href);
               return (
                 <li key={href}>
@@ -76,12 +76,7 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
                     >
                       <Icon className="size-4" />
                     </span>
-                    <span className="leading-tight">
-                      <span className="block">{label}</span>
-                      <span className={cn("block text-xs font-normal", active ? "text-primary/80" : "text-muted-foreground")}>
-                        {hint}
-                      </span>
-                    </span>
+                    {label}
                   </Link>
                 </li>
               );

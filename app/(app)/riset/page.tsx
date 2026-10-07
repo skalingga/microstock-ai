@@ -41,7 +41,7 @@ export default async function HalamanRiset() {
       <PageHeader
         icon={Telescope}
         title="Riset tema"
-        description="Pilih pasar dan periode. Aplikasi mencari event dan musim di periode itu, lalu menyusun ide tema dan mengurutkannya berdasarkan peluang."
+        description="Ide tema dari event dan musim, diurutkan menurut peluang."
       />
       <RisetForm initialRows={initialRows} initialRun={run ? { region: run.region } : null} />
     </div>

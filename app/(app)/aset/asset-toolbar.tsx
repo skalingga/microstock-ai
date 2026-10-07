@@ -50,7 +50,7 @@ export function AssetToolbar({ pending, bannedWords, job }: { pending: number; b
       </span>
       {!running && pending > 0 && (
         <>
-          <span>{pending} aset belum selesai diperiksa atau belum punya metadata.</span>
+          <span className="font-medium">{pending} aset belum punya QC atau metadata</span>
           <Button size="sm" onClick={start}>
             Jalankan QC dan metadata
           </Button>

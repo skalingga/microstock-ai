@@ -15,7 +15,6 @@ export default async function HalamanPengaturan() {
       <PageHeader
         icon={Settings}
         title="Pengaturan"
-        description="Urutan provider AI, batas biaya, daftar kata terlarang, serta gaya dan palet bawaan."
       />
 
       {error || !settings ? (

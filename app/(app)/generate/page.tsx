@@ -48,7 +48,7 @@ export default async function HalamanGenerate({
       <PageHeader
         icon={Sparkles}
         title="Generate"
-        description="Masukkan satu tema, lalu aplikasi membuat variasi aset SVG satu per satu. Biarkan tab ini terbuka sampai selesai."
+        description="Biarkan tab ini terbuka selama antrean berjalan."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
           {settings && (
@@ -58,7 +58,7 @@ export default async function HalamanGenerate({
               label="Biaya Kenari bulan ini"
               value={formatIdr(Number(kenariSpent ?? 0))}
               progress={settings.kenari_monthly_budget_idr > 0 ? Number(kenariSpent ?? 0) / settings.kenari_monthly_budget_idr : undefined}
-              detail={`dari batas ${formatIdr(settings.kenari_monthly_budget_idr)} · model gratis tidak dihitung`}
+              detail={`dari batas ${formatIdr(settings.kenari_monthly_budget_idr)}`}
             />
           )}
           <StatCard
@@ -69,16 +69,16 @@ export default async function HalamanGenerate({
               totalCalls === 0
                 ? "Belum ada panggilan hari ini"
                 : Object.entries(usageByProvider)
-                    .map(([provider, u]) => `${provider} ${u.total}${u.failed > 0 ? ` (${u.failed} gagal)` : ""}`)
+                    .map(([provider, u]) => `${provider} ${u.total}`)
                     .join(" · ")
             }
           />
           <StatCard
             icon={CircleCheck}
             tone="emerald"
-            label="Tingkat berhasil hari ini"
+            label="Berhasil hari ini"
             value={totalCalls === 0 ? "–" : `${Math.round(((totalCalls - totalFailed) / totalCalls) * 100)}%`}
-            detail="Panggilan yang dijawab provider tanpa error"
+            detail={totalFailed > 0 ? `${totalFailed} gagal` : undefined}
           />
         </div>
       </PageHeader>

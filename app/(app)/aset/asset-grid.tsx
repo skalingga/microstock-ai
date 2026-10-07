@@ -63,7 +63,7 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
         )}
       >
         {picked.length === 0 ? (
-          <span className="px-1 text-muted-foreground">Centang aset untuk memilih dan menghapus beberapa sekaligus.</span>
+          <span className="px-1 text-muted-foreground">Pilih aset untuk dihapus</span>
         ) : (
           <span className="px-1 font-medium">{picked.length} dipilih</span>
         )}

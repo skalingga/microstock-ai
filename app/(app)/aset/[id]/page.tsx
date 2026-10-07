@@ -115,7 +115,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
                 className="aspect-square w-full max-w-xs rounded-xl border"
                 style={{ backgroundImage: `url(${svgUrl})`, backgroundSize: "50% 50%", backgroundRepeat: "repeat" }}
               />
-              <p className="text-xs text-muted-foreground">Cari garis sambungan di tengah. Pola yang baik tidak terlihat sambungannya.</p>
+              <p className="text-xs text-muted-foreground">Sambungan di tengah tidak boleh terlihat.</p>
             </div>
           )}
         </div>
@@ -147,7 +147,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
               </ul>
             )}
             {!asset.title && asset.qc_status === "menunggu" && (
-              <p className="text-sm text-muted-foreground">Menunggu metadata. Buat dengan AI atau isi manual di bawah.</p>
+              <p className="text-sm text-muted-foreground">Metadata belum ada.</p>
             )}
             <AssetActions
               asset={{

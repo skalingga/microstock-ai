@@ -74,7 +74,7 @@ export function MetadataForm(props: Props) {
           onChange={(e) => setKeywordText(e.target.value)}
           placeholder={"pumpkin\nautumn\nharvest"}
         />
-        <p className="text-xs text-muted-foreground">Satu per baris atau dipisah koma. Urutan menentukan prioritas di pencarian Adobe.</p>
+        <p className="text-xs text-muted-foreground">Satu per baris. Yang paling atas paling penting.</p>
       </div>
 
       <div className="space-y-1.5">

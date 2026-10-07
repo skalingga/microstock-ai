@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { LayoutGrid, Loader2, Sparkles, Square, Wand2 } from "lucide-react";
+import { Clock, LayoutGrid, Loader2, Sparkles, Square, Wallet, Wand2 } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -153,14 +154,14 @@ export function GenerateForm({
             <Wand2 className="size-4 text-primary" />
             Tema baru
           </CardTitle>
-          <CardDescription>
-            Tulis tema dalam bahasa Inggris, mis. “autumn harvest icons”. Hindari nama merek, tokoh, atau karakter.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={start} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="theme">Tema</Label>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="theme">Tema (bahasa Inggris)</Label>
+                <InfoTip align="start">Hindari nama merek, tokoh, atau karakter: Adobe menolaknya.</InfoTip>
+              </div>
               <Input
                 id="theme"
                 value={theme}
@@ -175,7 +176,13 @@ export function GenerateForm({
 
             {traced ? (
               <div className="space-y-2">
-                <Label htmlFor="image-model">Model gambar (berbayar, saldo Kenari)</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="image-model">Model gambar</Label>
+                  <InfoTip align="start">
+                    Berbayar dari saldo Kenari. Model menggambar hitam-putih, lalu server mengubahnya jadi SVG. Konsep dan
+                    metadata tetap memakai model teks. Tanpa cadangan dan tanpa coba-ulang otomatis.
+                  </InfoTip>
+                </div>
                 <select
                   id="image-model"
                   value={imageModel}
@@ -193,14 +200,16 @@ export function GenerateForm({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-muted-foreground">
-                  Model gambar menggambar hitam-putih, lalu server mengubahnya jadi SVG. Konsep dan metadata tetap memakai
-                  model teks. Tidak ada cadangan otomatis dan tidak ada coba-ulang otomatis saat Gagal QC.
-                </p>
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="model">Model untuk membuat SVG</Label>
+                <div className="flex items-center gap-1">
+                <Label htmlFor="model">Model SVG</Label>
+                <InfoTip align="start">
+                  Hanya untuk menggambar SVG; konsep dan metadata memakai model dari Pengaturan. Model yang dipilih jalan
+                  sendiri tanpa cadangan. Model Kenari berbayar masuk batas biaya bulanan.
+                </InfoTip>
+              </div>
                 {catalog && catalog.length > 0 ? (
                   <select
                     id="model"
@@ -251,11 +260,6 @@ export function GenerateForm({
                     placeholder={catalog === null ? "Memuat daftar model..." : "Kosong = model dari Pengaturan; atau ketik nama model Kenari"}
                   />
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Hanya untuk membuat SVG; konsep dan metadata tetap memakai model dari Pengaturan. Model Kenari berbayar
-                  dihitung ke batas biaya Kenari bulanan. Bila model yang dipilih gagal, aplikasi tidak pindah ke model lain.
-                  Model Gemini yang lambat (mis. 3.8) bisa melewati batas waktu 60 detik.
-                </p>
               </div>
             )}
 
@@ -317,29 +321,14 @@ export function GenerateForm({
 
             <StylePreview style={style} palette={palette} />
 
-            {traced ? (
-              <div className="space-y-1 text-sm">
-                <p className="text-muted-foreground">
-                  Perkiraan waktu: sekitar {estimatedMinutes} menit. Perkiraan biaya gambar:{" "}
-                  {imageCost === undefined
-                    ? "harga model ini belum diketahui (akan ditolak server)"
-                    : `${formatIdr(imageCost)} (${count} × ${formatIdr(imagePrice!)}), plus konsep dan metadata yang sangat murah`}
-                  . Sisa batas Kenari bulan ini: {formatIdr(kenariBudgetLeftIdr)}.
-                </p>
-                {imageCost !== undefined && imageCost > kenariBudgetLeftIdr && (
-                  <p className="text-amber-700 dark:text-amber-400">
-                    Biaya melebihi sisa batas bulan ini: antrean akan berhenti saat batas tercapai. Kurangi jumlah variasi
-                    atau naikkan batas di Pengaturan.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Perkiraan waktu: sekitar {estimatedMinutes} menit bila batas model gratis 5 permintaan per menit.
+            {traced && imageCost !== undefined && imageCost > kenariBudgetLeftIdr && (
+              <p role="alert" className="rounded-xl bg-warning-soft px-3 py-2 text-sm font-medium text-warning-foreground">
+                Biaya melebihi sisa batas Kenari bulan ini ({formatIdr(kenariBudgetLeftIdr)}). Antrean berhenti saat batas
+                tercapai.
               </p>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button type="submit" size="lg" disabled={running || theme.trim().length < 2}>
                 {running ? <Loader2 className="animate-spin" /> : <Sparkles />}
                 {running ? "Sedang berjalan..." : "Mulai generate"}
@@ -349,6 +338,18 @@ export function GenerateForm({
                   <Square />
                   Hentikan
                 </Button>
+              )}
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                <Clock className="size-3.5" />±{estimatedMinutes} menit
+              </span>
+              {traced && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground"
+                  title={imageCost === undefined ? undefined : `${count} × ${formatIdr(imagePrice!)}`}
+                >
+                  <Wallet className="size-3.5" />
+                  {imageCost === undefined ? "Harga model belum diketahui" : formatIdr(imageCost)}
+                </span>
               )}
             </div>
           </form>

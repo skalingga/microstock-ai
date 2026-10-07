@@ -89,7 +89,7 @@ export default async function HalamanAset({
       <PageHeader
         icon={LayoutGrid}
         title="Aset"
-        description="Semua aset SVG hasil generate beserta status QC dan metadata. Hanya aset berstatus Lolos yang bisa diekspor tanpa konfirmasi."
+        description="Semua aset SVG beserta status QC."
         actions={
           <Link href="/generate" className={buttonVariants({ size: "lg" })}>
             <Sparkles />

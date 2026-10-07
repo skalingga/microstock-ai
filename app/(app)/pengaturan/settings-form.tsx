@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Ban, Bot, Loader2, Palette, Save, Wallet } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,14 +45,14 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
     <form onSubmit={onSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Urutan provider AI</CardTitle>
-          <CardDescription>
-            Aplikasi memakai provider utama dulu, lalu pindah ke cadangan bila kena limit, terlalu lama, error, atau
-            model hilang. Kosongkan nama model untuk memakai model bawaan dari environment (Gemini: gemini-3.5-flash-lite
-            bila GEMINI_DEFAULT_MODEL kosong, 500 permintaan per hari). Gemini memakai free tier; batasnya terlihat
-            di Google AI Studio, menu Rate Limit.
-            Recraft tidak masuk daftar ini karena hanya jalan lewat tombol eksplisit.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="size-4 text-primary" />
+            Model AI
+            <InfoTip align="start">
+              Provider utama dipakai dulu. Saat kena limit, terlalu lama, atau error, aplikasi pindah ke cadangan.
+              Kolom model yang kosong memakai model bawaan (Gemini: gemini-3.5-flash-lite).
+            </InfoTip>
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-2">
@@ -99,42 +101,42 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="kenari_text_model">Model Kenari untuk konsep dan metadata</Label>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="kenari_text_model">Model teks Kenari (konsep dan metadata)</Label>
+              <InfoTip align="start">Bisa memakai model yang lebih murah, karena hanya teks. SVG tetap memakai model utama.</InfoTip>
+            </div>
             <Input
               id="kenari_text_model"
               name="kenari_text_model"
               defaultValue={settings.kenari_text_model}
               placeholder="Sama dengan model utama"
             />
-            <p className="text-muted-foreground text-xs">
-              Konsep dan metadata hanya berupa teks, jadi bisa memakai model yang lebih murah. Gambar SVG tetap
-              memakai model utama. Kosongkan untuk memakai model yang sama.
-            </p>
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="kenari_image_model">Model gambar Kenari (gaya Siluet dan Line art)</Label>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="kenari_image_model">Model gambar (Siluet dan Line art)</Label>
+              <InfoTip align="start">Berbayar per gambar dari saldo Kenari dan masuk batas biaya bulanan. Tanpa cadangan.</InfoTip>
+            </div>
             <Input
               id="kenari_image_model"
               name="kenari_image_model"
               defaultValue={settings.kenari_image_model}
               placeholder="gpt-image-2"
             />
-            <p className="text-muted-foreground text-xs">
-              Model ini membuat gambar hitam-putih yang lalu diubah jadi SVG di server. Berbayar per gambar dari saldo
-              Kenari dan masuk batas biaya bulanan. Kosongkan untuk memakai KENARI_IMAGE_MODEL atau gpt-image-2. Tidak
-              ada cadangan otomatis untuk gaya ini.
-            </p>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Kata terlarang</CardTitle>
-          <CardDescription>
-            Nama artis, orang terkenal, karakter fiksi, merek, atau IP lain. Satu kata atau frasa per baris.
-            Dipakai untuk menyaring prompt dan metadata.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Ban className="size-4 text-primary" />
+            Kata terlarang
+            <InfoTip align="start">
+              Nama artis, tokoh, karakter fiksi, merek, atau IP lain. Dipakai untuk menyaring tema, prompt, dan metadata.
+            </InfoTip>
+          </CardTitle>
+          <CardDescription>Satu kata atau frasa per baris.</CardDescription>
         </CardHeader>
         <CardContent>
           <Label htmlFor="banned_words" className="sr-only">
@@ -151,10 +153,10 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
 
       <Card>
         <CardHeader>
-          <CardTitle>Gaya dan palet bawaan</CardTitle>
-          <CardDescription>
-            Palet ditulis satu per baris dengan format <code>Nama: #FF6B6B, #FFD93D</code>.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="size-4 text-primary" />
+            Gaya dan palet bawaan
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -173,7 +175,9 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="palettes">Palet warna</Label>
+            <Label htmlFor="palettes">
+              Palet warna <span className="font-normal text-muted-foreground">· format <code>Nama: #FF6B6B, #FFD93D</code></span>
+            </Label>
             <Textarea
               id="palettes"
               name="palettes"
@@ -187,53 +191,36 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
 
       <Card>
         <CardHeader>
-          <CardTitle>Batas biaya Kenari</CardTitle>
-          <CardDescription>
-            Batas pengeluaran model berbayar Kenari per bulan, dalam Rupiah. Setelah tercapai, model berbayar berhenti
-            sampai bulan berikutnya. Model gratis (berakhiran :free) tidak dihitung dan tidak pernah diblokir. Isi 0
-            untuk melarang model berbayar.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="size-4 text-primary" />
+            Batas biaya Kenari per bulan
+            <InfoTip align="start">
+              Setelah tercapai, model berbayar berhenti sampai bulan berikutnya. Model gratis tidak dihitung. Isi 0 untuk
+              melarang model berbayar.
+            </InfoTip>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Label htmlFor="kenari_monthly_budget_idr" className="sr-only">
             Batas biaya Kenari per bulan (Rupiah)
           </Label>
-          <Input
-            id="kenari_monthly_budget_idr"
-            name="kenari_monthly_budget_idr"
-            type="number"
-            min={0}
-            max={1000000}
-            step={1000}
-            defaultValue={settings.kenari_monthly_budget_idr}
-            className="max-w-40"
-          />
+          <div className="flex max-w-48 items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Rp</span>
+            <Input
+              id="kenari_monthly_budget_idr"
+              name="kenari_monthly_budget_idr"
+              type="number"
+              min={0}
+              max={1000000}
+              step={1000}
+              defaultValue={settings.kenari_monthly_budget_idr}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Batas biaya Recraft</CardTitle>
-          <CardDescription>
-            Batas pengeluaran per bulan dalam dolar AS. Nilai tertinggi yang diizinkan adalah $10.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Label htmlFor="recraft_monthly_budget_usd" className="sr-only">
-            Batas biaya Recraft per bulan (USD)
-          </Label>
-          <Input
-            id="recraft_monthly_budget_usd"
-            name="recraft_monthly_budget_usd"
-            type="number"
-            min={0}
-            max={10}
-            step={0.5}
-            defaultValue={settings.recraft_monthly_budget_usd}
-            className="max-w-32"
-          />
-        </CardContent>
-      </Card>
+      {/* Recraft is not built yet (Stage 7 became the Kenari image path): keep its saved limit without showing it. */}
+      <input type="hidden" name="recraft_monthly_budget_usd" value={settings.recraft_monthly_budget_usd} />
 
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -241,9 +228,12 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
         </p>
       )}
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Menyimpan..." : "Simpan pengaturan"}
-      </Button>
+      <div className="sticky bottom-4 z-10 flex justify-end">
+        <Button type="submit" size="lg" disabled={pending} className="shadow-lg shadow-primary/30">
+          {pending ? <Loader2 className="animate-spin" /> : <Save />}
+          {pending ? "Menyimpan..." : "Simpan pengaturan"}
+        </Button>
+      </div>
     </form>
   );
 }
