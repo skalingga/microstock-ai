@@ -1,3 +1,5 @@
+import { Settings } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsForm } from "./settings-form";
 
@@ -10,12 +12,10 @@ export default async function HalamanPengaturan() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Pengaturan</h1>
-        <p className="text-muted-foreground">
-          Urutan provider AI, daftar kata terlarang, gaya dan palet bawaan, serta batas biaya Recraft.
-        </p>
-      </div>
+      <PageHeader
+        icon={Settings}
+        title="Pengaturan"
+      />
 
       {error || !settings ? (
         <p role="alert" className="text-sm text-destructive">

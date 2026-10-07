@@ -1,5 +1,8 @@
 "use client";
 
+import { Download, Loader2 } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
+
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { QcBadge } from "@/components/qc-badge";
@@ -150,13 +153,14 @@ export function ExportPanel({ userId, candidates }: Props) {
         )}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={startExport} disabled={!canExport}>
+          <Button size="lg" onClick={startExport} disabled={!canExport}>
+            {building ? <Loader2 className="animate-spin" /> : <Download />}
             {building ? `Menyiapkan ${building.done}/${building.total}...` : `Ekspor ${chosen.length} aset`}
           </Button>
-          <p className="text-xs text-muted-foreground">
+          <InfoTip align="start">
             Setiap SVG diberi ukuran artboard {ADOBE.artboard.maxSidePx} px (syarat Adobe: minimal {ADOBE.artboard.minMegapixels} MP).
             Gambarnya tidak berubah.
-          </p>
+          </InfoTip>
         </div>
       </section>
 

@@ -1,9 +1,12 @@
+import { ChevronLeft, ChevronRight, LayoutGrid, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { QcBadge } from "@/components/qc-badge";
+import { PageHeader } from "@/components/page-header";
+import { buttonVariants } from "@/components/ui/button";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
 
 const PAGE_SIZE = 24;
@@ -83,38 +86,54 @@ export default async function HalamanAset({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Aset</h1>
-        <p className="text-muted-foreground">
-          Semua aset SVG hasil generate beserta status QC dan metadata. Hanya aset berstatus Lolos yang bisa diekspor
-          tanpa konfirmasi.
-        </p>
+      <PageHeader
+        icon={LayoutGrid}
+        title="Aset"
+        description="Semua aset SVG beserta status QC."
+        actions={
+          <Link href="/generate" className={buttonVariants({ size: "lg" })}>
+            <Sparkles />
+            Generate baru
+          </Link>
+        }
+      >
         {job && (
-          <p className="text-sm">
-            Menampilkan hasil satu job.{" "}
-            <Link href="/aset" className="font-medium underline underline-offset-4">
+          <p className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground">
+            Menampilkan hasil satu job.
+            <Link href="/aset" className="font-semibold underline underline-offset-4">
               Lihat semua aset
             </Link>
           </p>
         )}
-      </div>
+      </PageHeader>
 
       <AssetToolbar pending={pending} bannedWords={settings.data?.banned_words ?? []} job={job} />
 
-      <nav aria-label="Filter status" className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.value}
-            href={href({ status: f.value, page: 1 })}
-            aria-current={status === f.value ? "page" : undefined}
-            className={cn(
-              "rounded-md border px-3 py-1 text-sm transition-colors",
-              status === f.value ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-            )}
-          >
-            {f.label} <span className="opacity-70">{counts[f.value]}</span>
-          </Link>
-        ))}
+      <nav aria-label="Filter status" className="flex flex-wrap gap-1 rounded-2xl border bg-card p-1 shadow-xs sm:inline-flex">
+        {FILTERS.map((f) => {
+          const active = status === f.value;
+          return (
+            <Link
+              key={f.value}
+              href={href({ status: f.value, page: 1 })}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "inline-flex min-h-9 items-center gap-2 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150",
+                active ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {f.label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-px text-xs tabular-nums",
+                  active ? "bg-white/20" : "bg-muted text-muted-foreground",
+                )}
+              >
+                {counts[f.value]}
+              </span>
+            </Link>
+          );
+        })}
       </nav>
 
       {error ? (
@@ -123,57 +142,52 @@ export default async function HalamanAset({
         </p>
       ) : assets && assets.length > 0 ? (
         <>
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {assets.map((asset) => {
-              const url = asset.preview_path ? urlByPath.get(asset.preview_path) : undefined;
-              return (
-                <li key={asset.id} className="space-y-1.5 text-xs">
-                  <Link href={`/aset/${asset.id}`} className="block">
-                    <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-md border transition-shadow hover:shadow-md">
-                      {url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={url} alt={asset.title ?? asset.concept ?? "Aset SVG"} className="size-full object-contain" loading="lazy" />
-                      ) : (
-                        <span className="text-muted-foreground">Tanpa preview</span>
-                      )}
-                    </div>
-                  </Link>
-                  <p className="line-clamp-2 font-medium">{asset.title ?? asset.concept}</p>
-                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <QcBadge status={asset.qc_status} />
-                    {asset.exported_at && <span className="text-muted-foreground">Diekspor</span>}
-                    {asset.adobe_status === "diterima" && <span className="font-medium text-emerald-700">Diterima Adobe</span>}
-                    {asset.adobe_status === "ditolak" && <span className="font-medium text-red-700">Ditolak Adobe</span>}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+          <AssetGrid
+            assets={assets.map((asset) => ({
+              id: asset.id,
+              previewUrl: (asset.preview_path && urlByPath.get(asset.preview_path)) || undefined,
+              label: asset.title ?? asset.concept ?? "Aset SVG",
+              qcStatus: asset.qc_status,
+              exported: Boolean(asset.exported_at),
+              adobeStatus: asset.adobe_status,
+            }))}
+          />
 
           {lastPage > 1 && (
-            <nav aria-label="Halaman" className="flex items-center gap-4 text-sm">
+            <nav aria-label="Halaman" className="flex items-center justify-center gap-3 text-sm">
               {page > 1 ? (
-                <Link href={href({ page: page - 1 })} className="underline underline-offset-4">
+                <Link href={href({ page: page - 1 })} className={buttonVariants({ variant: "outline" })}>
+                  <ChevronLeft />
                   Sebelumnya
                 </Link>
               ) : (
-                <span className="text-muted-foreground">Sebelumnya</span>
+                <span className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
+                  <ChevronLeft />
+                  Sebelumnya
+                </span>
               )}
-              <span>
-                Halaman {page} dari {lastPage}
+              <span className="px-2 text-muted-foreground tabular-nums">
+                Halaman <span className="font-semibold text-foreground">{page}</span> dari {lastPage}
               </span>
               {page < lastPage ? (
-                <Link href={href({ page: page + 1 })} className="underline underline-offset-4">
+                <Link href={href({ page: page + 1 })} className={buttonVariants({ variant: "outline" })}>
                   Berikutnya
+                  <ChevronRight />
                 </Link>
               ) : (
-                <span className="text-muted-foreground">Berikutnya</span>
+                <span className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
+                  Berikutnya
+                  <ChevronRight />
+                </span>
               )}
             </nav>
           )}
         </>
       ) : (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
+          <span aria-hidden className="flex size-12 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
+            <LayoutGrid className="size-6" />
+          </span>
           {status === "semua" ? (
             <>
               Belum ada aset.{" "}

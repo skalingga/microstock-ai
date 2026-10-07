@@ -78,7 +78,7 @@ export function LoginForm({ notice }: { notice?: string }) {
       )}
       {state.info && <p className="text-sm text-muted-foreground">{state.info}</p>}
 
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>
         {pending ? "Memproses..." : isLupa ? "Kirim tautan" : isMasuk ? "Masuk" : "Buat akun"}
       </Button>
 
@@ -87,7 +87,7 @@ export function LoginForm({ notice }: { notice?: string }) {
           <button
             type="button"
             onClick={() => setMode("masuk")}
-            className="font-medium text-foreground underline underline-offset-4"
+            className="font-semibold text-primary underline-offset-4 hover:underline"
           >
             Kembali ke halaman masuk
           </button>
@@ -97,7 +97,7 @@ export function LoginForm({ notice }: { notice?: string }) {
             <button
               type="button"
               onClick={() => setMode(isMasuk ? "daftar" : "masuk")}
-              className="font-medium text-foreground underline underline-offset-4"
+              className="font-semibold text-primary underline-offset-4 hover:underline"
             >
               {isMasuk ? "Daftar" : "Masuk"}
             </button>

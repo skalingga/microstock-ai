@@ -1,3 +1,5 @@
+import { Telescope } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RisetForm, type ThemeRow } from "./riset-form";
@@ -36,13 +38,11 @@ export default async function HalamanRiset() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Riset Tema</h1>
-        <p className="text-muted-foreground">
-          Pilih pasar dan periode. Aplikasi mencari event dan musim di periode itu, lalu menyusun ide tema dan
-          mengurutkannya berdasarkan peluang.
-        </p>
-      </div>
+      <PageHeader
+        icon={Telescope}
+        title="Riset tema"
+        description="Ide tema dari event dan musim, diurutkan menurut peluang."
+      />
       <RisetForm initialRows={initialRows} initialRun={run ? { region: run.region } : null} />
     </div>
   );

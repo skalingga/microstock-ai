@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Clock, FlaskConical, Loader2, Shapes, Square, Trophy, Wallet } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
 import { QcBadge } from "@/components/qc-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,11 +152,15 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Uji baru</CardTitle>
-          <CardDescription>
-            Konsep dibuat sekali per tema oleh model teks di Pengaturan, lalu setiap model menggambar konsep yang sama.
-            Tiap model dicoba satu kali per konsep, tanpa coba-ulang: timeout atau balasan rusak dihitung gagal.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <FlaskConical className="size-4 text-primary" />
+            Uji baru
+            <InfoTip align="start">
+              Konsep dibuat sekali per tema (model teks dari Pengaturan), lalu tiap model menggambar konsep yang sama satu
+              kali, tanpa coba-ulang: timeout atau balasan rusak dihitung gagal. Siluet dan Line art tidak diuji di sini.
+              Model gratis Kenari berbagi satu kuota per menit, jadi antrean kadang menunggu.
+            </InfoTip>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={start} className="space-y-6">
@@ -183,9 +189,6 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
                   </select>
                 </div>
               ))}
-              <p className="text-xs text-muted-foreground">
-                Siluet dan Line art tidak diuji di sini: keduanya memakai model gambar berbayar, bukan model teks.
-              </p>
             </fieldset>
 
             <fieldset className="space-y-2" disabled={running}>
@@ -263,23 +266,29 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
               />
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              {cellCount} SVG ({validThemes.length} tema × {variations} konsep × {picked.length} model), perkiraan sekitar{" "}
-              {Math.max(1, Math.ceil((cellCount * SECONDS_PER_SVG) / 60))} menit. Model gratis Kenari berbagi satu kuota per
-              menit untuk seluruh akun, jadi antrean kadang menunggu.
-              {paidKenari > 0 &&
-                ` Model Kenari berbayar dihitung ke batas biaya bulanan (deepseek-v4-flash sekitar ${formatIdr(6)} per SVG).`}{" "}
-              Konsep memakai model teks dari Pengaturan.
-            </p>
-
-            <div className="flex gap-2">
-              <Button type="submit" disabled={running || cellCount === 0}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="submit" size="lg" disabled={running || cellCount === 0}>
+                {running ? <Loader2 className="animate-spin" /> : <FlaskConical />}
                 {running ? "Sedang berjalan..." : "Mulai uji"}
               </Button>
               {running && (
-                <Button type="button" variant="outline" onClick={() => abortRef.current?.abort()}>
+                <Button type="button" size="lg" variant="outline" onClick={() => abortRef.current?.abort()}>
+                  <Square />
                   Hentikan
                 </Button>
+              )}
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                <Shapes className="size-3.5" />
+                {cellCount} SVG
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                <Clock className="size-3.5" />±{Math.max(1, Math.ceil((cellCount * SECONDS_PER_SVG) / 60))} menit
+              </span>
+              {paidKenari > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground">
+                  <Wallet className="size-3.5" />
+                  {paidKenari} model berbayar
+                </span>
               )}
             </div>
           </form>
@@ -375,23 +384,26 @@ function SummaryTable({ rows }: { rows: ModelSummary[] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Skor = (Lolos + ½ × Perlu cek) ÷ semua percobaan. Status QC di sini hanya dari pemeriksaan visual, karena aset uji
-        tidak dibuatkan metadata. Seri diurutkan dari yang lebih cepat.
-      </p>
       {primary && (
-        <p className="text-sm">
-          Saran: model utama <span className="font-mono">{primary.model}</span>
-          {backup ? (
-            <>
-              , cadangan <span className="font-mono">{backup.model}</span> (kuotanya terpisah dari model utama)
-            </>
-          ) : (
-            " (belum ada cadangan dengan kuota terpisah yang lolos)"
-          )}
-          . Atur urutannya di <Link href="/pengaturan" className="underline underline-offset-4">Pengaturan</Link>. Lihat juga
-          gambarnya sendiri: skor QC tidak menilai bagus-jeleknya desain.
-        </p>
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-4 py-3 text-sm text-secondary-foreground">
+          <Trophy className="size-4" />
+          <span>
+            Utama: <span className="font-mono font-semibold">{primary.model}</span>
+            {backup && (
+              <>
+                {" "}
+                · cadangan: <span className="font-mono font-semibold">{backup.model}</span>
+              </>
+            )}
+          </span>
+          <InfoTip align="end">
+            Skor = (Lolos + ½ Perlu cek) ÷ percobaan, dari QC visual saja; seri diurutkan dari yang tercepat. Cadangan dipilih
+            dari kuota yang terpisah dari model utama. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya.
+          </InfoTip>
+          <Link href="/pengaturan" className="ml-auto font-semibold underline-offset-4 hover:underline">
+            Atur di Pengaturan
+          </Link>
+        </div>
       )}
     </div>
   );
@@ -473,14 +485,21 @@ function CellView({ cell, preview }: { cell: BenchCell; preview?: string }) {
         <img src={preview} alt={cell.concept} className="size-full object-contain" />
       ) : (
         <span className="px-1 text-center text-muted-foreground">
-          {cell.status === "berjalan" ? "Dibuat..." : cell.status === "gagal" ? (ERROR_LABEL[cell.errorCode ?? ""] ?? "Gagal") : cell.status === "selesai" ? "" : "Menunggu"}
+          {cell.status === "berjalan"
+            ? "Dibuat..."
+            : cell.status === "gagal"
+              ? (ERROR_LABEL[cell.errorCode ?? ""] ?? "Gagal")
+              : cell.status === "selesai"
+                ? "Aset dihapus"
+                : "Menunggu"}
         </span>
       )}
     </div>
   );
   return (
     <div className="space-y-1">
-      {cell.assetId ? <Link href={`/aset/${cell.assetId}`}>{thumb}</Link> : thumb}
+      {/* A finished cell without a preview means the asset was deleted from the gallery: no dead link. */}
+      {cell.assetId && preview ? <Link href={`/aset/${cell.assetId}`}>{thumb}</Link> : thumb}
       <div className="flex flex-wrap items-center gap-1">
         {cell.qc && <QcBadge status={cell.qc} />}
         {cell.durationMs !== undefined && cell.status !== "berjalan" && (

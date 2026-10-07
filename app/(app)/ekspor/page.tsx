@@ -1,4 +1,7 @@
+import { CircleX, Hourglass, ListChecks, PackageCheck } from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { redirect } from "next/navigation";
 import { AI_LABEL_REMINDER } from "@/lib/adobe/rules";
 import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
@@ -14,12 +17,12 @@ const dateFormat = new Intl.DateTimeFormat("id-ID", {
 });
 
 const CHECKLIST = [
-  "Ekstrak file ZIP lebih dulu. Adobe tidak menerima ZIP untuk vektor, jadi yang diunggah adalah file SVG-nya satu per satu.",
-  "Buka Contributor Portal Adobe Stock, pilih Upload, lalu pilih semua file SVG hasil ekstrak.",
-  `Untuk setiap aset, centang "${AI_LABEL_REMINDER}". Ini wajib untuk semua aset buatan AI.`,
-  "Impor file CSV (Upload CSV) agar judul, keyword, dan kategori terisi. Jangan mengubah baris header.",
-  "Periksa kategori di dialog CSV. Nomor kategori di aplikasi belum dikonfirmasi resmi oleh Adobe. Periksa juga peringatan ukuran artboard (minimal 15 MP).",
-  "Lihat kembali setiap aset sebelum submit. Aset yang menggambarkan orang atau properti nyata butuh release.",
+  "Ekstrak ZIP, lalu unggah file SVG-nya (Adobe tidak menerima ZIP untuk vektor).",
+  "Di Contributor Portal: Upload, pilih semua file SVG.",
+  `Centang "${AI_LABEL_REMINDER}" di setiap aset.`,
+  "Upload CSV agar judul, keyword, dan kategori terisi. Jangan ubah baris header.",
+  "Cek kategori dan peringatan ukuran artboard sebelum submit.",
+  "Aset dengan orang atau properti nyata butuh release.",
 ];
 
 export default async function HalamanEkspor() {
@@ -96,34 +99,57 @@ export default async function HalamanEkspor() {
       : [],
   );
 
+  const readyCount = candidates.filter((c) => c.status === "lolos" && !c.exportedAt).length;
+
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Ekspor</h1>
-        <p className="text-muted-foreground">
-          Unduh aset yang lolos QC sebagai ZIP (file SVG) dan CSV (judul, keyword, kategori) untuk diunggah ke Adobe Stock.
-        </p>
-        {((waiting.count ?? 0) > 0 || (failed.count ?? 0) > 0) && (
-          <p className="text-sm text-muted-foreground">
-            Belum bisa diekspor: {waiting.count ?? 0} aset menunggu QC atau metadata, {failed.count ?? 0} gagal QC.{" "}
-            <Link href="/aset" className="font-medium underline underline-offset-4">
-              Lihat di Aset
-            </Link>
-          </p>
-        )}
-      </div>
+      <PageHeader
+        icon={PackageCheck}
+        title="Ekspor"
+        description="ZIP berisi SVG dan CSV metadata untuk Adobe Stock."
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
+          <StatCard
+            icon={PackageCheck}
+            tone="emerald"
+            label="Siap diekspor"
+            value={readyCount}
+          />
+          <StatCard
+            icon={Hourglass}
+            tone="amber"
+            label="Menunggu QC"
+            value={waiting.count ?? 0}
+            detail={
+              <Link href="/aset?status=menunggu" className="font-medium text-primary underline-offset-4 hover:underline">
+                Proses di Aset
+              </Link>
+            }
+          />
+          <StatCard icon={CircleX} tone="rose" label="Gagal QC" value={failed.count ?? 0} />
+        </div>
+      </PageHeader>
 
       <ExportPanel userId={user.id} candidates={candidates} />
 
       <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
 
-      <section className="space-y-3 rounded-lg border p-4" aria-labelledby="checklist-heading">
-        <h2 id="checklist-heading" className="font-medium">
+      <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="checklist-heading">
+        <h2 id="checklist-heading" className="flex items-center gap-2 font-semibold">
+          <ListChecks className="size-4 text-primary" />
           Checklist upload ke Adobe Stock
         </h2>
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm">
-          {CHECKLIST.map((step) => (
-            <li key={step}>{step}</li>
+        <ol className="space-y-2.5 text-sm">
+          {CHECKLIST.map((step, i) => (
+            <li key={step} className="flex gap-3">
+              <span
+                aria-hidden
+                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground"
+              >
+                {i + 1}
+              </span>
+              <span className="pt-0.5 leading-relaxed">{step}</span>
+            </li>
           ))}
         </ol>
       </section>

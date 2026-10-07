@@ -1,5 +1,8 @@
 "use client";
 
+import { ExternalLink, Search, Sparkles, TrendingUp } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -194,11 +197,14 @@ export function RisetForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Riset baru</CardTitle>
-          <CardDescription>
-            Periode maksimal 12 bulan. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) adalah perkiraan,
-            cek lagi sebelum menentukan batas upload.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="size-4 text-primary" />
+            Riset baru
+            <InfoTip align="start">
+              Periode maksimal 12 bulan. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) hanya perkiraan: cek lagi
+              sebelum menentukan batas upload.
+            </InfoTip>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={start} className="space-y-4">
@@ -241,12 +247,17 @@ export function RisetForm({
       {sorted.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Tema berdasarkan peluang</CardTitle>
-            <CardDescription>
-              Peluang = permintaan tinggi dan persaingan rendah. Isi “Hasil Adobe” (jumlah hasil pencarian di Adobe
-              Stock) agar skor persaingan memakai data nyata; tanpa itu dianggap sedang.
-              {trendsMissing && " Google Trends tidak tersedia, jadi permintaan memakai perkiraan AI dan bobot event."}
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="size-4 text-primary" />
+              Tema berdasarkan peluang
+              <InfoTip align="start">
+                Peluang tinggi = permintaan tinggi dan persaingan rendah. Isi “Hasil Adobe” (jumlah hasil pencarian di Adobe
+                Stock) agar skor persaingan memakai data nyata; kalau kosong dianggap sedang.
+              </InfoTip>
+            </CardTitle>
+            {trendsMissing && (
+              <CardDescription>Google Trends tidak tersedia: permintaan memakai perkiraan AI.</CardDescription>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {sorted.map((row, index) => {
@@ -254,10 +265,27 @@ export function RisetForm({
               const query = row.keywords[0] ?? row.title;
               const generateHref = `/generate?${new URLSearchParams({ tema: row.title })}`;
               return (
-                <div key={row.id ?? `${row.title}-${index}`} className="space-y-2 rounded-lg border p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium">{row.title}</p>
+                <div
+                  key={row.id ?? `${row.title}-${index}`}
+                  className="space-y-3 rounded-2xl border bg-card p-4 transition-[border-color,box-shadow] duration-200 hover:border-primary/30 hover:shadow-md"
+                >
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div
+                      className={cn(
+                        "flex size-14 shrink-0 flex-col items-center justify-center rounded-2xl ring-1 ring-inset",
+                        s.opportunity >= 60
+                          ? "bg-success-soft text-success-foreground ring-success/25"
+                          : s.opportunity >= 40
+                            ? "bg-warning-soft text-warning-foreground ring-warning/30"
+                            : "bg-muted text-muted-foreground ring-border",
+                      )}
+                      title="Skor peluang"
+                    >
+                      <span className="text-lg leading-none font-bold tabular-nums">{s.opportunity}</span>
+                      <span className="text-[10px] font-medium uppercase">peluang</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{row.title}</p>
                       <p className="text-sm text-muted-foreground">
                         {row.event || "Tema sepanjang tahun"}
                         {row.uploadBy ? ` · upload sebelum ${row.uploadBy}` : ""}
@@ -268,20 +296,27 @@ export function RisetForm({
                         </p>
                       )}
                       {deadlineStatus(daysLeftOf(row)) === "mendesak" && (
-                        <p className="text-xs text-amber-600">Batas upload kurang dari 14 hari lagi.</p>
+                        <p className="text-xs font-medium text-warning-foreground">Batas upload kurang dari 14 hari lagi.</p>
                       )}
                     </div>
                     <Link href={generateHref} className={buttonVariants({ size: "sm" })}>
+                      <Sparkles />
                       Generate dari tema ini
                     </Link>
                   </div>
-                  <p className="text-sm">
-                    Peluang <strong>{s.opportunity}</strong> · permintaan {s.demand}
+                  <p className="text-sm text-muted-foreground">
+                    Permintaan <span className="font-medium text-foreground">{s.demand}</span>
                     {row.trendScore === null ? " (perkiraan)" : " (Trends)"} · persaingan{" "}
                     {s.competition === null ? "belum diketahui" : `${s.competition}${s.competitionKnown ? "" : " (perkiraan)"}`}
                   </p>
                   {row.keywords.length > 0 && (
-                    <p className="text-xs text-muted-foreground">{row.keywords.join(", ")}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {row.keywords.map((k, i) => (
+                        <span key={`${k}-${i}`} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {k}
+                        </span>
+                      ))}
+                    </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <Label htmlFor={`adobe-${index}`} className="text-xs">
@@ -299,8 +334,9 @@ export function RisetForm({
                       href={`https://stock.adobe.com/search?k=${encodeURIComponent(query)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs underline"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
                     >
+                      <ExternalLink className="size-3" />
                       Cari “{query}” di Adobe Stock
                     </a>
                   </div>

@@ -1,4 +1,6 @@
+import { FlaskConical, History } from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { parseCells, type BenchSetup } from "@/lib/generate/benchmark";
@@ -47,28 +49,29 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Uji model</h1>
-        <p className="text-muted-foreground">
-          Bandingkan model pembuat SVG dengan input yang sama: tiap tema mendapat konsep yang sama untuk semua model, lalu
-          hasilnya dinilai QC otomatis. Aset hasil uji masuk ke galeri Aset tanpa metadata.
-        </p>
-      </div>
+      <PageHeader
+        icon={FlaskConical}
+        title="Uji model"
+        description="Konsep yang sama digambar beberapa model, lalu dinilai QC."
+      />
 
       <BenchmarkRunner userId={user.id} bannedWords={settings?.banned_words ?? []} />
 
       {selected && (
         <section className="space-y-4">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">Hasil uji tersimpan</h2>
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <History className="size-5 text-primary" />
+              Hasil uji tersimpan
+            </h2>
             <div className="flex flex-wrap gap-2 text-sm">
               {runs!.map((r) => (
                 <Link
                   key={r.id}
                   href={`/uji-model?run=${r.id}`}
                   className={cn(
-                    "rounded-md border px-2 py-1",
-                    r.id === selected.id ? "border-primary bg-primary/10" : "text-muted-foreground hover:bg-muted",
+                    "rounded-full border bg-card px-3 py-1.5 transition-colors duration-150",
+                    r.id === selected.id ? "border-primary bg-secondary font-medium text-secondary-foreground" : "text-muted-foreground hover:bg-muted",
                   )}
                 >
                   {new Date(r.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" })}{" "}
