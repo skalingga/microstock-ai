@@ -17,7 +17,7 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 - [2026-10-07] Tahap 5 (di `main`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
 
 ## Sedang dikerjakan
-- Tahap 4 (uji banding model): halaman `/uji-model` sudah jadi (`lib/generate/benchmark.ts`, `app/(app)/uji-model/`, migrasi `20261011000000_model_benchmarks.sql` sudah diterapkan). Uji kecil (1 tema × 2 model) berhasil. Uji penuh 5 tema × 8 model (6 gratis + `deepseek-v4-flash` + `gemini-3.5-flash-lite`) belum dijalankan; setelah itu pilih model utama dan cadangan di Pengaturan.
+- Tahap 4 (uji banding model): halaman `/uji-model` jadi (`lib/generate/benchmark.ts`, `app/(app)/uji-model/`, migrasi `20261011000000_model_benchmarks.sql` sudah diterapkan) dan uji penuh sudah jalan di lokal (lihat Catatan). Menunggu pengguna: setujui pilihan model, lalu Tahap 4 dicentang dan di-merge ke `main`.
 - Perbandingan kualitas Gemini vs Kenari lewat dropdown `/generate` belum dilakukan pengguna.
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
@@ -27,6 +27,15 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
 
 ## Catatan penting
+- Hasil uji Tahap 4 (7 Okt 2026 22.12-22.45 WIB, akun adminproject, 5 tema satu per gaya teks × 8 model, satu percobaan, timeout 55 dtk). Skor = (Lolos + ½ Perlu cek) ÷ 5:
+  - gemini-3.5-flash-lite: 90%, 5/5 jadi (4 Lolos, 1 Perlu cek), median 5,9 dtk, Rp0
+  - agnes-2-0-flash:free: 60%, 4/5 (1 timeout), 15 dtk
+  - deepseek-v4-flash: 60%, 5/5 (1 Gagal QC: pola tidak menyambung), 37 dtk, Rp55 untuk 5 SVG
+  - muse-spark-1-3-contributor:free dan nemotron-3-super:free: 50%, 3/5 (2 timeout), 28-34 dtk
+  - agnes-3-0-flash:free: 40%, 4/5 (1 timeout, 1 Gagal QC: keluar kanvas), 15 dtk
+  - qwen3-8-27b:free: 0/5 (3 timeout, 2 error 503); hy3:free: 0/5 (5 timeout)
+  - Hampir semua Perlu cek berasal dari pemeriksa kemiripan (selisih 4-8 dari 64 bit dengan aset lama): ikon sederhana mudah dianggap mirip. Bahan penyetelan ambang di Tahap 6.
+  - Pengaturan akun sekarang sudah sesuai hasil: urutan Gemini (3.5 Flash-Lite) lalu Kenari (`KENARI_DEFAULT_MODEL` = deepseek-v4-flash). Saran halaman untuk cadangan adalah agnes-2-0-flash:free (seri dengan deepseek, lebih cepat), tapi deepseek lebih andal (5/5) dan cadangan jarang terpakai, jadi biayanya kecil.
 - Uji model (Tahap 4): konsep dibuat sekali per tema (model teks dari Pengaturan), lalu semua model menggambar konsep yang sama, satu percobaan tanpa coba-ulang, tanpa metadata (aset uji masuk galeri berstatus Menunggu). Status QC di tabel hanya dari pemeriksaan visual; kemiripan dibandingkan dengan riwayat saja, tidak antar-model. Skor = (Lolos + ½ Perlu cek) ÷ percobaan. Saran cadangan harus punya kuota terpisah: semua model `:free` Kenari berbagi satu kuota per menit untuk seluruh akun (terbukti: 5 panggilan paralel ke model gratis berbeda langsung 429 `free_quota_rpm`).
 - Cek cepat model gratis Kenari 2026-10-07 (satu SVG labu): cepat dan jadi SVG: agnes-3-0-flash 4 dtk, agnes-2-0-flash 7, nemotron-3-super 8, muse-spark 11, agnes-2-5-flash 13, qwen3-8-27b 24, hy3 29, laguna-s 39, north-mini-code 48. Terlalu lambat (lebih dari 55 dtk): glm-4-7-flash, mimo-v2-6-flash, nemotron-3-ultra, laguna-xs (timeout 90 dtk). Tidak menghasilkan SVG: space-bunny-alpha, step-3-7-flash.
 - Katalog Kenari kini mencantumkan harga `cache_read` (mis. deepseek-v4-flash Rp65 vs Rp2.750 per 1 juta token masuk). Aplikasi belum memakainya, jadi biaya teks dengan cache sedikit dilebihkan.
