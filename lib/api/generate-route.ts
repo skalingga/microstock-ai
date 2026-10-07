@@ -18,6 +18,8 @@ type Options<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number
   /** Text the user controls; checked against the banned-word list before any AI call. */
   textToCheck: (input: z.infer<S>) => string;
   run: (provider: SvgProvider, input: z.infer<S>, ctx: Ctx) => Promise<R>;
+  /** Model chosen by the user for this request, if any (SVG calls only). */
+  modelOverride?: (input: z.infer<S>) => string | undefined;
 };
 
 function fail(status: number, code: string, message: string, extra?: Record<string, unknown>) {
@@ -61,7 +63,12 @@ export async function handleGenerate<
 
   try {
     const result = await runWithFallback(
-      orderForKind(toProviderOrder(settings.provider_order), opts.kind, settings.kenari_text_model),
+      orderForKind(
+        toProviderOrder(settings.provider_order),
+        opts.kind,
+        settings.kenari_text_model,
+        opts.modelOverride?.(input),
+      ),
       opts.kind,
       (provider) => opts.run(provider, input, { bannedWords: settings.banned_words }),
       async (entry) => {

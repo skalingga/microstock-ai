@@ -16,6 +16,12 @@ export const conceptsRequestSchema = z.object({
   count: z.number().int().min(1, "Jumlah variasi minimal 1.").max(MAX_VARIATIONS, `Jumlah variasi maksimal ${MAX_VARIATIONS}.`),
 });
 
+// Kenari model ids look like "deepseek-v4-flash" or "vendor/model:free".
+export const modelId = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/, "Nama model tidak valid.");
+
 export const svgRequestSchema = z.object({
   theme,
   style,
@@ -25,6 +31,8 @@ export const svgRequestSchema = z.object({
     palette: z.array(hex).max(5),
   }),
   feedback: z.string().trim().max(600).optional(),
+  /** Model picked on the Generate page; when set it is used alone, with no silent fallback. */
+  model: modelId.optional(),
 });
 
 export type ConceptsRequest = z.infer<typeof conceptsRequestSchema>;

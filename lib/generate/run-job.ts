@@ -55,6 +55,8 @@ export type RunJobParams = {
   style: StyleId;
   palette: string[];
   count: number;
+  /** Model picked on the Generate page for the SVG calls; empty = the one from Settings. */
+  model?: string;
   /** From the user's settings: used to judge the generated metadata. */
   bannedWords: string[];
   signal: AbortSignal;
@@ -292,7 +294,7 @@ async function draftSvg(
 ): Promise<Draft> {
   const res = await postJson<SvgResponse>(
     "/api/generate/svg",
-    { theme: p.theme, style: p.style, concept, ...(feedback ? { feedback } : {}) },
+    { theme: p.theme, style: p.style, concept, ...(feedback ? { feedback } : {}), ...(p.model ? { model: p.model } : {}) },
     p.signal,
   );
   gate.update(res.rateLimit);
