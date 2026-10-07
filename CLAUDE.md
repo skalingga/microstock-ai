@@ -87,7 +87,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
 - [x] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
-- [ ] 5. Gemini direct sebagai cadangan otomatis
+- [x] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
 - [ ] 7. Recraft: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan
 - [x] 8. Riset tema: kalender event, Google Trends, skor peluang

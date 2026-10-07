@@ -1,7 +1,7 @@
 # Progress
 
 ## Status terakhir
-Tahap 1, 2, 3, 3b, dan 8 selesai dan terverifikasi. Tahap 5 (Gemini cadangan) sudah dikodekan di `dev` dan menunggu verifikasi pengguna; belum di `main`. Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
+Tahap 1, 2, 3, 3b, 5, dan 8 selesai. Tahap 5 (Gemini cadangan) sudah di `main` dan `GEMINI_API_KEY` sudah ada di Vercel. Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
 
 ## Sudah selesai
 - [2026-10-06] Tahap 1: fondasi (Next.js, Supabase Auth, skema + RLS, deploy Vercel)
@@ -12,15 +12,14 @@ Tahap 1, 2, 3, 3b, dan 8 selesai dan terverifikasi. Tahap 5 (Gemini cadangan) su
 - [2026-10-07] Verifikasi 3b: batch pola `autumn leaves` (palet Musim gugur, 5 aset) = 4 Lolos, 1 Gagal (gagal sambung tile), turun dari 2 gagal per 5; coba-ulang otomatis berjalan
 - [2026-10-07] Tahap 8 riset tema (kalender, Google Trends, skor peluang; migrasi `20261008000000`), alat Tahap 6 (migrasi `20261009000000`), pilihan model SVG di `/generate`, perbaikan riset pasar Dunia (jatah token). Semua sudah di `main`
 - [2026-10-07] Login: tombol intip password, lupa password (email -> /auth/callback -> /reset-password). Perlu Redirect URLs di Supabase, lihat catatan
-- [2026-10-07] Tahap 5 (kode, di `dev`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
+- [2026-10-07] Tahap 5 (di `main`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
 
 ## Sedang dikerjakan
-- Tahap 5 menunggu verifikasi: pengguna perlu menambah `GEMINI_API_KEY` di Vercel (Production + Preview), lalu mencoba generate dengan model Gemini dari dropdown dan membandingkan dengan Kenari. Setelah lolos: merge `dev` ke `main`, centang Tahap 5 di CLAUDE.md.
+- Tidak ada kode yang menggantung. Perbandingan kualitas Gemini vs Kenari lewat dropdown `/generate` belum dilakukan pengguna.
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-0. Verifikasi Tahap 5 (lihat "Sedang dikerjakan").
-1. Bandingkan model: buat batch kecil (5 aset) dengan tema, gaya, dan palet sama memakai model berbeda lewat dropdown di `/generate`, bandingkan di galeri dan biaya. Satu-satunya model yang sudah teruji: `deepseek-v4-flash`.
+1. Bandingkan model, termasuk Gemini (grup "Gemini (free tier)" di dropdown): buat batch kecil (5 aset) dengan tema, gaya, dan palet sama memakai model berbeda lewat dropdown di `/generate`, bandingkan di galeri dan biaya. Satu-satunya model yang sudah teruji: `deepseek-v4-flash`.
 2. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
 3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
 
