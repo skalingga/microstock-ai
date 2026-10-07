@@ -102,7 +102,7 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
 
     const parsed = conceptsSchema.safeParse(extractJson(content));
     if (!parsed.success) {
-      throw new ProviderError("bad_output", "Balasan model bukan daftar konsep yang valid.");
+      throw new ProviderError("bad_output", "Balasan model bukan daftar konsep yang valid.", { costIdr });
     }
 
     const concepts: Concept[] = parsed.data.concepts.slice(0, input.count).map((c) => ({
@@ -111,7 +111,7 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
       palette: c.palette.filter((color) => HEX.test(color)).slice(0, 5),
     }));
     if (concepts.length === 0) {
-      throw new ProviderError("bad_output", "Model tidak menghasilkan konsep.");
+      throw new ProviderError("bad_output", "Model tidak menghasilkan konsep.", { costIdr });
     }
     return { concepts, model: this.model, costIdr, rateLimit };
   }
@@ -122,7 +122,7 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
 
     const svg = extractSvg(content);
     if (!svg) {
-      throw new ProviderError("bad_output", "Balasan model tidak berisi SVG yang utuh.");
+      throw new ProviderError("bad_output", "Balasan model tidak berisi SVG yang utuh.", { costIdr });
     }
     return { svg, model: this.model, costIdr, rateLimit };
   }
@@ -133,7 +133,7 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
 
     const parsed = metadataSchema.safeParse(extractJson(content));
     if (!parsed.success) {
-      throw new ProviderError("bad_output", "Balasan model bukan metadata yang valid.");
+      throw new ProviderError("bad_output", "Balasan model bukan metadata yang valid.", { costIdr });
     }
     const { title, keywords, category, needs_release } = parsed.data;
     return {
@@ -156,7 +156,7 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
 
     const parsed = themesSchema.safeParse(extractJson(content));
     if (!parsed.success) {
-      throw new ProviderError("bad_output", "Balasan model bukan daftar tema yang valid.");
+      throw new ProviderError("bad_output", "Balasan model bukan daftar tema yang valid.", { costIdr });
     }
 
     const themes: ThemeIdea[] = parsed.data.themes.slice(0, input.count).map((t) => ({
@@ -170,7 +170,7 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
       competitionGuess: Math.round(t.competition_guess),
     }));
     if (themes.length === 0) {
-      throw new ProviderError("bad_output", "Model tidak menghasilkan tema.");
+      throw new ProviderError("bad_output", "Model tidak menghasilkan tema.", { costIdr });
     }
     return { themes, model: this.model, costIdr, rateLimit };
   }
@@ -213,15 +213,18 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
       choices?: { message?: { content?: string | null }; finish_reason?: string }[];
       usage?: TokenUsage;
     } | null;
+    // Tokens are billed once the provider answers, even when the answer turns out unusable.
+    const costIdr = await this.costOf(body?.usage);
     const content = body?.choices?.[0]?.message?.content?.trim();
     if (!content) {
       const truncated = body?.choices?.[0]?.finish_reason === "length";
       throw new ProviderError(
         "bad_output",
         truncated ? "Jawaban model terpotong sebelum selesai." : "Model mengirim balasan kosong.",
+        { costIdr },
       );
     }
-    return { content, rateLimit, costIdr: await this.costOf(body?.usage) };
+    return { content, rateLimit, costIdr };
   }
 }
 

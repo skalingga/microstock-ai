@@ -1,5 +1,5 @@
 import { isImageStyle } from "@/lib/settings/schema";
-import { ProviderError } from "./errors";
+import { ProviderError, charged } from "./errors";
 import { kenariHttpError, readRateLimit } from "./kenari";
 import { imagePriceIdr } from "./kenari-image-pricing";
 import { imagePrompt } from "./prompts";
@@ -78,23 +78,29 @@ export class KenariImageProvider implements SvgProvider {
       throw kenariHttpError(res, detail, rateLimit);
     }
 
-    const body = (await res.json().catch(() => null)) as { data?: { b64_json?: string; url?: string }[] } | null;
-    const item = body?.data?.[0];
-    const remaining = Math.max(1_000, Math.min(DOWNLOAD_TIMEOUT_MS, this.timeoutMs - (Date.now() - started)));
-    const bytes = item?.b64_json
-      ? Buffer.from(item.b64_json, "base64")
-      : item?.url
-        ? await this.download(item.url, remaining)
-        : null;
-    if (!bytes) throw new ProviderError("bad_output", "Model gambar tidak mengirim gambar.");
-
-    // Loaded on demand so the other generate routes do not pull in potrace and jimp.
-    const { TraceError, traceImage } = await import("@/lib/svg/trace");
+    // Kenari bills the picture once it answers 200, so every failure from here on still costs the price.
     try {
-      const traced = await traceImage(bytes, style);
-      return { svg: traced.svg, model: this.model, costIdr: price, rateLimit };
+      const body = (await res.json().catch(() => null)) as { data?: { b64_json?: string; url?: string }[] } | null;
+      const item = body?.data?.[0];
+      const remaining = Math.max(1_000, Math.min(DOWNLOAD_TIMEOUT_MS, this.timeoutMs - (Date.now() - started)));
+      const bytes = item?.b64_json
+        ? Buffer.from(item.b64_json, "base64")
+        : item?.url
+          ? await this.download(item.url, remaining)
+          : null;
+      if (!bytes) throw new ProviderError("bad_output", "Model gambar tidak mengirim gambar.");
+
+      // Loaded on demand so the other generate routes do not pull in potrace and jimp.
+      const { TraceError, traceImage } = await import("@/lib/svg/trace");
+      try {
+        const traced = await traceImage(bytes, style);
+        return { svg: traced.svg, model: this.model, costIdr: price, rateLimit };
+      } catch (err) {
+        if (err instanceof TraceError) throw new ProviderError("bad_output", err.message);
+        throw err;
+      }
     } catch (err) {
-      if (err instanceof TraceError) throw new ProviderError("bad_output", err.message);
+      if (err instanceof ProviderError) throw charged(err, { costIdr: price });
       throw err;
     }
   }

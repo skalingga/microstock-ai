@@ -11,13 +11,27 @@ export type ProviderErrorCode =
 export class ProviderError extends Error {
   readonly code: ProviderErrorCode;
   readonly retryAfterSec?: number;
+  /** What the provider charged although the call failed, e.g. a reply that arrived but could not be parsed. */
+  readonly costIdr?: number;
+  readonly costUsd?: number;
 
-  constructor(code: ProviderErrorCode, message: string, opts?: { retryAfterSec?: number }) {
+  constructor(
+    code: ProviderErrorCode,
+    message: string,
+    opts?: { retryAfterSec?: number; costIdr?: number; costUsd?: number },
+  ) {
     super(message);
     this.name = "ProviderError";
     this.code = code;
     this.retryAfterSec = opts?.retryAfterSec;
+    this.costIdr = opts?.costIdr;
+    this.costUsd = opts?.costUsd;
   }
+}
+
+/** The same error, carrying the cost of a call that was billed before it failed. */
+export function charged(err: ProviderError, cost: { costIdr?: number; costUsd?: number }): ProviderError {
+  return new ProviderError(err.code, err.message, { retryAfterSec: err.retryAfterSec, ...cost });
 }
 
 // Codes where trying the next provider in the user's order makes sense.

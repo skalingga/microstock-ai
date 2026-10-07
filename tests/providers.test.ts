@@ -126,6 +126,26 @@ describe("KenariProvider", () => {
     expect((await provider.generateSvg(svgInput)).costIdr).toBeUndefined();
   });
 
+  it("keeps the cost of a billed reply that was not usable", async () => {
+    // Kenari bills the tokens even when the answer was cut off (seen 2026-10-07 on themes at 6000 tokens).
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "{\"themes\": [" }, finish_reason: "length" }],
+            usage: { prompt_tokens: 1000, completion_tokens: 2000 },
+          }),
+        ),
+    );
+    const provider = new KenariProvider("paid-model", {
+      apiKey: "kn-test",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      priceLookup: async () => ({ inIdr: 0.001, outIdr: 0.005 }),
+    });
+    await expect(provider.generateThemes({ region: "Indonesia", events: [], count: 3 })).rejects.toMatchObject({ code: "bad_output", costIdr: 11 });
+    await expect(provider.generateSvg(svgInput)).rejects.toMatchObject({ code: "bad_output", costIdr: 11 });
+  });
+
   it("parses metadata JSON, accepting keywords as a comma separated string", async () => {
     const json = JSON.stringify({ title: "Orange pumpkin", keywords: "pumpkin, autumn, harvest", category: "Graphic resources", needs_release: false });
     const out = await kenari((async () => reply(`Here you go:
@@ -178,6 +198,16 @@ describe("runWithFallback", () => {
     expect(result).toMatchObject({ provider: "gemini", model: "gemini-model" });
     expect(log).toHaveBeenNthCalledWith(1, expect.objectContaining({ provider: "kenari", ok: false }));
     expect(log).toHaveBeenNthCalledWith(2, expect.objectContaining({ provider: "gemini", ok: true }));
+  });
+
+  it("logs the cost of a failed call that was billed", async () => {
+    const log = vi.fn<(e: UsageEntry) => Promise<void>>(async () => {});
+    await expect(
+      runWithFallback(order, "svg", async () => {
+        throw new ProviderError("bad_output", "rusak", { costIdr: 28.5 });
+      }, log),
+    ).rejects.toMatchObject({ code: "bad_output" });
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ provider: "kenari", ok: false, costIdr: 28.5 }));
   });
 
   it("keeps the last rate limit when every provider is limited", async () => {
