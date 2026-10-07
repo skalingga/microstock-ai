@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/riset", label: "Riset" },
   { href: "/generate", label: "Generate" },
+  { href: "/uji-model", label: "Uji model" },
   { href: "/aset", label: "Aset" },
   { href: "/ekspor", label: "Ekspor" },
   { href: "/pengaturan", label: "Pengaturan" },

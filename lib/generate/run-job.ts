@@ -63,6 +63,9 @@ export type RunJobParams = {
   onState: (state: JobState) => void;
 };
 
+/** What drawing and storing one asset needs; the benchmark (lib/generate/benchmark.ts) shares these steps. */
+export type DrawParams = Pick<RunJobParams, "supabase" | "userId" | "theme" | "style" | "model" | "bannedWords" | "signal">;
+
 const BUCKET = "assets";
 
 export async function runJob(p: RunJobParams): Promise<void> {
@@ -198,7 +201,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
   }
 }
 
-type MadeAsset = {
+export type MadeAsset = {
   assetId: string;
   provider: string;
   model: string;
@@ -231,6 +234,17 @@ async function makeAsset(
       if (p.signal.aborted) throw err;
     }
   }
+  return storeDraft(p, jobId, concept, assetId, draft);
+}
+
+/** Uploads the SVG and its preview and inserts the asset row. Cleans up the files when a later step fails. */
+export async function storeDraft(
+  p: DrawParams,
+  jobId: string,
+  concept: Concept,
+  assetId: string,
+  draft: Draft,
+): Promise<MadeAsset> {
   const { res, clean, stats, png, qc, verdict } = draft;
 
   const svgPath = `${p.userId}/svg/${assetId}.svg`;
@@ -277,7 +291,7 @@ async function makeAsset(
   };
 }
 
-type Draft = {
+export type Draft = {
   res: SvgResponse;
   clean: { svg: string };
   stats: ReturnType<typeof analyzeSvg>;
@@ -287,8 +301,8 @@ type Draft = {
 };
 
 /** One AI call for the SVG, then sanitize, render, and the visual QC. Nothing is stored yet. */
-async function draftSvg(
-  p: RunJobParams,
+export async function draftSvg(
+  p: DrawParams,
   concept: Concept,
   gate: RateGate,
   pool: HashPoolEntry[],
