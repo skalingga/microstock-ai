@@ -133,7 +133,8 @@ export class KenariProvider implements SvgProvider {
 
   async generateThemes(input: ThemesInput) {
     const { system, user } = themesPrompt(input);
-    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 6000, temperature: 0.8 });
+    // Generous on purpose: reasoning models spend part of the limit thinking before they answer.
+    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 14_000, temperature: 0.8 });
 
     const parsed = themesSchema.safeParse(extractJson(content));
     if (!parsed.success) {
