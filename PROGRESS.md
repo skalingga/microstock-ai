@@ -1,9 +1,10 @@
 # Progress
 
 ## Status terakhir
-Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, gaya Siluet dan Line art) sudah di `main` setelah diuji pengguna di aplikasi. Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
+Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model utama Gemini 3.5 Flash-Lite, cadangan Kenari deepseek-v4-flash (disetujui pengguna). Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
 
 ## Sudah selesai
+- [2026-10-07] Tahap 4 (di `main`): halaman `/uji-model` (`lib/generate/benchmark.ts`, migrasi `20261011000000_model_benchmarks.sql`), uji 5 tema × 8 model; pilihan: Gemini 3.5 Flash-Lite utama, deepseek-v4-flash cadangan (hasil di Catatan)
 - [2026-10-06] Tahap 1: fondasi (Next.js, Supabase Auth, skema + RLS, deploy Vercel)
 - [2026-10-06] Tahap 2: generate + galeri dengan Kenari, antrean di browser, biaya dan batas bulanan Kenari
 - [2026-10-06] Tahap 3: QC otomatis, metadata AI, ekspor ZIP + CSV Adobe, checklist upload; metadata tidak lagi menyebut clipart sebagai "icon"
@@ -17,16 +18,27 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 - [2026-10-07] Tahap 5 (di `main`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
 
 ## Sedang dikerjakan
-- Tidak ada kode yang menggantung.
-- Perbandingan kualitas Gemini vs Kenari lewat dropdown `/generate` belum dilakukan pengguna.
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-1. Bandingkan model, termasuk Gemini (grup "Gemini (free tier)" di dropdown): buat batch kecil (5 aset) dengan tema, gaya, dan palet sama memakai model berbeda lewat dropdown di `/generate`, bandingkan di galeri dan biaya. Satu-satunya model yang sudah teruji: `deepseek-v4-flash`.
-2. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
-3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
+1. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
+2. Tahap 6: unggah batch 50-100 aset (boleh termasuk Siluet/Line art dan aset uji model yang bagus setelah dibuatkan metadata), catat keputusan Adobe, lalu setel ambang QC (terutama pemeriksa kemiripan).
+3. Opsional: ulangi `/uji-model` sesekali, karena daftar dan kecepatan model gratis Kenari berubah.
 
 ## Catatan penting
+- Hasil uji Tahap 4 (7 Okt 2026 22.10-22.35 WIB, akun adminproject, 5 tema satu per gaya teks × 8 model, satu percobaan, timeout 55 dtk). Skor = (Lolos + ½ Perlu cek) ÷ 5:
+  - gemini-3.5-flash-lite: 90%, 5/5 jadi (4 Lolos, 1 Perlu cek), median 5,9 dtk, Rp0
+  - agnes-2-0-flash:free: 60%, 4/5 (1 timeout), 15 dtk
+  - deepseek-v4-flash: 60%, 5/5 (1 Gagal QC: pola tidak menyambung), 37 dtk, Rp55 untuk 5 SVG
+  - muse-spark-1-3-contributor:free dan nemotron-3-super:free: 50%, 3/5 (2 timeout), 28-34 dtk
+  - agnes-3-0-flash:free: 40%, 4/5 (1 timeout, 1 Gagal QC: keluar kanvas), 15 dtk
+  - qwen3-8-27b:free: 0/5 (3 timeout, 2 error 503); hy3:free: 0/5 (5 timeout)
+  - Hampir semua Perlu cek berasal dari pemeriksa kemiripan (selisih 4-8 dari 64 bit dengan aset lama): ikon sederhana mudah dianggap mirip. Bahan penyetelan ambang di Tahap 6.
+  - Pengaturan akun sekarang sudah sesuai hasil: urutan Gemini (3.5 Flash-Lite) lalu Kenari (`KENARI_DEFAULT_MODEL` = deepseek-v4-flash). Saran halaman untuk cadangan adalah agnes-2-0-flash:free (seri dengan deepseek, lebih cepat), tapi deepseek lebih andal (5/5) dan cadangan jarang terpakai, jadi biayanya kecil.
+- Uji model (Tahap 4): konsep dibuat sekali per tema (model teks dari Pengaturan), lalu semua model menggambar konsep yang sama, satu percobaan tanpa coba-ulang, tanpa metadata (aset uji masuk galeri berstatus Menunggu). Status QC di tabel hanya dari pemeriksaan visual; kemiripan dibandingkan dengan riwayat saja, tidak antar-model. Skor = (Lolos + ½ Perlu cek) ÷ percobaan. Saran cadangan harus punya kuota terpisah: semua model `:free` Kenari berbagi satu kuota per menit untuk seluruh akun (terbukti: 5 panggilan paralel ke model gratis berbeda langsung 429 `free_quota_rpm`).
+- Cek cepat model gratis Kenari 2026-10-07 (satu SVG labu): cepat dan jadi SVG: agnes-3-0-flash 4 dtk, agnes-2-0-flash 7, nemotron-3-super 8, muse-spark 11, agnes-2-5-flash 13, qwen3-8-27b 24, hy3 29, laguna-s 39, north-mini-code 48. Terlalu lambat (lebih dari 55 dtk): glm-4-7-flash, mimo-v2-6-flash, nemotron-3-ultra, laguna-xs (timeout 90 dtk). Tidak menghasilkan SVG: space-bunny-alpha, step-3-7-flash.
+- Katalog Kenari kini mencantumkan harga `cache_read` (mis. deepseek-v4-flash Rp65 vs Rp2.750 per 1 juta token masuk). Aplikasi belum memakainya, jadi biaya teks dengan cache sedikit dilebihkan.
+- Gemini 3.5 Flash-Lite sesekali timeout di aplikasi (4 kali antara 21.33 dan 22.07 WIB, 7 Okt) walau panggilan langsung kecil cuma 2 dtk. Penyebabnya belum diketahui (mungkin berpikir lama dengan `max_tokens` besar); uji model akan mengukurnya.
 - Tagihan Kenari dicocokkan per baris dengan CSV pemakaian (2026-10-07, jam CSV = UTC): 56 gambar aplikasi cocok persis (Rp125), 3 panggilan gambar yang timeout TIDAK ditagih. Temuan: panggilan yang dijawab tapi tidak terpakai (jawaban terpotong/rusak) tetap ditagih, padahal dulu dicatat Rp0. Sudah diperbaiki: `ProviderError` membawa `costIdr`, `runWithFallback` mencatatnya; gambar yang sudah dijawab 200 tapi gagal unduh/trace dihitung Rp125. Tiga baris lama (Rp96) sudah dikoreksi di database. Biaya teks yang memakai cache prompt dicatat sedikit lebih tinggi dari tagihan (aman, katalog tidak memberi harga cache).
 - Saldo Kenari juga terpakai oleh skrip uji di luar aplikasi (uji banding model, uji gambar: sekitar Rp3.270 pada 6-7 Okt). Itu tidak masuk `provider_usage`, jadi sisa batas bulanan di aplikasi bisa lebih besar dari sisa saldo sebenarnya.
 - Tahap 7: uji di aplikasi 2026-10-07: gpt-image-2 13-57 dtk per gambar; batas 55 dtk menyebabkan timeout, jadi route SVG kini `maxDuration = 120` (Vercel Hobby + Fluid compute maks 300 dtk, dicek di dokumentasi) dengan timeout model gambar 105 dtk; panggilan teks tetap 57 dtk. Setelah perbaikan 6/6 gambar jadi (30-39 dtk). Gaya gambar diulang maks 1 kali.

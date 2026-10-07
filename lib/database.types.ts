@@ -121,6 +121,33 @@ export type Database = {
         }
         Relationships: []
       }
+      model_benchmarks: {
+        Row: {
+          created_at: string
+          id: string
+          results: Json
+          setup: Json
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          results?: Json
+          setup: Json
+          status?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          results?: Json
+          setup?: Json
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generation_jobs: {
         Row: {
           count: number

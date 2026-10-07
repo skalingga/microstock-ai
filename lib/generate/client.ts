@@ -51,7 +51,7 @@ export type MetadataResponse = {
   provider: string;
   rateLimit?: RateLimit;
 };
-export type SvgResponse = { svg: string; model: string; provider: string; rateLimit?: RateLimit };
+export type SvgResponse = { svg: string; model: string; provider: string; costIdr?: number; rateLimit?: RateLimit };
 
 export async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
   let res: Response;

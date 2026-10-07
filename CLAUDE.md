@@ -53,7 +53,7 @@ export interface SvgProvider {
 - Urutan provider dan model cadangan disimpan di pengaturan (database), bukan di kode, supaya bisa diubah tanpa deploy.
 - **Anggaran Recraft maksimal $10 per bulan** (bila nanti dibangun). Hanya jalan lewat tombol eksplisit yang menampilkan estimasi biaya sebelum proses. Pengeluaran bulan berjalan dicatat di tabel `provider_usage`; saat mencapai $10 tombol terkunci sampai bulan berikutnya. Jangan pernah memanggil Recraft otomatis.
 - Catat provider dan model di setiap aset (`assets.provider`, `assets.model`) dan catat setiap panggilan di `provider_usage`.
-- Pilihan model Kenari ditentukan lewat uji banding. Hasil uji awal (Oktober 2026): `deepseek-v4-flash` terbaik (kualitas, keandalan, sekitar Rp6 per aset); model :free umumnya lambat atau lemah. Model default diatur lewat `KENARI_DEFAULT_MODEL` atau pengaturan.
+- Pilihan model ditentukan lewat uji banding di `/uji-model`. Hasil Tahap 4 (7 Oktober 2026, 5 tema × 8 model, satu percobaan per model): `gemini-3.5-flash-lite` terbaik (5/5 jadi, 4 Lolos, median 6 dtk, gratis); `deepseek-v4-flash` 5/5 jadi tapi 37 dtk dan sekitar Rp11 per SVG; model :free Kenari sering timeout (terbaik `agnes-2-0-flash:free` 4/5, 15 dtk; `hy3:free` dan `qwen3-8-27b:free` 0/5). Model default diatur lewat `KENARI_DEFAULT_MODEL`, `GEMINI_DEFAULT_MODEL`, atau pengaturan.
 - **Anggaran Kenari berbayar**: model berakhiran `:free` tidak dihitung. Biaya model berbayar (teks per token, gambar per gambar dari `lib/providers/kenari-image-pricing.ts`) dicatat di `provider_usage.cost_idr` dan dibatasi per bulan (zona WIB) lewat `user_settings.kenari_monthly_budget_idr` (bawaan Rp20.000). Saat tercapai, panggilan berbayar ditolak sampai bulan berikutnya. Batas ini tidak berlaku untuk Recraft, yang punya batas USD sendiri.
 
 ## Aturan Adobe Stock yang dipaksakan aplikasi
@@ -73,13 +73,13 @@ export interface SvgProvider {
 
 Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor tanpa konfirmasi manual. Pemeriksaan: validitas parse dan render, sanitasi, tanpa elemen teks, kompleksitas path, tidak kosong dan tidak keluar viewBox, latar transparan untuk ikon, uji tile untuk pola, kemiripan lewat perceptual hash terhadap batch dan riwayat, kata terlarang di metadata. Render dan hash berjalan di browser.
 
-## Model data (7 tabel, semua dengan RLS)
+## Model data (semua dengan RLS)
 
-`research_runs`, `themes`, `generation_jobs`, `assets` (termasuk `provider`, `model`, `svg_path`, `preview_path`, `path_count`, `phash`, `qc_status`, `qc_notes`, `title`, `keywords`, `category`, `needs_release`, `exported_at`), `exports`, `provider_usage`, serta pengaturan pengguna. Detail kolom ada di PRD bagian Model data.
+`research_runs`, `themes`, `generation_jobs`, `assets` (termasuk `provider`, `model`, `svg_path`, `preview_path`, `path_count`, `phash`, `qc_status`, `qc_notes`, `title`, `keywords`, `category`, `needs_release`, `exported_at`), `exports`, `provider_usage`, `model_benchmarks` (uji banding Tahap 4), serta pengaturan pengguna. Detail kolom ada di PRD bagian Model data.
 
 ## Halaman
 
-`/login`, `/riset`, `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
+`/login`, `/riset`, `/generate`, `/uji-model`, `/aset`, `/ekspor`, `/pengaturan`.
 
 ## Roadmap (kerjakan berurutan, satu tahap per sesi)
 
@@ -87,7 +87,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 2. Generate + galeri dengan Kenari: adapter provider, antrean di browser, sanitasi, simpan SVG + preview, catat panggilan per provider
 - [x] 3. QC + metadata + ekspor: semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload
 - [x] 3b. Peningkatan kualitas generate (sisipan): palet bawaan, set terpadu, contoh SVG untuk pola, coba-ulang otomatis saat gagal QC, model teks opsional
-- [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
+- [x] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [x] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
 - [x] 7. Gambar Kenari + konversi SVG: gaya Siluet dan Line art, adapter `gpt-image-2`, konversi di server, harga per gambar (Recraft jadi opsional)

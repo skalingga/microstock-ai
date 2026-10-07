@@ -176,7 +176,7 @@ Setiap aset diproses lewat satu panggilan pendek ke server, sehingga batas duras
 
 ## Model data
 
-Tujuh tabel di Supabase Postgres cukup untuk versi 1; file SVG dan preview disimpan di Supabase Storage.
+Tabel inti di Supabase Postgres untuk versi 1 (ditambah `model_benchmarks` untuk uji banding Tahap 4); file SVG dan preview disimpan di Supabase Storage.
 
 | Tabel | Kolom utama | Fungsi |
 | --- | --- | --- |
@@ -187,6 +187,7 @@ Tujuh tabel di Supabase Postgres cukup untuk versi 1; file SVG dan preview disim
 | assets | id, job_id, provider, model, svg_path, preview_path, path_count, phash, qc_status, qc_notes, title, keywords, category, needs_release, exported_at | Satu file SVG beserta QC dan metadata |
 | exports | id, user_id, zip_path, csv_path, asset_count, created_at | Riwayat ekspor |
 | provider_usage | id, user_id, provider, model, kind, cost_usd, created_at | Hitungan panggilan harian per provider dan pengeluaran Recraft bulanan |
+| model_benchmarks | id, user_id, status, setup, results, created_at | Satu uji banding model: tema, model, dan hasil per pasangan konsep × model (aset tetap di `assets`) |
 
 Semua tabel memakai Row Level Security berdasarkan user_id agar siap multi-user saat dijual.
 
@@ -207,6 +208,7 @@ Alur utama berjalan lurus dari riset sampai upload manual ke Adobe.
 | /login | Login email atau Google |
 | /riset | Form riset dan tabel tema |
 | /generate | Form tema dan antrean |
+| /uji-model | Uji banding model SVG: konsep yang sama untuk semua model, tabel skor QC, waktu, biaya, saran model utama dan cadangan |
 | /aset | Galeri, status QC, edit metadata |
 | /ekspor | Pilihan aset, checklist upload, riwayat |
 | /pengaturan | Urutan provider dan model cadangan, model gambar Kenari, batas biaya Kenari, gaya default, palet, daftar kata terlarang |
@@ -237,7 +239,7 @@ Generate dan QC dikerjakan sebelum riset, karena tema bisa diketik manual dan ku
 1. **Fondasi:** setup Next.js, Supabase Auth, skema database, deploy ke Vercel.
 2. **Generate + galeri dengan Kenari:** adapter provider, antrean di browser, sanitasi, penyimpanan SVG dan preview, pencatatan panggilan per provider.
 3. **QC + metadata + ekspor:** semua pemeriksaan QC, metadata AI, ZIP + CSV, checklist upload.
-4. **Uji banding model gratis Kenari** (setelah kerangka jadi): 5 tema × 6 model kandidat, dinilai lewat QC dasar dan dilihat langsung di galeri, lalu pilih model utama dan cadangan.
+4. **Uji banding model gratis Kenari** (setelah kerangka jadi): 5 tema × 6 model kandidat, dinilai lewat QC dasar dan dilihat langsung di galeri, lalu pilih model utama dan cadangan. Dijalankan dari halaman `/uji-model`: konsep dibuat sekali per tema lalu digambar semua model, satu percobaan per model tanpa coba-ulang, tanpa metadata; pembanding `deepseek-v4-flash` dan `gemini-3.5-flash-lite` ikut diuji.
 5. **Gemini direct** sebagai cadangan otomatis.
 6. **Uji ke Adobe:** upload batch pertama sekitar 50-100 aset, catat tingkat penerimaan per provider, setel batas QC.
 7. **Gambar Kenari + konversi SVG:** gaya Siluet dan Line art, adapter model gambar (`gpt-image-2`), konversi dan pengolahan SVG di server, harga per gambar, batas biaya Kenari. (Menggantikan Recraft, yang menjadi opsional bila ada anggaran USD: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan.)
