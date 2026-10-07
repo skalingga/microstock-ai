@@ -12,6 +12,7 @@ Tahap 1, 2, 3, 3b, 5, dan 8 selesai. Tahap 5 (Gemini cadangan) sudah di `main` d
 - [2026-10-07] Verifikasi 3b: batch pola `autumn leaves` (palet Musim gugur, 5 aset) = 4 Lolos, 1 Gagal (gagal sambung tile), turun dari 2 gagal per 5; coba-ulang otomatis berjalan
 - [2026-10-07] Tahap 8 riset tema (kalender, Google Trends, skor peluang; migrasi `20261008000000`), alat Tahap 6 (migrasi `20261009000000`), pilihan model SVG di `/generate`, perbaikan riset pasar Dunia (jatah token). Semua sudah di `main`
 - [2026-10-07] Login: tombol intip password, lupa password (email -> /auth/callback -> /reset-password). Perlu Redirect URLs di Supabase, lihat catatan
+- [2026-10-07] `/generate`: contoh gambar per gaya (`components/style-preview.tsx`, gambar buatan tangan, warnanya ikut palet terpilih) agar pilihan gaya tidak cuma tulisan
 - [2026-10-07] Tahap 5 (di `main`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
 
 ## Sedang dikerjakan
