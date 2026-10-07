@@ -17,7 +17,7 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 - [2026-10-07] Tahap 5 (di `main`): adapter OpenAI-compatible bersama (`lib/providers/openai-compat.ts`), `lib/providers/gemini.ts`, fallback otomatis Kenari -> Gemini, pengulangan lewat cadangan setelah timeout (`skipPrimary`), model Gemini di dropdown `/generate`. Uji langsung `gemini-3.5-flash`: konsep 4 dtk, SVG 19-24 dtk, metadata 5 dtk, semua valid
 
 ## Sedang dikerjakan
-- Belum dicek: apakah Kenari menagih panggilan gambar yang timeout (3 panggilan 2026-10-07 20.22-20.24 WIB, dicatat Rp0). Bila ya, catat biaya untuk gambar yang timeout agar batas bulanan akurat.
+- Tidak ada kode yang menggantung.
 - Perbandingan kualitas Gemini vs Kenari lewat dropdown `/generate` belum dilakukan pengguna.
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
@@ -27,6 +27,7 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
 
 ## Catatan penting
+- Tagihan gambar Kenari dicek di dashboard (Aktivitas API, jam WITA = WIB + 1): panggilan gambar yang timeout TIDAK ditagih, harga gpt-image-2 Rp125 terkonfirmasi, catatan `provider_usage` sama persis dengan potongan saldo.
 - Tahap 7: uji di aplikasi 2026-10-07: gpt-image-2 13-57 dtk per gambar; batas 55 dtk menyebabkan timeout, jadi route SVG kini `maxDuration = 120` (Vercel Hobby + Fluid compute maks 300 dtk, dicek di dokumentasi) dengan timeout model gambar 105 dtk; panggilan teks tetap 57 dtk. Setelah perbaikan 6/6 gambar jadi (30-39 dtk). Gaya gambar diulang maks 1 kali.
 - Tahap 7 (gambar + konversi): Recraft dibatalkan sebagai Tahap 7 karena butuh dolar; jadi opsional. Harga gambar Kenari tidak ada di katalog API (tertulis 0), jadi disimpan di `lib/providers/kenari-image-pricing.ts` (dari dashboard Kenari 2026-10-07); model tanpa harga ditolak. Gaya gambar: tanpa cadangan, tanpa coba-ulang otomatis, selalu hitam (palet tidak dikirim). potrace berlisensi GPL-2.0: aman selama hanya di server; tinjau ulang bila aplikasi dijual sebagai perangkat lunak. Prompt meminta desain generik, tapi hasil mobil/truk klasik tetap bisa mirip model sungguhan: cek manual sebelum upload. Konsep set (mis. 4 laba-laba) bisa berisi salinan identik.
 - Gemini (Tahap 5): free tier saja, biaya dicatat 0. Model bawaan `GEMINI_DEFAULT_MODEL`, kosong = `gemini-3.5-flash-lite`, dikirim dengan `reasoning_effort: "low"` (tanpa itu Gemini 3.x berpikir terlalu lama). Error Gemini berbentuk array `[{error}]`; jeda 429 dibaca dari `retryDelay` di body.
