@@ -290,6 +290,7 @@ export type Database = {
           created_at: string
           default_style: string
           kenari_monthly_budget_idr: number
+          kenari_image_model: string
           kenari_text_model: string
           palettes: Json
           provider_order: Json
@@ -302,6 +303,7 @@ export type Database = {
           created_at?: string
           default_style?: string
           kenari_monthly_budget_idr?: number
+          kenari_image_model?: string
           kenari_text_model?: string
           palettes?: Json
           provider_order?: Json
@@ -314,6 +316,7 @@ export type Database = {
           created_at?: string
           default_style?: string
           kenari_monthly_budget_idr?: number
+          kenari_image_model?: string
           kenari_text_model?: string
           palettes?: Json
           provider_order?: Json

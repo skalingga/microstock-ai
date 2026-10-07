@@ -4,7 +4,7 @@ import type { Concept } from "@/lib/providers/types";
 import { combine, type Verdict } from "@/lib/qc/evaluate";
 import { applyMetadata, fetchHashPool, runVisualQc } from "@/lib/qc/store";
 import type { HashPoolEntry, QcNote, QcStatus } from "@/lib/qc/types";
-import type { StyleId } from "@/lib/settings/schema";
+import { isImageStyle, type StyleId } from "@/lib/settings/schema";
 import { renderPreviewPng } from "@/lib/svg/preview";
 import { sanitizeSvg } from "@/lib/svg/sanitize";
 import { analyzeSvg } from "@/lib/svg/stats";
@@ -127,7 +127,8 @@ export async function runJob(p: RunJobParams): Promise<void> {
       try {
         made = await callWithRetry(
           (ctx) => makeAsset(p, jobId!, item.concept, gate, pool, ctx),
-          retryOpts((message) => emit({ message })),
+          // A traced style pays per picture, and a timed-out picture may still be charged: one retry only.
+          { ...retryOpts((message) => emit({ message })), maxAttempts: isImageStyle(p.style) ? 2 : 3 },
         );
       } catch (err) {
         if (p.signal.aborted) break;
@@ -221,7 +222,8 @@ async function makeAsset(
   let draft = await draftSvg(p, concept, gate, pool, assetId, ctx);
 
   // One automatic retry when QC failed on something a new drawing can fix. A failed retry keeps the first draft.
-  const feedback = draft.verdict.status === "gagal" ? retryFeedback(draft.qc.notes) : null;
+  // Not for the traced styles: every image costs money, so a failed one is left for the user to redo.
+  const feedback = draft.verdict.status === "gagal" && !isImageStyle(p.style) ? retryFeedback(draft.qc.notes) : null;
   if (feedback) {
     try {
       draft = await draftSvg(p, concept, gate, pool, assetId, ctx, feedback);

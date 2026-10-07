@@ -19,6 +19,10 @@ const DESCRIPTIONS: Record<StyleId, string> = {
     "Bentuk lencana, pita, perisai, atau stempel tanpa huruf dan angka; pembeli menambah tulisannya sendiri. Cocok untuk label kemasan dan promo.",
   abstract_background:
     "Bentuk geometris penuh sampai tepi dengan ruang kosong untuk teks, mendatar 3:2. Cocok untuk slide, banner, dan poster.",
+  silhouette:
+    "Siluet hitam padat, satu objek atau satu set 3-6 variasi, latar transparan. Dibuat model gambar AI lalu diubah ke vektor. Cocok untuk hewan, tanaman, dan benda dengan bentuk lengkung (mis. kelelawar).",
+  line_art:
+    "Garis hitam tegas dengan isi putih, latar transparan. Dibuat model gambar AI lalu diubah ke vektor. Cocok untuk kendaraan, bangunan, dan benda berdetail.",
 };
 
 function lightness(hex: string): number {
@@ -41,7 +45,8 @@ function pickColors(palette: string[]): string[] {
 export function StylePreview({ style, palette }: { style: StyleId; palette: string[] }) {
   const patternId = useId();
   const [a, b, c, d, bg] = pickColors(palette);
-  const transparent = style === "icon_set" || style === "badge_label";
+  const transparent = style === "icon_set" || style === "badge_label" || style === "silhouette" || style === "line_art";
+  const traced = style === "silhouette" || style === "line_art";
 
   return (
     <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center">
@@ -92,6 +97,26 @@ export function StylePreview({ style, palette }: { style: StyleId; palette: stri
               <path d="M256 175 V295" stroke={c} strokeWidth="6" />
             </>
           )}
+          {style === "silhouette" && (
+            <g fill="#111111">
+              <path d="M256 236 C230 200 170 170 60 190 C110 205 120 240 110 262 C150 250 175 262 182 290 C205 270 235 268 256 290 C277 268 307 270 330 290 C337 262 362 250 402 262 C392 240 402 205 452 190 C342 170 282 200 256 236Z" />
+              <path d="M240 214 L246 192 L256 206 L266 192 L272 214Z" />
+              <path d="M130 380 C118 360 92 348 50 356 C70 362 74 376 70 386 C86 381 96 386 99 397 C108 389 120 388 130 397 C140 388 152 389 161 397 C164 386 174 381 190 386 C186 376 190 362 210 356 C168 348 142 360 130 380Z" />
+              <path d="M390 400 C380 384 358 374 324 381 C340 386 343 397 340 405 C353 401 361 405 363 414 C370 408 381 407 390 414 C399 407 410 408 417 414 C419 405 427 401 440 405 C437 397 440 386 456 381 C422 374 400 384 390 400Z" />
+            </g>
+          )}
+          {style === "line_art" && (
+            <g stroke="#111111" strokeWidth="8" strokeLinejoin="round" fill="#ffffff">
+              <path d="M40 300 L52 250 C90 236 130 232 160 230 L200 180 C230 160 300 160 330 178 L370 226 C420 230 460 240 476 262 L480 300 Z" />
+              <path d="M214 190 L200 228 L268 228 L268 182 C244 180 228 182 214 190Z" />
+              <path d="M286 182 L286 228 L350 228 L322 190 C312 184 300 182 286 182Z" />
+              <circle cx="140" cy="300" r="42" fill="#111111" />
+              <circle cx="140" cy="300" r="20" />
+              <circle cx="390" cy="300" r="42" fill="#111111" />
+              <circle cx="390" cy="300" r="20" />
+              <path d="M60 268 L470 268" fill="none" />
+            </g>
+          )}
           {style === "abstract_background" && (
             <>
               <rect width="1500" height="1000" fill={bg} />
@@ -107,7 +132,9 @@ export function StylePreview({ style, palette }: { style: StyleId; palette: stri
       <div className="space-y-1 text-sm">
         <p className="text-muted-foreground">{DESCRIPTIONS[style]}</p>
         <p className="text-xs text-muted-foreground">
-          Gambar contoh untuk menunjukkan bentuknya, bukan hasil AI. Warnanya mengikuti palet yang dipilih.
+          {traced
+            ? "Gambar contoh untuk menunjukkan bentuknya, bukan hasil AI. Gaya ini selalu hitam (palet diabaikan) dan memakai saldo Kenari, sekitar Rp125 per gambar."
+            : "Gambar contoh untuk menunjukkan bentuknya, bukan hasil AI. Warnanya mengikuti palet yang dipilih."}
         </p>
       </div>
     </div>
@@ -121,4 +148,6 @@ const VIEWBOX: Record<StyleId, string> = {
   flat_illustration: "0 0 800 600",
   badge_label: "0 0 512 512",
   abstract_background: "0 0 1500 1000",
+  silhouette: "0 0 512 512",
+  line_art: "0 0 512 512",
 };

@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { formatIdr, startOfMonthWib } from "@/lib/budget";
 import { ProviderError, httpStatusFor } from "@/lib/providers/errors";
 import { isFreeModel } from "@/lib/providers/kenari-pricing";
-import { orderForKind, runWithFallback, withoutPrimary, type UsageKind } from "@/lib/providers";
+import { imageOrder, orderForKind, runWithFallback, withoutPrimary, type UsageKind } from "@/lib/providers";
 import type { SvgProvider } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
 import { toProviderOrder, type ProviderEntry } from "@/lib/settings/schema";
@@ -20,9 +20,13 @@ type Options<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number
   run: (provider: SvgProvider, input: z.infer<S>, ctx: Ctx) => Promise<R>;
   /** Model chosen by the user for this request, if any (SVG calls only). */
   modelOverride?: (input: z.infer<S>) => ProviderEntry | undefined;
+  /** True when this request is drawn by a Kenari image model and traced (SVG calls of the traced styles). */
+  usesImageModel?: (input: z.infer<S>) => boolean;
+  /** Time budget for this request when it differs from the default (the route's maxDuration must allow it). */
+  budgetMs?: (input: z.infer<S>) => number | undefined;
 };
 
-// Vercel stops the function at 60s (maxDuration); keep a little room for the response and logging.
+// Text calls stay under 60s (CLAUDE.md rule 3); keep a little room for the response and logging.
 const REQUEST_BUDGET_MS = 57_000;
 
 function fail(status: number, code: string, message: string, extra?: Record<string, unknown>) {
@@ -39,7 +43,7 @@ export async function handleGenerate<
 >(
   opts: Options<S, R>,
 ): Promise<Response> {
-  const deadline = Date.now() + REQUEST_BUDGET_MS;
+  const started = Date.now();
   const supabase = await createClient();
   const {
     data: { user },
@@ -52,6 +56,7 @@ export async function handleGenerate<
     return fail(400, "invalid_input", parsed.error.issues[0]?.message ?? "Input tidak valid.");
   }
   const input = parsed.data as z.infer<S>;
+  const deadline = started + (opts.budgetMs?.(input) ?? REQUEST_BUDGET_MS);
   // Set by the browser when it retries after the primary provider timed out.
   const skipPrimary = (raw as { skipPrimary?: unknown } | null)?.skipPrimary === true;
 
@@ -69,12 +74,9 @@ export async function handleGenerate<
 
   const override = opts.modelOverride?.(input);
   const savedOrder = toProviderOrder(settings.provider_order);
-  const order = orderForKind(
-    skipPrimary && !override ? withoutPrimary(savedOrder) : savedOrder,
-    opts.kind,
-    settings.kenari_text_model,
-    override,
-  );
+  const order = opts.usesImageModel?.(input)
+    ? imageOrder(settings.kenari_image_model, override)
+    : orderForKind(skipPrimary && !override ? withoutPrimary(savedOrder) : savedOrder, opts.kind, settings.kenari_text_model, override);
 
   try {
     const result = await runWithFallback(

@@ -18,13 +18,13 @@ Spesifikasi lengkap ada di `docs/PRD.md`. Baca file itu sebelum mengerjakan taha
 - Login, database, file: Supabase (Auth, Postgres dengan Row Level Security, Storage)
 - Olah SVG: DOMPurify (sanitasi), SVGO (optimasi), canvas di browser (render + perceptual hash)
 - Ekspor: JSZip + pembuat CSV di browser
-- AI: tiga provider lewat satu antarmuka (lihat bagian Provider)
+- AI: provider lewat satu antarmuka (lihat bagian Provider)
 
 ## Aturan wajib
 
 1. **API key hanya di server.** Semua key provider dibaca dari environment variable di Route Handler. Jangan pernah mengirim key ke browser, menulisnya di kode, atau meng-commit `.env*` (kecuali `.env.example` tanpa nilai).
 2. **Satu panggilan AI per aset per request.** Antrean batch berjalan di browser, satu aset sekali jalan, dengan jeda dan retry saat kena rate limit. Jangan memproses batch besar dalam satu request server.
-3. **Batas durasi Vercel.** Anggap batas fungsi paket Hobby 60 detik per request (sumber di internet berbeda-beda, ada yang menyebut 10 detik dan ada 300 detik). Set `export const maxDuration = 60` di route generate, beri timeout pada panggilan provider, dan pindah ke model atau provider cadangan saat timeout. Cek dokumentasi Vercel terbaru sebelum mengubah angka ini.
+3. **Batas durasi Vercel.** Dokumentasi resmi (dicek 7 Oktober 2026): Hobby dengan Fluid compute 300 detik default dan maksimum. Aplikasi tetap hemat: route teks `maxDuration = 60` dengan tenggat 57 detik, route SVG `maxDuration = 120` karena model gambar gaya Siluet/Line art kadang lebih dari 55 detik. Beri timeout pada panggilan provider dan pindah ke model atau provider cadangan saat timeout. Cek dokumentasi Vercel terbaru sebelum mengubah angka ini.
 4. **Semua provider lewat satu antarmuka.** Kode aplikasi tidak boleh memanggil API provider langsung dari UI atau dari logika bisnis; selalu lewat adapter.
 5. **Semua tabel punya `user_id` dan RLS.** Pengguna hanya bisa membaca dan menulis barisnya sendiri. Service role key hanya dipakai di server dan hanya bila benar-benar perlu.
 6. **SVG dari AI tidak dipercaya.** Setiap SVG disanitasi dulu (hapus `script`, `foreignObject`, link eksternal, gambar raster tertanam) sebelum disimpan atau ditampilkan.
@@ -47,13 +47,14 @@ export interface SvgProvider {
 | --- | --- | --- |
 | Kenari (default) | Volume besar: ikon, pola, ilustrasi flat | OpenAI-compatible, base URL `https://kenari.id/v1`, key berawalan `kn-`. Pakai model chat yang menulis kode SVG. Model `:free` tersedia; batas pemakaiannya belum dicek |
 | Gemini direct (cadangan) | Pengganti otomatis saat Kenari kena limit atau model hilang | Model teks lewat Google AI Studio. Jangan pakai API gambar Gemini (raster, tanpa free tier publik). Cek apakah bisa berbagi adapter OpenAI-compatible dengan Kenari |
-| Recraft (premium) | Ilustrasi kompleks atau ulang aset gagal QC | Model vektor V4.1, sekitar $0.08 per SVG, hasil SVG native. Adapter sendiri. **Baru dibangun di Tahap 7** |
+| Kenari gambar + konversi | Gaya Siluet dan Line art (bentuk organik yang gagal ditulis model teks) | `/images/generations`, model bawaan `gpt-image-2` (Rp125 per gambar, Oktober 2026). Hasil raster dikonversi ke SVG di server, selalu hitam. Tanpa cadangan dan tanpa coba-ulang otomatis. **Dibangun di Tahap 7** |
+| Recraft (opsional) | Ilustrasi kompleks bila ada anggaran USD | Model vektor V4.1, sekitar $0.08 per SVG. Adapter sendiri. Belum dijadwalkan |
 
 - Urutan provider dan model cadangan disimpan di pengaturan (database), bukan di kode, supaya bisa diubah tanpa deploy.
-- **Anggaran Recraft maksimal $10 per bulan.** Hanya jalan lewat tombol eksplisit yang menampilkan estimasi biaya sebelum proses. Pengeluaran bulan berjalan dicatat di tabel `provider_usage`; saat mencapai $10 tombol terkunci sampai bulan berikutnya. Jangan pernah memanggil Recraft otomatis.
+- **Anggaran Recraft maksimal $10 per bulan** (bila nanti dibangun). Hanya jalan lewat tombol eksplisit yang menampilkan estimasi biaya sebelum proses. Pengeluaran bulan berjalan dicatat di tabel `provider_usage`; saat mencapai $10 tombol terkunci sampai bulan berikutnya. Jangan pernah memanggil Recraft otomatis.
 - Catat provider dan model di setiap aset (`assets.provider`, `assets.model`) dan catat setiap panggilan di `provider_usage`.
 - Pilihan model Kenari ditentukan lewat uji banding. Hasil uji awal (Oktober 2026): `deepseek-v4-flash` terbaik (kualitas, keandalan, sekitar Rp6 per aset); model :free umumnya lambat atau lemah. Model default diatur lewat `KENARI_DEFAULT_MODEL` atau pengaturan.
-- **Anggaran Kenari berbayar**: model berakhiran `:free` tidak dihitung. Biaya model berbayar dicatat di `provider_usage.cost_idr` dan dibatasi per bulan (zona WIB) lewat `user_settings.kenari_monthly_budget_idr` (bawaan Rp20.000). Saat tercapai, panggilan berbayar ditolak sampai bulan berikutnya. Batas ini tidak berlaku untuk Recraft, yang punya batas USD sendiri.
+- **Anggaran Kenari berbayar**: model berakhiran `:free` tidak dihitung. Biaya model berbayar (teks per token, gambar per gambar dari `lib/providers/kenari-image-pricing.ts`) dicatat di `provider_usage.cost_idr` dan dibatasi per bulan (zona WIB) lewat `user_settings.kenari_monthly_budget_idr` (bawaan Rp20.000). Saat tercapai, panggilan berbayar ditolak sampai bulan berikutnya. Batas ini tidak berlaku untuk Recraft, yang punya batas USD sendiri.
 
 ## Aturan Adobe Stock yang dipaksakan aplikasi
 
@@ -89,7 +90,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [ ] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [x] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
-- [ ] 7. Recraft: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan
+- [x] 7. Gambar Kenari + konversi SVG: gaya Siluet dan Line art, adapter `gpt-image-2`, konversi di server, harga per gambar (Recraft jadi opsional)
 - [x] 8. Riset tema: kalender event, Google Trends, skor peluang
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 
@@ -104,6 +105,7 @@ SUPABASE_SERVICE_ROLE_KEY=      # server saja
 KENARI_API_KEY=                 # server saja, berawalan kn-
 KENARI_BASE_URL=https://kenari.id/v1
 KENARI_DEFAULT_MODEL=            # model bawaan bila pengaturan kosong, mis. model :free
+KENARI_IMAGE_MODEL=             # model gambar bila pengaturan kosong; kosong = gpt-image-2
 GEMINI_API_KEY=                 # server saja, mulai Tahap 5
 GEMINI_DEFAULT_MODEL=           # model Gemini bila pengaturan kosong; kosong = gemini-3.5-flash-lite
 RECRAFT_API_KEY=                # server saja, mulai Tahap 7

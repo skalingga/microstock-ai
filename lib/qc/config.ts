@@ -45,7 +45,22 @@ export const STYLE_RULES: Record<StyleId, { transparentBackground: boolean; seam
   flat_illustration: { transparentBackground: false, seamless: false, boundsCheck: true },
   badge_label: { transparentBackground: false, seamless: false, boundsCheck: true },
   abstract_background: { transparentBackground: false, seamless: false, boundsCheck: false },
+  silhouette: { transparentBackground: true, seamless: false, boundsCheck: true },
+  line_art: { transparentBackground: true, seamless: false, boundsCheck: true },
 };
+
+export type ComplexityLimits = { minShapes: number; warnShapes: number; failShapes: number; warnPoints: number };
+
+// Traced styles differ from hand-written SVG: one bat is a single shape, and line art has many small pieces.
+// Starting guesses, to be tuned on Adobe's decisions like the rest (stage 6).
+const COMPLEXITY_OVERRIDES: Partial<Record<StyleId, Partial<ComplexityLimits>>> = {
+  silhouette: { minShapes: 1 },
+  line_art: { warnShapes: 150, failShapes: 300, warnPoints: 4000 },
+};
+
+export function complexityFor(style: StyleId): ComplexityLimits {
+  return { ...QC.complexity, ...COMPLEXITY_OVERRIDES[style] };
+}
 
 // Titles must not imply a real news event (Adobe clarification). The AI is told too; this is the safety net.
 export const NEWS_WORDS = [

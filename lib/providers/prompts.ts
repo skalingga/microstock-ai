@@ -1,5 +1,5 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
-import type { StyleId } from "@/lib/settings/schema";
+import { isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
 import { SVG_EXAMPLES } from "./examples";
 import type { ConceptInput, MetadataInput, SvgInput, ThemesInput } from "./types";
 
@@ -34,6 +34,26 @@ const STYLE_SPECS: Record<StyleId, StyleSpec> = {
     brief:
       "An abstract geometric background that fills the whole canvas edge to edge. Overlapping simple shapes, balanced composition, calm area for placing text later.",
   },
+  // Drawn by an image model and traced (stage 7): the viewBox is unused, the brief steers the concepts.
+  silhouette: {
+    viewBox: "0 0 1024 1024",
+    brief:
+      "A solid black silhouette with a strong, instantly readable outline and no interior detail. Either one subject or a small set of 3 to 6 variations of it (different poses or sizes) on one artboard.",
+  },
+  line_art: {
+    viewBox: "0 0 1024 1024",
+    brief:
+      "Black ink line art with clean bold outlines and a few solid black areas, white inside, no shading or hatching. One subject, side or three-quarter view.",
+  },
+};
+
+// What the image model is asked to draw for each traced style. The tracer keeps only dark pixels, so the picture
+// must be pure black on pure white, with nothing else around the subject.
+const IMAGE_STYLE_PROMPT: Record<ImageStyleId, string> = {
+  silhouette:
+    "solid flat black silhouette, completely filled with black, no interior lines, no highlights, smooth clean edges, like a vector cut-out",
+  line_art:
+    "black and white vector line art, clean bold black outlines with a few solid black areas, white fills inside, no shading, no hatching, no cross-hatching, no gradients, no grey tones",
 };
 
 const SAFETY_RULES = [
@@ -43,7 +63,9 @@ const SAFETY_RULES = [
 
 export function conceptsPrompt(input: ConceptInput): { system: string; user: string } {
   const spec = STYLE_SPECS[input.style];
-  const palette = input.palette.length > 0 ? input.palette.join(", ") : "any harmonious flat colors";
+  const traced = isImageStyle(input.style);
+  // Traced styles are always black, so there is no palette to plan with.
+  const palette = traced ? "black only" : input.palette.length > 0 ? input.palette.join(", ") : "any harmonious flat colors";
 
   return {
     system:
@@ -55,14 +77,20 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
       `Available palette: ${palette}`,
       "",
       `Propose exactly ${input.count} clearly different concepts for this theme. Vary subject, composition, and color combination so no two assets look alike.`,
-      "Each concept must be easy to draw with a handful of flat vector shapes.",
-      "The concepts form ONE cohesive set sold together: the same visual language, the same level of detail, and colors only from the available palette. Vary the subject and composition, never the style.",
+      traced
+        ? "Each concept must read clearly in black and white alone: a recognizable outline, no fine texture."
+        : "Each concept must be easy to draw with a handful of flat vector shapes.",
+      traced
+        ? "The concepts form ONE cohesive set sold together: the same visual language and level of detail. Vary the subject and composition, never the style. Prefer generic subjects; never a specific real product model."
+        : "The concepts form ONE cohesive set sold together: the same visual language, the same level of detail, and colors only from the available palette. Vary the subject and composition, never the style.",
       ...SAFETY_RULES,
       "",
       'Reply with JSON only, in this exact shape: {"concepts":[{"subject":"...","composition":"...","palette":["#RRGGBB","#RRGGBB"]}]}',
       "- subject: what is drawn, max 12 words.",
       "- composition: layout and arrangement, max 20 words.",
-      "- palette: 2 to 5 hex colors copied exactly from the available palette. Never invent a color.",
+      traced
+        ? '- palette: always ["#000000"].'
+        : "- palette: 2 to 5 hex colors copied exactly from the available palette. Never invent a color.",
     ].join("\n"),
   };
 }
@@ -105,6 +133,18 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
   };
 }
 
+/** Prompt for the image model behind the traced styles (silhouette, line art). English, one paragraph. */
+export function imagePrompt(input: SvgInput & { style: ImageStyleId }): string {
+  return [
+    `${input.concept.subject}. ${input.concept.composition}.`,
+    `Theme: ${input.theme}.`,
+    `Style: ${IMAGE_STYLE_PROMPT[input.style]}.`,
+    "Isolated on a pure white background with nothing else in the picture: no ground line, no cast shadow, no frame, no text, no letters, no numbers, no watermark, no logo.",
+    "Generic design: not a specific real product, car model, brand, character, celebrity or person.",
+    "Stock vector clipart, crisp edges, the subject fills most of the picture with a small even margin.",
+  ].join(" ");
+}
+
 // How each style is described to the metadata writer. The internal style id (for example "icon_set") must never
 // reach the model: it made titles and keywords call clipart an "icon", but Adobe reserves that label for interface
 // symbols and the app has no icon mode.
@@ -114,6 +154,8 @@ const METADATA_STYLE: Record<StyleId, string> = {
   flat_illustration: "a flat vector illustration",
   badge_label: "a badge or label emblem",
   abstract_background: "an abstract geometric background",
+  silhouette: "a solid black vector silhouette on a transparent background",
+  line_art: "a black and white vector line art illustration on a transparent background",
 };
 
 export function metadataPrompt(input: MetadataInput): { system: string; user: string } {

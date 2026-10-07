@@ -111,6 +111,20 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
               memakai model utama. Kosongkan untuk memakai model yang sama.
             </p>
           </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="kenari_image_model">Model gambar Kenari (gaya Siluet dan Line art)</Label>
+            <Input
+              id="kenari_image_model"
+              name="kenari_image_model"
+              defaultValue={settings.kenari_image_model}
+              placeholder="gpt-image-2"
+            />
+            <p className="text-muted-foreground text-xs">
+              Model ini membuat gambar hitam-putih yang lalu diubah jadi SVG di server. Berbayar per gambar dari saldo
+              Kenari dan masuk batas biaya bulanan. Kosongkan untuk memakai KENARI_IMAGE_MODEL atau gpt-image-2. Tidak
+              ada cadangan otomatis untuk gaya ini.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

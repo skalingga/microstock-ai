@@ -46,21 +46,29 @@ export class KenariProvider extends OpenAiCompatProvider {
   }
 
   protected toError(res: Response, detail: string | undefined, rateLimit?: RateLimit): ProviderError {
-    if (res.status === 401 || res.status === 403) {
-      return new ProviderError("auth", "API key Kenari ditolak. Periksa KENARI_API_KEY.");
-    }
-    if (res.status === 429) {
-      const header = Number(res.headers.get("retry-after"));
-      const fromReset = rateLimit?.resetAt ? (rateLimit.resetAt - Date.now()) / 1000 : undefined;
-      return new ProviderError("rate_limit", "Batas pemakaian Kenari tercapai.", {
-        retryAfterSec: clampRetryAfter(header > 0 ? header : fromReset),
-      });
-    }
-    if (res.status === 404 || (res.status === 400 && /model/i.test(detail ?? ""))) {
-      return new ProviderError("model_unavailable", "Model Kenari tidak ditemukan atau sudah dihapus.");
-    }
-    return new ProviderError("upstream", `Kenari mengembalikan error ${res.status}.`);
+    return kenariHttpError(res, detail, rateLimit);
   }
+}
+
+/** Kenari HTTP failure to a ProviderError. Shared by the chat and image adapters. */
+export function kenariHttpError(res: Response, detail: string | undefined, rateLimit?: RateLimit): ProviderError {
+  if (res.status === 401 || res.status === 403) {
+    return new ProviderError("auth", "API key Kenari ditolak. Periksa KENARI_API_KEY.");
+  }
+  if (res.status === 402) {
+    return new ProviderError("budget_exceeded", "Saldo Kenari tidak cukup. Isi saldo di dashboard Kenari.");
+  }
+  if (res.status === 429) {
+    const header = Number(res.headers.get("retry-after"));
+    const fromReset = rateLimit?.resetAt ? (rateLimit.resetAt - Date.now()) / 1000 : undefined;
+    return new ProviderError("rate_limit", "Batas pemakaian Kenari tercapai.", {
+      retryAfterSec: clampRetryAfter(header > 0 ? header : fromReset),
+    });
+  }
+  if (res.status === 404 || (res.status === 400 && /model/i.test(detail ?? ""))) {
+    return new ProviderError("model_unavailable", "Model Kenari tidak ditemukan atau sudah dihapus.");
+  }
+  return new ProviderError("upstream", `Kenari mengembalikan error ${res.status}.`);
 }
 
 export function readRateLimit(headers: Headers): RateLimit | undefined {

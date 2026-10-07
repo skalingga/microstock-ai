@@ -4,7 +4,7 @@ Dibuat 5 Oktober 2026 · Satriyo
 
 ## Ringkasan
 
-MicroStock Vector AI membuat aset vektor SVG siap upload ke Adobe Stock dari satu tema, dengan target lebih dari 1.000 aset per bulan (sekitar 33 per hari) tanpa biaya API di jalur gratis dan maksimal $10 per bulan bila Recraft dipakai.
+MicroStock Vector AI membuat aset vektor SVG siap upload ke Adobe Stock dari satu tema, dengan target lebih dari 1.000 aset per bulan (sekitar 33 per hari) dengan biaya API serendah mungkin: jalur teks hampir gratis, jalur gambar sekitar Rp125 per aset dari saldo Kenari.
 
 - **Masalah:** membuat vektor, menulis metadata, dan mengecek kepatuhan satu per satu memakan waktu dan rawan ditolak.
 - **Solusi:** satu alur dari riset tema, generate variasi SVG, QC otomatis, metadata AI, sampai ekspor ZIP + CSV.
@@ -18,7 +18,7 @@ Versi 1 fokus pada satu pengguna, satu platform (Adobe Stock), dan satu jenis as
 
 - Login
 - Riset tema dan peluang per negara/musim
-- Generate variasi SVG dari satu tema lewat tiga provider: Kenari (default), Gemini direct (cadangan), Recraft (premium, maksimal $10 per bulan)
+- Generate variasi SVG dari satu tema lewat Kenari (default), Gemini direct (cadangan), dan model gambar Kenari yang hasilnya dikonversi ke SVG (gaya Siluet dan Line art). Recraft opsional, hanya bila ada anggaran USD
 - QC otomatis
 - Metadata AI (judul, keyword, kategori)
 - Ekspor ZIP + CSV dan riwayat aset
@@ -26,7 +26,7 @@ Versi 1 fokus pada satu pengguna, satu platform (Adobe Stock), dan satu jenis as
 **Tidak masuk versi 1**
 
 - Platform selain Adobe Stock
-- Foto/raster dan upscale
+- Foto/raster dan upscale (gambar raster hanya bahan antara untuk dikonversi ke SVG, tidak pernah diekspor)
 - Provider lain di luar Kenari, Gemini, dan Recraft
 - Kuota, paket langganan, dan pembayaran
 - Multi-user atau tim
@@ -73,9 +73,9 @@ Pengguna memilih negara/region dan periode, lalu aplikasi mengembalikan daftar t
 
 Setiap baris punya tombol "Generate dari tema ini" yang membawa tema ke Fitur 2.
 
-## Fitur 2: Generate variasi SVG (tiga provider)
+## Fitur 2: Generate variasi SVG
 
-Aplikasi memanggil satu antarmuka generate SVG dan tidak peduli provider di belakangnya. Kenari dan Gemini memakai model teks yang menulis kode SVG langsung dari tema, sedangkan Recraft menghasilkan SVG native; model gambar tidak dipakai karena API gambar Gemini tidak lagi punya free tier publik dan hasilnya raster, bukan vektor ([aifreeapi](https://www.aifreeapi.com/en/posts/gemini-image-generation-free-tier)).
+Aplikasi memanggil satu antarmuka generate SVG dan tidak peduli provider di belakangnya. Kenari dan Gemini memakai model teks yang menulis kode SVG langsung dari tema. Untuk bentuk organik yang tidak sanggup ditulis model teks (siluet hewan, line art kendaraan), model gambar Kenari membuat gambar hitam-putih lalu server mengubahnya menjadi SVG. API gambar Gemini tidak dipakai karena tidak punya free tier publik ([aifreeapi](https://www.aifreeapi.com/en/posts/gemini-image-generation-free-tier)). Uji Oktober 2026: model teks gagal menggambar kelelawar dan mobil klasik, sedangkan `gpt-image-2` + konversi menghasilkan siluet dan line art yang rapi.
 
 **Provider**
 
@@ -83,7 +83,8 @@ Aplikasi memanggil satu antarmuka generate SVG dan tidak peduli provider di bela
 | --- | --- | --- |
 | [Kenari](https://kenari.id/en) (default) | Volume besar: ikon, pola, ilustrasi flat. Model chat OpenAI-compatible di kenari.id/v1 | Model :free Rp0; model berbayar dari saldo Rupiah |
 | Gemini direct (cadangan) | Pengganti otomatis saat Kenari kena limit atau modelnya hilang | Free tier; batas tidak dipublikasikan |
-| [Recraft](https://www.recraft.ai/docs/api-reference/models/recraft-v4-1.md) (premium) | Ilustrasi kompleks, atau ulang aset yang gagal QC. Model vektor V4.1 | Sekitar $0.08 per SVG; batas $10 per bulan (sekitar 125 SVG) |
+| Kenari gambar + konversi SVG | Gaya Siluet dan Line art. Model bawaan `gpt-image-2`, hasil raster dikonversi ke SVG di server | Per gambar dari saldo Rupiah Kenari (`gpt-image-2` Rp125, 7 Oktober 2026), masuk batas biaya Kenari bulanan |
+| [Recraft](https://www.recraft.ai/docs/api-reference/models/recraft-v4-1.md) (opsional) | Ilustrasi kompleks bila ada anggaran USD. Model vektor V4.1 | Sekitar $0.08 per SVG; batas $10 per bulan. Belum dibangun |
 
 **Alur per tema**
 
@@ -93,7 +94,7 @@ Aplikasi memanggil satu antarmuka generate SVG dan tidak peduli provider di bela
 4. SVG divalidasi dan disanitasi, lalu disimpan bersama preview PNG.
 5. Aset langsung masuk ke QC (Fitur 3).
 
-**Gaya yang didukung versi 1:** set ikon flat, pola seamless, ilustrasi flat sederhana, badge/label, dan background geometris abstrak. Gaya ini paling realistis untuk SVG buatan model teks.
+**Gaya yang didukung versi 1:** set ikon flat, pola seamless, ilustrasi flat sederhana, badge/label, dan background geometris abstrak (model teks); siluet dan line art (model gambar + konversi, selalu hitam, palet diabaikan).
 
 **Aturan teknis**
 
@@ -104,7 +105,15 @@ Aplikasi memanggil satu antarmuka generate SVG dan tidak peduli provider di bela
 - Urutan provider dan model cadangan disimpan di pengaturan; bila model utama kena limit atau hilang, aplikasi pindah ke berikutnya tanpa deploy ulang.
 - Aplikasi mencatat panggilan per provider per hari, karena batas free tier Gemini hanya terlihat di AI Studio ([memetik](https://www.memetik.ai/guides/gemini-api-free-tier-limits)) dan batas model :free Kenari belum dicek.
 - Recraft hanya jalan lewat tombol eksplisit dengan estimasi biaya sebelum proses. Saat pengeluaran bulan berjalan mencapai $10, tombolnya terkunci sampai bulan berikutnya.
-- Tiap provider adalah adapter di balik satu antarmuka. Kenari dan Gemini kemungkinan bisa berbagi adapter OpenAI-compatible (dicek saat implementasi); Recraft punya adapter sendiri.
+- Tiap provider adalah adapter di balik satu antarmuka. Kenari dan Gemini berbagi adapter OpenAI-compatible; model gambar Kenari punya adapter sendiri; Recraft (bila dibangun) juga.
+
+**Jalur gambar + konversi (gaya Siluet dan Line art)**
+
+- Konsep dan metadata tetap dari model teks; hanya langkah SVG yang memakai model gambar. Satu panggilan AI per request; konversi berjalan di server tanpa AI (sekitar 0,2 detik).
+- Prompt gambar memaksa latar putih polos, tanpa teks, tanpa logo, desain generik (bukan model atau merek nyata).
+- Setelah konversi: tiap bentuk jadi path sendiri (lubang ikut bentuknya), kanvas dipotong pas ke objek lalu diberi margin dan rasio 1:1 atau 3:2 (agar artboard Adobe 15 MP tercapai), line art diberi lapisan isi putih di belakang garis.
+- Tanpa cadangan otomatis (tidak ada model gambar gratis) dan tanpa coba-ulang otomatis saat Gagal QC (tiap ulang berbayar).
+- Harga per gambar disimpan di konfigurasi karena katalog API Kenari tidak mencantumkannya; biaya dicatat di `provider_usage` dan masuk batas biaya Kenari bulanan.
 
 ## Fitur 3: QC otomatis
 
@@ -200,7 +209,7 @@ Alur utama berjalan lurus dari riset sampai upload manual ke Adobe.
 | /generate | Form tema dan antrean |
 | /aset | Galeri, status QC, edit metadata |
 | /ekspor | Pilihan aset, checklist upload, riwayat |
-| /pengaturan | Urutan provider dan model cadangan, batas biaya Recraft, gaya default, palet, daftar kata terlarang |
+| /pengaturan | Urutan provider dan model cadangan, model gambar Kenari, batas biaya Kenari, gaya default, palet, daftar kata terlarang |
 
 ## Batasan, risiko, dan mitigasi
 
@@ -208,15 +217,17 @@ Risiko terbesar adalah ketergantungan pada free tier Gemini, karena batasnya bis
 
 | Risiko | Dampak | Mitigasi |
 | --- | --- | --- |
-| Kuota model :free Kenari atau free tier Gemini berkurang atau berubah | Target 33 aset per hari tidak tercapai | Retry, pencatatan panggilan per provider, pindah otomatis ke model atau provider cadangan; Recraft sebagai jalur berbayar |
+| Kuota model :free Kenari atau free tier Gemini berkurang atau berubah | Target 33 aset per hari tidak tercapai | Retry, pencatatan panggilan per provider, pindah otomatis ke model atau provider cadangan; model berbayar Kenari dengan batas biaya bulanan |
+| Adobe menolak vektor hasil konversi otomatis yang tidak rapi | Aset jalur gambar ditolak | Prompt hitam-putih polos, path dipecah per bentuk, batas jumlah titik di QC, review manual sebelum upload |
+| Harga gambar Kenari berubah | Biaya tercatat salah | Harga di file konfigurasi, dicek ulang di dashboard Kenari |
 | Kualitas SVG dari model teks terbatas | Banyak aset ditolak Adobe | Fokus gaya sederhana, QC ketat, review manual sebelum upload |
 | Variasi terlalu mirip | Ditolak sebagai konten berulang | Perceptual hash dan batas variasi per tema |
 | Google Trends tidak punya jaminan akses gratis | Riset gagal atau lambat | Cache hasil; cadangan kalender event + skor manual |
 | Vercel Hobby hanya untuk non-komersial ([Vercel](https://vercel.com/docs/plans/hobby)) | Tidak boleh dipakai saat dijual | Pindah ke Vercel Pro saat mulai menjual |
-| Batas durasi function Hobby 60 detik, patokan aman karena sumber berbeda-beda ([Vercel](https://vercel.com/docs/plans/hobby)) | Proses panjang terputus | Satu panggilan pendek per aset, antrean di browser |
+| Batas durasi function Hobby: 300 detik dengan Fluid compute ([Vercel](https://vercel.com/docs/functions/limitations), dicek 7 Oktober 2026); aplikasi memakai 60 detik untuk teks dan 120 detik untuk route SVG (model gambar) | Proses panjang terputus | Satu panggilan pendek per aset, antrean di browser; untuk gaya gambar hanya satu kali ulang |
 | Free tier tidak cocok untuk data sensitif ([Wikipedia](https://en.wikipedia.org/wiki/Google_AI_Studio)) | Privasi | Hanya kirim tema dan SVG, tanpa data pribadi |
 | Kebijakan Adobe berubah | Aturan QC usang | Aturan disimpan sebagai konfigurasi yang mudah diubah |
-| Biaya Recraft melewati anggaran | Pengeluaran lebih dari $10 per bulan | Tombol eksplisit, estimasi biaya sebelum proses, kunci otomatis di $10 |
+| Biaya Recraft melewati anggaran (bila dibangun) | Pengeluaran lebih dari $10 per bulan | Tombol eksplisit, estimasi biaya sebelum proses, kunci otomatis di $10 |
 | Model :free Kenari berubah atau hilang tanpa kabar | Model utama berhenti bekerja | Daftar model cadangan berurutan di pengaturan; uji banding setelah kerangka jadi |
 
 ## Tahapan pengerjaan
@@ -229,7 +240,7 @@ Generate dan QC dikerjakan sebelum riset, karena tema bisa diketik manual dan ku
 4. **Uji banding model gratis Kenari** (setelah kerangka jadi): 5 tema × 6 model kandidat, dinilai lewat QC dasar dan dilihat langsung di galeri, lalu pilih model utama dan cadangan.
 5. **Gemini direct** sebagai cadangan otomatis.
 6. **Uji ke Adobe:** upload batch pertama sekitar 50-100 aset, catat tingkat penerimaan per provider, setel batas QC.
-7. **Recraft:** adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan.
+7. **Gambar Kenari + konversi SVG:** gaya Siluet dan Line art, adapter model gambar (`gpt-image-2`), konversi dan pengolahan SVG di server, harga per gambar, batas biaya Kenari. (Menggantikan Recraft, yang menjadi opsional bila ada anggaran USD: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan.)
 8. **Riset tema:** kalender event, Google Trends, skor peluang, tombol generate dari tema.
 9. **Lanjutan (bila dijual):** kuota, langganan, pindah ke Vercel Pro.
 
@@ -241,7 +252,7 @@ Versi 1 dianggap berhasil bila menghasilkan lebih dari 1.000 SVG lolos QC per bu
 
 - Jumlah SVG lolos QC per bulan: lebih dari 1.000
 - Tingkat penerimaan di Adobe: target ditetapkan setelah batch uji pertama
-- Biaya API per bulan: Rp0 di jalur gratis, maksimal $10 bila Recraft dipakai (sekitar 125 SVG)
+- Biaya API per bulan: di bawah batas biaya Kenari (bawaan Rp20.000, sekitar 150 aset jalur gambar); Rp0 di jalur gratis
 
 **Keputusan tertunda**
 
