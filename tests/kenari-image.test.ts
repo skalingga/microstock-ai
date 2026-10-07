@@ -80,11 +80,27 @@ describe("KenariImageProvider", () => {
     await expect(provider(fetchImpl).generateSvg(input)).rejects.toMatchObject({ code });
   });
 
-  it("reports a reply without a picture, or a picture that is not an image", async () => {
+  it("reports a reply without a picture, or a picture that is not an image, and still counts the price", async () => {
     const empty = (async () => new Response(JSON.stringify({ data: [] }))) as unknown as typeof fetch;
-    await expect(provider(empty).generateSvg(input)).rejects.toMatchObject({ code: "bad_output" });
+    await expect(provider(empty).generateSvg(input)).rejects.toMatchObject({ code: "bad_output", costIdr: 125 });
     const junk = (async () => new Response(JSON.stringify({ data: [{ b64_json: "bm90IGFuIGltYWdl" }] }))) as unknown as typeof fetch;
-    await expect(provider(junk).generateSvg(input)).rejects.toMatchObject({ code: "bad_output" });
+    await expect(provider(junk).generateSvg(input)).rejects.toMatchObject({ code: "bad_output", costIdr: 125 });
+  });
+
+  it("counts the price when the picture cannot be downloaded", async () => {
+    const fetchImpl = (async (url: string) =>
+      url.endsWith("/images/generations")
+        ? new Response(JSON.stringify({ data: [{ url: "https://cdn.test/a.png" }] }))
+        : new Response("gone", { status: 404 })) as unknown as typeof fetch;
+    await expect(provider(fetchImpl).generateSvg(input)).rejects.toMatchObject({ code: "upstream", costIdr: 125 });
+  });
+
+  it("charges nothing for a refused or failed request", async () => {
+    const refused = (async () =>
+      new Response('{"error":{"message":"rejected by the safety system"}}', { status: 400 })) as unknown as typeof fetch;
+    const err = await provider(refused).generateSvg(input).catch((e) => e);
+    expect(err).toMatchObject({ code: "bad_output" });
+    expect(err.costIdr).toBeUndefined();
   });
 
   it("maps a timeout", async () => {

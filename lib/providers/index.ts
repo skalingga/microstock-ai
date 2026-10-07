@@ -144,7 +144,8 @@ export async function runWithFallback<T extends { model: string; costUsd?: numbe
       return { ...result, provider: entry.provider };
     } catch (err) {
       if (!(err instanceof ProviderError)) throw err;
-      await log({ provider: entry.provider, model: resolved.model, kind, ok: false });
+      // A failed call can still be billed (an unusable reply): log what it cost so the budget stays honest.
+      await log({ provider: entry.provider, model: resolved.model, kind, ok: false, costUsd: err.costUsd, costIdr: err.costIdr });
       if (!canFallBack(err.code)) throw err;
       lastError = err;
     }
