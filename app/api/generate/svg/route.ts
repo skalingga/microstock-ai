@@ -10,7 +10,14 @@ export async function POST(request: Request) {
     request,
     schema: svgRequestSchema,
     kind: "svg",
+    modelOverride: (input) => input.model,
     textToCheck: (input) => `${input.theme} ${input.concept.subject} ${input.concept.composition}`,
-    run: (provider, input) => provider.generateSvg({ ...input, style: input.style as StyleId }),
+    run: (provider, input) =>
+      provider.generateSvg({
+        theme: input.theme,
+        style: input.style as StyleId,
+        concept: input.concept,
+        feedback: input.feedback,
+      }),
   });
 }

@@ -21,7 +21,14 @@ export type CallGuard = (info: { provider: ProviderId; model: string }) => Promi
  * Concepts and metadata are text only, so Kenari may use a cheaper model for them (user setting).
  * SVG calls and other providers keep the model from the provider order.
  */
-export function orderForKind(order: ProviderEntry[], kind: UsageKind, kenariTextModel: string): ProviderEntry[] {
+export function orderForKind(
+  order: ProviderEntry[],
+  kind: UsageKind,
+  kenariTextModel: string,
+  svgModelOverride?: string,
+): ProviderEntry[] {
+  // A model picked by the user runs alone: falling back to another model would hide which one made the asset.
+  if (kind === "svg" && svgModelOverride) return [{ provider: "kenari", model: svgModelOverride }];
   const textModel = kenariTextModel.trim();
   if (kind === "svg" || !textModel) return order;
   return order.map((entry) => (entry.provider === "kenari" ? { ...entry, model: textModel } : entry));

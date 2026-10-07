@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { MAX_VARIATIONS } from "@/lib/generate/schemas";
 import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
 import { STYLES, type Palette, type StyleId } from "@/lib/settings/schema";
+import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
 import { selectClass } from "@/lib/ui";
 
@@ -39,10 +40,28 @@ export function GenerateForm({
   const [style, setStyle] = useState<StyleId>(defaultStyle);
   const [paletteIndex, setPaletteIndex] = useState(palettes.length > 0 ? "0" : "");
   const [count, setCount] = useState(10);
+  const [model, setModel] = useState(""); // "" = the model from Settings
+  const [catalog, setCatalog] = useState<CatalogModel[] | null>(null);
   const [state, setState] = useState<JobState | null>(null);
   const [running, setRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const urlsRef = useRef<string[]>([]);
+
+  // The model list comes from Kenari's catalog; if it cannot be loaded the field becomes free text.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/models")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { models?: CatalogModel[] } | null) => {
+        if (!cancelled) setCatalog(body?.models ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Warn before closing the tab: the queue lives in this page.
   useEffect(() => {
@@ -83,6 +102,7 @@ export function GenerateForm({
       style,
       palette,
       count,
+      model: model.trim() || undefined,
       bannedWords,
       signal: controller.signal,
       onState: (next) => {
@@ -123,6 +143,55 @@ export function GenerateForm({
                 disabled={running}
                 placeholder="autumn harvest icons"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="model">Model untuk membuat SVG</Label>
+              {catalog && catalog.length > 0 ? (
+                <select
+                  id="model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={running}
+                  className={selectClass}
+                >
+                  <option value="">Sesuai Pengaturan (bawaan)</option>
+                  <optgroup label="Gratis">
+                    {catalog
+                      .filter((m) => m.free)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.id}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Berbayar (perkiraan Rp per 1 juta token, masuk/keluar)">
+                    {catalog
+                      .filter((m) => !m.free)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.id}
+                          {m.inPerMTokIdr !== null && m.outPerMTokIdr !== null
+                            ? ` · Rp${Math.round(m.inPerMTokIdr).toLocaleString("id-ID")} / Rp${Math.round(m.outPerMTokIdr).toLocaleString("id-ID")}`
+                            : ""}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+              ) : (
+                <Input
+                  id="model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={running || catalog === null}
+                  maxLength={120}
+                  placeholder={catalog === null ? "Memuat daftar model..." : "Kosong = model dari Pengaturan; atau ketik nama model Kenari"}
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                Hanya untuk membuat SVG; konsep dan metadata tetap memakai model dari Pengaturan. Model berbayar dihitung ke
+                batas biaya Kenari bulanan. Bila model yang dipilih gagal, aplikasi tidak pindah ke model lain.
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">

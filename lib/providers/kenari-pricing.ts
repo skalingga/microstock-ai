@@ -62,3 +62,48 @@ export function computeCostIdr(price: ModelPrice, usage: { prompt_tokens?: numbe
   const cost = (usage.prompt_tokens ?? 0) * price.inIdr + (usage.completion_tokens ?? 0) * price.outIdr;
   return Math.round(cost * 100) / 100;
 }
+
+export type CatalogModel = {
+  id: string;
+  free: boolean;
+  /** Rupiah per 1M input / output tokens; null when the catalog gives no price. */
+  inPerMTokIdr: number | null;
+  outPerMTokIdr: number | null;
+};
+
+let catalogCache: { at: number; models: CatalogModel[] } | null = null;
+
+/** Every model Kenari lists, for the model picker. Cached like prices; empty when Kenari is unreachable. */
+export async function fetchModelCatalog(
+  opts: { baseUrl?: string; fetchImpl?: typeof fetch; now?: () => number } = {},
+): Promise<CatalogModel[]> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const now = opts.now ?? Date.now;
+  const injected = Boolean(opts.fetchImpl || opts.now);
+  const baseUrl = (opts.baseUrl ?? process.env.KENARI_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+
+  if (!injected && catalogCache && now() - catalogCache.at < TTL_MS) return catalogCache.models;
+
+  try {
+    const res = await fetchImpl(`${baseUrl}/models`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = (await res.json()) as { data?: CatalogEntry[] };
+    const models: CatalogModel[] = [];
+    for (const entry of body.data ?? []) {
+      if (!entry.id) continue;
+      const input = entry.pricing?.input;
+      const output = entry.pricing?.output;
+      models.push({
+        id: entry.id,
+        free: isFreeModel(entry.id),
+        inPerMTokIdr: typeof input === "number" ? input / 1e6 : null,
+        outPerMTokIdr: typeof output === "number" ? output / 1e6 : null,
+      });
+    }
+    models.sort((a, b) => Number(b.free) - Number(a.free) || a.id.localeCompare(b.id));
+    if (!injected) catalogCache = { at: now(), models };
+    return models;
+  } catch {
+    return catalogCache?.models ?? [];
+  }
+}
