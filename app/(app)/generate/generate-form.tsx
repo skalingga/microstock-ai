@@ -40,20 +40,24 @@ export function GenerateForm({
   const [style, setStyle] = useState<StyleId>(defaultStyle);
   const [paletteIndex, setPaletteIndex] = useState(palettes.length > 0 ? "0" : "");
   const [count, setCount] = useState(10);
-  const [model, setModel] = useState(""); // "" = the model from Settings
+  // "" = the order from Settings; "kenari|<id>" or "gemini|<id>" from the picker; free text = a Kenari id.
+  const [model, setModel] = useState("");
   const [catalog, setCatalog] = useState<CatalogModel[] | null>(null);
+  const [geminiModels, setGeminiModels] = useState<string[]>([]);
   const [state, setState] = useState<JobState | null>(null);
   const [running, setRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const urlsRef = useRef<string[]>([]);
 
-  // The model list comes from Kenari's catalog; if it cannot be loaded the field becomes free text.
+  // The model list comes from Kenari's catalog and the Gemini key; if Kenari's cannot be loaded the field becomes free text.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/models")
       .then((r) => (r.ok ? r.json() : null))
-      .then((body: { models?: CatalogModel[] } | null) => {
-        if (!cancelled) setCatalog(body?.models ?? []);
+      .then((body: { models?: CatalogModel[]; geminiModels?: string[] } | null) => {
+        if (cancelled) return;
+        setCatalog(body?.models ?? []);
+        setGeminiModels(body?.geminiModels ?? []);
       })
       .catch(() => {
         if (!cancelled) setCatalog([]);
@@ -102,7 +106,7 @@ export function GenerateForm({
       style,
       palette,
       count,
-      model: model.trim() || undefined,
+      model: parseModelChoice(model),
       bannedWords,
       signal: controller.signal,
       onState: (next) => {
@@ -155,21 +159,21 @@ export function GenerateForm({
                   disabled={running}
                   className={selectClass}
                 >
-                  <option value="">Sesuai Pengaturan (bawaan)</option>
-                  <optgroup label="Gratis">
+                  <option value="">Sesuai Pengaturan (bawaan, dengan cadangan)</option>
+                  <optgroup label="Kenari gratis">
                     {catalog
                       .filter((m) => m.free)
                       .map((m) => (
-                        <option key={m.id} value={m.id}>
+                        <option key={m.id} value={`kenari|${m.id}`}>
                           {m.id}
                         </option>
                       ))}
                   </optgroup>
-                  <optgroup label="Berbayar (perkiraan Rp per 1 juta token, masuk/keluar)">
+                  <optgroup label="Kenari berbayar (perkiraan Rp per 1 juta token, masuk/keluar)">
                     {catalog
                       .filter((m) => !m.free)
                       .map((m) => (
-                        <option key={m.id} value={m.id}>
+                        <option key={m.id} value={`kenari|${m.id}`}>
                           {m.id}
                           {m.inPerMTokIdr !== null && m.outPerMTokIdr !== null
                             ? ` · Rp${Math.round(m.inPerMTokIdr).toLocaleString("id-ID")} / Rp${Math.round(m.outPerMTokIdr).toLocaleString("id-ID")}`
@@ -177,6 +181,15 @@ export function GenerateForm({
                         </option>
                       ))}
                   </optgroup>
+                  {geminiModels.length > 0 && (
+                    <optgroup label="Gemini (free tier)">
+                      {geminiModels.map((id) => (
+                        <option key={id} value={`gemini|${id}`}>
+                          {id}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               ) : (
                 <Input
@@ -189,8 +202,9 @@ export function GenerateForm({
                 />
               )}
               <p className="text-xs text-muted-foreground">
-                Hanya untuk membuat SVG; konsep dan metadata tetap memakai model dari Pengaturan. Model berbayar dihitung ke
-                batas biaya Kenari bulanan. Bila model yang dipilih gagal, aplikasi tidak pindah ke model lain.
+                Hanya untuk membuat SVG; konsep dan metadata tetap memakai model dari Pengaturan. Model Kenari berbayar
+                dihitung ke batas biaya Kenari bulanan. Bila model yang dipilih gagal, aplikasi tidak pindah ke model lain.
+                Model Gemini yang lambat (mis. 3.8) bisa melewati batas waktu 60 detik.
               </p>
             </div>
 
@@ -330,4 +344,13 @@ export function GenerateForm({
       )}
     </div>
   );
+}
+
+/** Picker value to the model sent with each SVG call. Typed text without a prefix is a Kenari id. */
+function parseModelChoice(value: string): { provider: "kenari" | "gemini"; model: string } | undefined {
+  const text = value.trim();
+  if (!text) return undefined;
+  const [prefix, ...rest] = text.split("|");
+  if (rest.length > 0 && (prefix === "kenari" || prefix === "gemini")) return { provider: prefix, model: rest.join("|") };
+  return { provider: "kenari", model: text };
 }

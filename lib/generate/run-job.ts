@@ -17,7 +17,7 @@ import {
   type MetadataResponse,
   type SvgResponse,
 } from "./client";
-import { RateGate, callWithRetry } from "./queue";
+import { RateGate, callWithRetry, type AttemptContext } from "./queue";
 import { retryFeedback } from "./retry";
 
 // The whole job runs in the browser, one asset at a time (CLAUDE.md rule 2).
@@ -55,8 +55,8 @@ export type RunJobParams = {
   style: StyleId;
   palette: string[];
   count: number;
-  /** Model picked on the Generate page for the SVG calls; empty = the one from Settings. */
-  model?: string;
+  /** Model picked on the Generate page for the SVG calls; empty = the order from Settings. */
+  model?: { provider: "kenari" | "gemini"; model: string };
   /** From the user's settings: used to judge the generated metadata. */
   bannedWords: string[];
   signal: AbortSignal;
@@ -85,10 +85,10 @@ export async function runJob(p: RunJobParams): Promise<void> {
     emit({ phase: "konsep", message: "Menyusun konsep variasi..." });
 
     const conceptsRes = await callWithRetry(
-      () =>
+      (ctx) =>
         postJson<ConceptsResponse>(
           "/api/generate/concepts",
-          { theme: p.theme, style: p.style, palette: p.palette, count: p.count },
+          { theme: p.theme, style: p.style, palette: p.palette, count: p.count, ...skip(ctx) },
           p.signal,
         ).then((r) => {
           gate.update(r.rateLimit);
@@ -126,7 +126,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
       let made: Awaited<ReturnType<typeof makeAsset>>;
       try {
         made = await callWithRetry(
-          () => makeAsset(p, jobId!, item.concept, gate, pool),
+          (ctx) => makeAsset(p, jobId!, item.concept, gate, pool, ctx),
           retryOpts((message) => emit({ message })),
         );
       } catch (err) {
@@ -155,7 +155,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
 
       try {
         const verdict = await callWithRetry(
-          () => makeMetadata(p, made, item.concept, gate),
+          (ctx) => makeMetadata(p, made, item.concept, gate, ctx),
           retryOpts((message) => emit({ message })),
         );
         patchItem(item.index, { qc: verdict.status, note: undefined });
@@ -214,16 +214,17 @@ async function makeAsset(
   concept: Concept,
   gate: RateGate,
   pool: HashPoolEntry[],
+  ctx: AttemptContext,
 ): Promise<MadeAsset> {
   const assetId = crypto.randomUUID();
 
-  let draft = await draftSvg(p, concept, gate, pool, assetId);
+  let draft = await draftSvg(p, concept, gate, pool, assetId, ctx);
 
   // One automatic retry when QC failed on something a new drawing can fix. A failed retry keeps the first draft.
   const feedback = draft.verdict.status === "gagal" ? retryFeedback(draft.qc.notes) : null;
   if (feedback) {
     try {
-      draft = await draftSvg(p, concept, gate, pool, assetId, feedback);
+      draft = await draftSvg(p, concept, gate, pool, assetId, ctx, feedback);
     } catch (err) {
       if (p.signal.aborted) throw err;
     }
@@ -290,11 +291,19 @@ async function draftSvg(
   gate: RateGate,
   pool: HashPoolEntry[],
   assetId: string,
+  ctx: AttemptContext,
   feedback?: string,
 ): Promise<Draft> {
   const res = await postJson<SvgResponse>(
     "/api/generate/svg",
-    { theme: p.theme, style: p.style, concept, ...(feedback ? { feedback } : {}), ...(p.model ? { model: p.model } : {}) },
+    {
+      theme: p.theme,
+      style: p.style,
+      concept,
+      ...(feedback ? { feedback } : {}),
+      ...(p.model ? { model: p.model.model, modelProvider: p.model.provider } : {}),
+      ...skip(ctx),
+    },
     p.signal,
   );
   gate.update(res.rateLimit);
@@ -318,10 +327,16 @@ async function draftSvg(
   return { res, clean, stats, png, qc, verdict };
 }
 
-async function makeMetadata(p: RunJobParams, asset: MadeAsset, concept: Concept, gate: RateGate): Promise<Verdict> {
+async function makeMetadata(
+  p: RunJobParams,
+  asset: MadeAsset,
+  concept: Concept,
+  gate: RateGate,
+  ctx: AttemptContext,
+): Promise<Verdict> {
   const res = await postJson<MetadataResponse>(
     "/api/generate/metadata",
-    { theme: p.theme, style: p.style, concept: describeConcept(concept) },
+    { theme: p.theme, style: p.style, concept: describeConcept(concept), ...skip(ctx) },
     p.signal,
   );
   gate.update(res.rateLimit);
@@ -329,4 +344,9 @@ async function makeMetadata(p: RunJobParams, asset: MadeAsset, concept: Concept,
   const verdict = await applyMetadata(p.supabase, asset.assetId, asset.notes, res.metadata, p.bannedWords);
   if (!verdict) throw new ApiError("storage", "Gagal menyimpan metadata.");
   return verdict;
+}
+
+/** Request field that tells the server to start at the backup provider (see AttemptContext). */
+function skip(ctx: AttemptContext) {
+  return ctx.skipPrimary ? { skipPrimary: true } : {};
 }

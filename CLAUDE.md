@@ -105,6 +105,7 @@ KENARI_API_KEY=                 # server saja, berawalan kn-
 KENARI_BASE_URL=https://kenari.id/v1
 KENARI_DEFAULT_MODEL=            # model bawaan bila pengaturan kosong, mis. model :free
 GEMINI_API_KEY=                 # server saja, mulai Tahap 5
+GEMINI_DEFAULT_MODEL=           # model Gemini bila pengaturan kosong; kosong = gemini-3.5-flash
 RECRAFT_API_KEY=                # server saja, mulai Tahap 7
 RECRAFT_MONTHLY_BUDGET_USD=10
 ```

@@ -5,7 +5,7 @@ import { findBannedWords } from "@/lib/settings/banned";
 import { unifyPalettes } from "@/lib/generate/concept";
 import { conceptsRequestSchema } from "@/lib/generate/schemas";
 
-// Stay under Vercel's 60s Hobby limit (CLAUDE.md rule 3); the provider call itself times out at 45s.
+// Stay under Vercel's 60s Hobby limit (CLAUDE.md rule 3); the provider call itself times out at 55s.
 export const maxDuration = 60;
 
 export async function POST(request: Request) {

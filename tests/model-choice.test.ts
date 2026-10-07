@@ -9,11 +9,16 @@ const order = [
 ];
 
 describe("orderForKind with a chosen model", () => {
-  it("runs only the chosen Kenari model for SVG calls", () => {
-    expect(orderForKind(order, "svg", "", "vendor/model:free")).toEqual([{ provider: "kenari", model: "vendor/model:free" }]);
+  it("runs only the chosen model for SVG calls", () => {
+    expect(orderForKind(order, "svg", "", { provider: "kenari", model: "vendor/model:free" })).toEqual([
+      { provider: "kenari", model: "vendor/model:free" },
+    ]);
+    expect(orderForKind(order, "svg", "", { provider: "gemini", model: "gemini-3.5-flash" })).toEqual([
+      { provider: "gemini", model: "gemini-3.5-flash" },
+    ]);
   });
   it("ignores the choice for concepts and metadata", () => {
-    expect(orderForKind(order, "metadata", "", "vendor/model:free")).toEqual(order);
+    expect(orderForKind(order, "metadata", "", { provider: "kenari", model: "vendor/model:free" })).toEqual(order);
   });
   it("keeps the saved order when nothing is chosen", () => {
     expect(orderForKind(order, "svg", "cheap")).toEqual(order);
@@ -25,6 +30,11 @@ describe("svgRequestSchema model", () => {
   it("accepts Kenari style ids", () => {
     expect(svgRequestSchema.safeParse({ ...base, model: "vendor/model-1.5:free" }).success).toBe(true);
     expect(svgRequestSchema.safeParse(base).success).toBe(true);
+  });
+  it("accepts a Gemini model with its provider", () => {
+    const parsed = svgRequestSchema.safeParse({ ...base, model: "gemini-3.5-flash", modelProvider: "gemini" });
+    expect(parsed.success && parsed.data.modelProvider).toBe("gemini");
+    expect(svgRequestSchema.safeParse({ ...base, model: "x", modelProvider: "recraft" }).success).toBe(false);
   });
   it("rejects odd input", () => {
     expect(svgRequestSchema.safeParse({ ...base, model: "a b; drop" }).success).toBe(false);
