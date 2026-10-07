@@ -193,10 +193,17 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
       let res: ConceptsResponse;
       try {
         res = await callWithRetry(
-          () =>
+          (ctx) =>
             postJson<ConceptsResponse>(
               "/api/generate/concepts",
-              { theme: t.theme, style: t.style, palette: [], count: p.setup.variations },
+              {
+                theme: t.theme,
+                style: t.style,
+                palette: [],
+                count: p.setup.variations,
+                // After a timeout the server starts at the backup provider, like a normal job.
+                ...(ctx.skipPrimary ? { skipPrimary: true } : {}),
+              },
               p.signal,
             ),
           { gate: gateFor("concepts"), signal: p.signal, onStatus: (message) => emit({ message }) },

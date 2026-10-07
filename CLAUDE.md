@@ -73,13 +73,13 @@ export interface SvgProvider {
 
 Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor tanpa konfirmasi manual. Pemeriksaan: validitas parse dan render, sanitasi, tanpa elemen teks, kompleksitas path, tidak kosong dan tidak keluar viewBox, latar transparan untuk ikon, uji tile untuk pola, kemiripan lewat perceptual hash terhadap batch dan riwayat, kata terlarang di metadata. Render dan hash berjalan di browser.
 
-## Model data (7 tabel, semua dengan RLS)
+## Model data (semua dengan RLS)
 
-`research_runs`, `themes`, `generation_jobs`, `assets` (termasuk `provider`, `model`, `svg_path`, `preview_path`, `path_count`, `phash`, `qc_status`, `qc_notes`, `title`, `keywords`, `category`, `needs_release`, `exported_at`), `exports`, `provider_usage`, serta pengaturan pengguna. Detail kolom ada di PRD bagian Model data.
+`research_runs`, `themes`, `generation_jobs`, `assets` (termasuk `provider`, `model`, `svg_path`, `preview_path`, `path_count`, `phash`, `qc_status`, `qc_notes`, `title`, `keywords`, `category`, `needs_release`, `exported_at`), `exports`, `provider_usage`, `model_benchmarks` (uji banding Tahap 4), serta pengaturan pengguna. Detail kolom ada di PRD bagian Model data.
 
 ## Halaman
 
-`/login`, `/riset`, `/generate`, `/aset`, `/ekspor`, `/pengaturan`.
+`/login`, `/riset`, `/generate`, `/uji-model`, `/aset`, `/ekspor`, `/pengaturan`.
 
 ## Roadmap (kerjakan berurutan, satu tahap per sesi)
 
