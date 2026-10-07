@@ -58,8 +58,8 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
     <div className="space-y-4">
       <div
         className={cn(
-          "sticky top-2 z-10 flex min-h-12 flex-wrap items-center gap-2 rounded-lg border p-2 text-sm",
-          picked.length > 0 ? "bg-background shadow-sm" : "bg-muted/40",
+          "sticky top-16 z-20 flex min-h-13 flex-wrap items-center gap-2 rounded-2xl border p-2 text-sm transition-colors duration-150 lg:top-3",
+          picked.length > 0 ? "border-primary/30 bg-card shadow-lg shadow-primary/10" : "bg-card/70",
         )}
       >
         {picked.length === 0 ? (
@@ -111,13 +111,23 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
         )}
       </div>
 
-      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
         {assets.map((asset) => {
           const isPicked = selected.has(asset.id);
           return (
-            <li key={asset.id} className="relative space-y-1.5 text-xs">
+            <li
+              key={asset.id}
+              className={cn(
+                "group relative flex flex-col gap-2 rounded-2xl border bg-card p-2 text-xs shadow-xs transition-[box-shadow,border-color] duration-200 hover:border-primary/30 hover:shadow-md",
+                isPicked && "border-primary ring-2 ring-primary/30",
+              )}
+            >
               <label
-                className="absolute top-1.5 left-1.5 z-[1] flex size-7 cursor-pointer items-center justify-center rounded-md border bg-background/90 shadow-sm"
+                className={cn(
+                  "absolute top-3 left-3 z-[1] flex size-8 cursor-pointer items-center justify-center rounded-lg border bg-card/95 shadow-sm transition-opacity duration-150",
+                  // Hidden until hover on devices with a mouse, always shown when picked or on touch screens.
+                  !isPicked && picked.length === 0 && "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-within:opacity-100",
+                )}
                 title={isPicked ? "Batalkan pilihan" : "Pilih aset ini"}
               >
                 <input
@@ -132,8 +142,7 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
               <Link href={`/aset/${asset.id}`} className="block">
                 <div
                   className={cn(
-                    "bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-md border transition-shadow hover:shadow-md",
-                    isPicked && "ring-2 ring-primary",
+                    "bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-xl",
                   )}
                 >
                   {asset.previewUrl ? (
@@ -144,12 +153,12 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
                   )}
                 </div>
               </Link>
-              <p className="line-clamp-2 font-medium">{asset.label}</p>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p className="line-clamp-2 min-h-8 px-1 font-medium leading-4">{asset.label}</p>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 pb-1">
                 <QcBadge status={asset.qcStatus} />
                 {asset.exported && <span className="text-muted-foreground">Diekspor</span>}
-                {asset.adobeStatus === "diterima" && <span className="font-medium text-emerald-700">Diterima Adobe</span>}
-                {asset.adobeStatus === "ditolak" && <span className="font-medium text-red-700">Ditolak Adobe</span>}
+                {asset.adobeStatus === "diterima" && <span className="font-medium text-success-foreground">Diterima Adobe</span>}
+                {asset.adobeStatus === "ditolak" && <span className="font-medium text-danger-foreground">Ditolak Adobe</span>}
               </p>
             </li>
           );

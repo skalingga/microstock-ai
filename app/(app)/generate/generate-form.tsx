@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { LayoutGrid, Loader2, Sparkles, Square, Wand2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { QcBadge } from "@/components/qc-badge";
@@ -16,6 +17,7 @@ import { STYLES, isImageStyle, type Palette, type StyleId } from "@/lib/settings
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
 import { selectClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 const REQUESTS_PER_MINUTE = 5; // observed on Kenari free models; the queue reads the real limit from headers
 const IMAGE_SECONDS_PER_ASSET = 45; // gpt-image-2 took 13-35s per picture in the Oktober 2026 test, plus metadata
@@ -147,7 +149,10 @@ export function GenerateForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Tema baru</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Wand2 className="size-4 text-primary" />
+            Tema baru
+          </CardTitle>
           <CardDescription>
             Tulis tema dalam bahasa Inggris, mis. “autumn harvest icons”. Hindari nama merek, tokoh, atau karakter.
           </CardDescription>
@@ -335,11 +340,13 @@ export function GenerateForm({
             )}
 
             <div className="flex gap-2">
-              <Button type="submit" disabled={running || theme.trim().length < 2}>
+              <Button type="submit" size="lg" disabled={running || theme.trim().length < 2}>
+                {running ? <Loader2 className="animate-spin" /> : <Sparkles />}
                 {running ? "Sedang berjalan..." : "Mulai generate"}
               </Button>
               {running && (
-                <Button type="button" variant="outline" onClick={() => abortRef.current?.abort()}>
+                <Button type="button" size="lg" variant="outline" onClick={() => abortRef.current?.abort()}>
+                  <Square />
                   Hentikan
                 </Button>
               )}
@@ -371,7 +378,7 @@ export function GenerateForm({
             {total > 0 && (
               <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
                 <div
-                  className="h-full bg-primary transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-[width] duration-300"
                   style={{ width: `${Math.round(((done + failed) / total) * 100)}%` }}
                 />
               </div>
@@ -379,13 +386,18 @@ export function GenerateForm({
 
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {state.items.map((item) => (
-                <li key={item.index} className="space-y-1 text-xs">
-                  <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-md border">
+                <li key={item.index} className="space-y-1.5 rounded-2xl border bg-card p-2 text-xs shadow-xs">
+                  <div
+                    className={cn(
+                      "bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-xl",
+                      item.status === "berjalan" && "animate-pulse ring-2 ring-primary/40",
+                    )}
+                  >
                     {item.previewUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={item.previewUrl} alt={item.concept.subject} className="size-full object-contain" />
                     ) : (
-                      <span className="rounded bg-background/80 px-2 py-1 text-muted-foreground">
+                      <span className="rounded-full bg-card/90 px-2.5 py-1 font-medium text-muted-foreground shadow-xs">
                         {STATUS_LABEL[item.status]}
                       </span>
                     )}
@@ -399,10 +411,8 @@ export function GenerateForm({
             </ul>
 
             {finished && state.jobId && done > 0 && (
-              <Link
-                href={`/aset?job=${state.jobId}`}
-                className="inline-block text-sm font-medium underline underline-offset-4"
-              >
+              <Link href={`/aset?job=${state.jobId}`} className={buttonVariants({ variant: "secondary" })}>
+                <LayoutGrid />
                 Lihat hasilnya di Aset
               </Link>
             )}

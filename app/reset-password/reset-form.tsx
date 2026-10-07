@@ -26,7 +26,7 @@ export function ResetForm() {
           {state.error}
         </p>
       )}
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>
         {pending ? "Memproses..." : "Simpan password"}
       </Button>
     </form>

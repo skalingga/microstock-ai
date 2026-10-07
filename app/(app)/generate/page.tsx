@@ -1,4 +1,7 @@
+import { Activity, CircleCheck, Sparkles, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
 import { createClient } from "@/lib/supabase/server";
 import { withPresetPalettes } from "@/lib/settings/palettes";
@@ -31,6 +34,9 @@ export default async function HalamanGenerate({
     if (!row.ok) entry.failed += 1;
   }
 
+  const totalCalls = Object.values(usageByProvider).reduce((sum, u) => sum + u.total, 0);
+  const totalFailed = Object.values(usageByProvider).reduce((sum, u) => sum + u.failed, 0);
+
   const defaultStyle = (STYLES.find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
   // Same order as the server's imageOrder(): settings, then env, then the built-in model.
   const defaultImageModel =
@@ -39,27 +45,43 @@ export default async function HalamanGenerate({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Generate</h1>
-        <p className="text-muted-foreground">
-          Masukkan satu tema, lalu aplikasi membuat variasi aset SVG satu per satu. Biarkan tab ini terbuka sampai
-          selesai.
-        </p>
-        {settings && (
-          <p className="text-sm text-muted-foreground">
-            Biaya Kenari bulan ini: {formatIdr(Number(kenariSpent ?? 0))} dari batas{" "}
-            {formatIdr(settings.kenari_monthly_budget_idr)} (model gratis tidak dihitung).
-          </p>
-        )}
-        {Object.keys(usageByProvider).length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            Panggilan hari ini:{" "}
-            {Object.entries(usageByProvider)
-              .map(([provider, u]) => `${provider} ${u.total}${u.failed > 0 ? ` (${u.failed} gagal)` : ""}`)
-              .join(", ")}
-          </p>
-        )}
-      </div>
+      <PageHeader
+        icon={Sparkles}
+        title="Generate"
+        description="Masukkan satu tema, lalu aplikasi membuat variasi aset SVG satu per satu. Biarkan tab ini terbuka sampai selesai."
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
+          {settings && (
+            <StatCard
+              icon={Wallet}
+              tone="amber"
+              label="Biaya Kenari bulan ini"
+              value={formatIdr(Number(kenariSpent ?? 0))}
+              progress={settings.kenari_monthly_budget_idr > 0 ? Number(kenariSpent ?? 0) / settings.kenari_monthly_budget_idr : undefined}
+              detail={`dari batas ${formatIdr(settings.kenari_monthly_budget_idr)} · model gratis tidak dihitung`}
+            />
+          )}
+          <StatCard
+            icon={Activity}
+            label="Panggilan AI hari ini"
+            value={totalCalls}
+            detail={
+              totalCalls === 0
+                ? "Belum ada panggilan hari ini"
+                : Object.entries(usageByProvider)
+                    .map(([provider, u]) => `${provider} ${u.total}${u.failed > 0 ? ` (${u.failed} gagal)` : ""}`)
+                    .join(" · ")
+            }
+          />
+          <StatCard
+            icon={CircleCheck}
+            tone="emerald"
+            label="Tingkat berhasil hari ini"
+            value={totalCalls === 0 ? "–" : `${Math.round(((totalCalls - totalFailed) / totalCalls) * 100)}%`}
+            detail="Panggilan yang dijawab provider tanpa error"
+          />
+        </div>
+      </PageHeader>
 
       <GenerateForm
         userId={user.id}

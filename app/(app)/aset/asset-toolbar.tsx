@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { processPending, type BatchProgress } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/client";
@@ -43,7 +44,10 @@ export function AssetToolbar({ pending, bannedWords, job }: { pending: number; b
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft/60 p-3 text-sm text-warning-foreground">
+      <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning-foreground ring-1 ring-warning/30">
+        <ScanSearch className="size-4" />
+      </span>
       {!running && pending > 0 && (
         <>
           <span>{pending} aset belum selesai diperiksa atau belum punya metadata.</span>

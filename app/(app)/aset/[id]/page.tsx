@@ -1,4 +1,16 @@
+import {
+  ArrowLeft,
+  BadgeCheck,
+  CircleCheck,
+  CircleX,
+  Download,
+  ShieldCheck,
+  Tags,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { notFound } from "next/navigation";
 import { QcBadge } from "@/components/qc-badge";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
@@ -17,11 +29,23 @@ const dateFormat = new Intl.DateTimeFormat("id-ID", {
   timeZone: "Asia/Jakarta",
 });
 
-const NOTE_MARK: Record<NoteStatus, { symbol: string; className: string }> = {
-  ok: { symbol: "✓", className: "text-emerald-600" },
-  cek: { symbol: "!", className: "text-amber-600" },
-  gagal: { symbol: "✕", className: "text-red-600" },
+const NOTE_MARK: Record<NoteStatus, { icon: LucideIcon; className: string }> = {
+  ok: { icon: CircleCheck, className: "text-success" },
+  cek: { icon: TriangleAlert, className: "text-warning-foreground" },
+  gagal: { icon: CircleX, className: "text-destructive" },
 };
+
+function Section({ id, icon: Icon, title, children }: { id: string; icon: LucideIcon; title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby={id}>
+      <h2 id={id} className="flex items-center gap-2 font-semibold">
+        <Icon className="size-4 text-primary" />
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
 export default async function HalamanDetailAset({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -62,13 +86,17 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <Link href={`/aset?job=${asset.job_id}`} className="text-sm underline underline-offset-4">
-        ← Kembali ke aset
+      <Link
+        href={`/aset?job=${asset.job_id}`}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg pr-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        <ArrowLeft className="size-4" />
+        Kembali ke aset
       </Link>
 
-      <div className="grid gap-8 md:grid-cols-2">
-        <div className="space-y-4">
-          <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-lg border">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-2xl border shadow-sm">
             {svgUrl ? (
               // Shown through <img>, never inline, so scripts in an SVG can never run.
               // eslint-disable-next-line @next/next/no-img-element
@@ -84,7 +112,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
               <div
                 role="img"
                 aria-label="Pola diulang 2 kali 2"
-                className="aspect-square w-full max-w-xs rounded-md border"
+                className="aspect-square w-full max-w-xs rounded-xl border"
                 style={{ backgroundImage: `url(${svgUrl})`, backgroundSize: "50% 50%", backgroundRepeat: "repeat" }}
               />
               <p className="text-xs text-muted-foreground">Cari garis sambungan di tengah. Pola yang baik tidak terlihat sambungannya.</p>
@@ -94,26 +122,22 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
 
         <div className="space-y-6">
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold">{asset.title ?? "Aset tanpa judul"}</h1>
-              <QcBadge status={asset.qc_status} />
-            </div>
-            {asset.concept && <p className="text-muted-foreground">{asset.concept}</p>}
+            <QcBadge status={asset.qc_status} />
+            <h1 className="text-2xl font-bold">{asset.title ?? "Aset tanpa judul"}</h1>
+            {asset.concept && <p className="leading-relaxed text-muted-foreground">{asset.concept}</p>}
           </div>
 
-          <section className="space-y-2" aria-labelledby="qc-heading">
-            <h2 id="qc-heading" className="font-medium">
-              Hasil QC
-            </h2>
+          <Section id="qc-heading" icon={ShieldCheck} title="Hasil QC">
             {notes.length === 0 ? (
               <p className="text-sm text-muted-foreground">QC belum dijalankan untuk aset ini.</p>
             ) : (
-              <ul className="space-y-1 text-sm">
+              <ul className="space-y-2 text-sm">
                 {notes.map((note, i) => (
                   <li key={`${note.check}-${i}`} className="flex gap-2">
-                    <span aria-hidden className={cn("w-4 shrink-0 text-center font-bold", NOTE_MARK[note.status].className)}>
-                      {NOTE_MARK[note.status].symbol}
-                    </span>
+                    {(() => {
+                      const Mark = NOTE_MARK[note.status].icon;
+                      return <Mark aria-hidden className={cn("mt-0.5 size-4 shrink-0", NOTE_MARK[note.status].className)} />;
+                    })()}
                     <span>
                       <span className="sr-only">{note.status === "ok" ? "Lolos: " : note.status === "cek" ? "Perlu cek: " : "Gagal: "}</span>
                       {note.message}
@@ -140,12 +164,9 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
               concept={asset.concept ?? ""}
               bannedWords={settings?.banned_words ?? []}
             />
-          </section>
+          </Section>
 
-          <section className="space-y-3" aria-labelledby="meta-heading">
-            <h2 id="meta-heading" className="font-medium">
-              Metadata
-            </h2>
+          <Section id="meta-heading" icon={Tags} title="Metadata">
             <MetadataForm
               key={`${asset.title}-${asset.keywords.length}-${asset.category}`}
               id={asset.id}
@@ -154,16 +175,13 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
               category={asset.category}
               needsRelease={asset.needs_release}
             />
-          </section>
+          </Section>
 
-          <section className="space-y-3" aria-labelledby="adobe-heading">
-            <h2 id="adobe-heading" className="font-medium">
-              Hasil review Adobe
-            </h2>
+          <Section id="adobe-heading" icon={BadgeCheck} title="Hasil review Adobe">
             <AdobeResultForm key={`${asset.adobe_status}-${asset.adobe_reason}`} id={asset.id} status={asset.adobe_status} reason={asset.adobe_reason} />
-          </section>
+          </Section>
 
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl border bg-card p-5 text-sm shadow-xs">
             {rows.map(([label, value]) => (
               <div key={label} className="contents">
                 <dt className="text-muted-foreground">{label}</dt>
@@ -174,10 +192,8 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
 
           <div className="flex flex-wrap items-start gap-3">
             {download?.data?.signedUrl && (
-              <a
-                href={download.data.signedUrl}
-                className="inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium hover:bg-muted"
-              >
+              <a href={download.data.signedUrl} className={buttonVariants({ variant: "outline" })}>
+                <Download />
                 Unduh SVG
               </a>
             )}
