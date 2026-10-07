@@ -26,7 +26,12 @@ export const AUTO_PROVIDERS = [
 ] as const;
 
 export type StyleId = (typeof STYLES)[number]["value"];
-export type ProviderEntry = { provider: "kenari" | "gemini"; model: string };
+export type ProviderEntry = {
+  provider: "kenari" | "gemini";
+  model: string;
+  /** Set by the server for the traced styles: the model is a Kenari image model. Never stored in settings. */
+  image?: boolean;
+};
 export type Palette = { name: string; colors: string[] };
 
 const styleValues = STYLES.map((s) => s.value) as [string, ...string[]];

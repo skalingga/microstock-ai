@@ -2,6 +2,8 @@ import type { ProviderEntry } from "@/lib/settings/schema";
 import { ProviderError, canFallBack } from "./errors";
 import { GEMINI_FALLBACK_MODEL, GEMINI_TIMEOUT_MS, GeminiProvider } from "./gemini";
 import { KENARI_TIMEOUT_MS, KenariProvider } from "./kenari";
+import { KenariImageProvider } from "./kenari-image";
+import { KENARI_IMAGE_FALLBACK_MODEL, imagePriceIdr } from "./kenari-image-pricing";
 import type { ProviderId, SvgProvider } from "./types";
 
 export type UsageKind = "concepts" | "svg" | "metadata" | "themes";
@@ -39,6 +41,16 @@ export function orderForKind(
 }
 
 /**
+ * Traced styles (silhouette, line art) always use one Kenari image model, with no backup: there is no free image
+ * model to fall back to. A model picked on the Generate page is used only when it is an image model.
+ */
+export function imageOrder(settingsModel: string, override?: ProviderEntry): ProviderEntry[] {
+  const picked = override?.provider === "kenari" && imagePriceIdr(override.model) !== undefined ? override.model : "";
+  const model = picked || settingsModel.trim() || process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL;
+  return [{ provider: "kenari", model, image: true }];
+}
+
+/**
  * After the primary timed out, the browser retries with skipPrimary so the backup gets the whole
  * 60s window instead of the few seconds left over. A single provider is never dropped.
  */
@@ -60,6 +72,9 @@ export function resolveProvider(
           "model_unavailable",
           "Model Kenari belum diatur. Isi di Pengaturan atau set KENARI_DEFAULT_MODEL.",
         );
+      }
+      if (entry.image) {
+        return { provider: new KenariImageProvider(model, { timeoutMs: cap(KENARI_TIMEOUT_MS) }), model };
       }
       return { provider: new KenariProvider(model, { timeoutMs: cap(KENARI_TIMEOUT_MS) }), model };
     }

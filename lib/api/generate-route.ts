@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { formatIdr, startOfMonthWib } from "@/lib/budget";
 import { ProviderError, httpStatusFor } from "@/lib/providers/errors";
 import { isFreeModel } from "@/lib/providers/kenari-pricing";
-import { orderForKind, runWithFallback, withoutPrimary, type UsageKind } from "@/lib/providers";
+import { imageOrder, orderForKind, runWithFallback, withoutPrimary, type UsageKind } from "@/lib/providers";
 import type { SvgProvider } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
 import { toProviderOrder, type ProviderEntry } from "@/lib/settings/schema";
@@ -20,6 +20,8 @@ type Options<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number
   run: (provider: SvgProvider, input: z.infer<S>, ctx: Ctx) => Promise<R>;
   /** Model chosen by the user for this request, if any (SVG calls only). */
   modelOverride?: (input: z.infer<S>) => ProviderEntry | undefined;
+  /** True when this request is drawn by a Kenari image model and traced (SVG calls of the traced styles). */
+  usesImageModel?: (input: z.infer<S>) => boolean;
 };
 
 // Vercel stops the function at 60s (maxDuration); keep a little room for the response and logging.
@@ -69,12 +71,9 @@ export async function handleGenerate<
 
   const override = opts.modelOverride?.(input);
   const savedOrder = toProviderOrder(settings.provider_order);
-  const order = orderForKind(
-    skipPrimary && !override ? withoutPrimary(savedOrder) : savedOrder,
-    opts.kind,
-    settings.kenari_text_model,
-    override,
-  );
+  const order = opts.usesImageModel?.(input)
+    ? imageOrder(settings.kenari_image_model, override)
+    : orderForKind(skipPrimary && !override ? withoutPrimary(savedOrder) : savedOrder, opts.kind, settings.kenari_text_model, override);
 
   try {
     const result = await runWithFallback(

@@ -25,6 +25,7 @@ Buka http://localhost:3000. Halaman selain `/login` hanya bisa dibuka setelah ma
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase: Project Settings, API Keys (`service_role`). **Rahasia**, hanya untuk server dan script uji |
 | `KENARI_API_KEY` | Kunci Kenari (berawalan `kn-`). **Rahasia**, hanya dibaca server |
 | `KENARI_DEFAULT_MODEL` | Model dipakai bila kolom model di Pengaturan kosong, mis. `deepseek-v4-flash` (hasil uji banding: kualitas terbaik, sekitar Rp6 per aset). Daftar model: https://kenari.id/v1/models |
+| `KENARI_IMAGE_MODEL` | Model gambar Kenari untuk gaya Siluet dan Line art bila kolomnya di Pengaturan kosong. Kosong = `gpt-image-2` (Rp125 per gambar). Harga per model ada di `lib/providers/kenari-image-pricing.ts` |
 | `GEMINI_API_KEY` | Kunci Google AI Studio (free tier), untuk provider cadangan Gemini. **Rahasia**, hanya dibaca server |
 | `GEMINI_DEFAULT_MODEL` | Model Gemini bila kolom model di Pengaturan kosong. Kosong = `gemini-3.5-flash-lite` (free tier 15 RPM, 500 permintaan per hari) |
 | `RECRAFT_API_KEY` | Belum dipakai (Tahap 7). Boleh dikosongkan |
