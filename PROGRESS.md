@@ -27,7 +27,7 @@ Tahap 1, 2, 3, 3b, 5, 7, dan 8 selesai. Tahap 7 (gambar Kenari + konversi SVG, g
 3. Pilih tahap berikutnya: 5 (Gemini cadangan, bisa sekaligus dipakai membandingkan kualitas), 4 (uji banding model), atau 7 (Recraft, SVG vektor native).
 
 ## Catatan penting
-- Hasil uji Tahap 4 (7 Okt 2026 22.12-22.45 WIB, akun adminproject, 5 tema satu per gaya teks × 8 model, satu percobaan, timeout 55 dtk). Skor = (Lolos + ½ Perlu cek) ÷ 5:
+- Hasil uji Tahap 4 (7 Okt 2026 22.10-22.35 WIB, akun adminproject, 5 tema satu per gaya teks × 8 model, satu percobaan, timeout 55 dtk). Skor = (Lolos + ½ Perlu cek) ÷ 5:
   - gemini-3.5-flash-lite: 90%, 5/5 jadi (4 Lolos, 1 Perlu cek), median 5,9 dtk, Rp0
   - agnes-2-0-flash:free: 60%, 4/5 (1 timeout), 15 dtk
   - deepseek-v4-flash: 60%, 5/5 (1 Gagal QC: pola tidak menyambung), 37 dtk, Rp55 untuk 5 SVG
