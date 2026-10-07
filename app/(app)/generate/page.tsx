@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
 import { createClient } from "@/lib/supabase/server";
 import { withPresetPalettes } from "@/lib/settings/palettes";
+import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
 import { STYLES, toPalettes, type StyleId } from "@/lib/settings/schema";
 import { GenerateForm } from "./generate-form";
 
@@ -31,6 +32,10 @@ export default async function HalamanGenerate({
   }
 
   const defaultStyle = (STYLES.find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
+  // Same order as the server's imageOrder(): settings, then env, then the built-in model.
+  const defaultImageModel =
+    settings?.kenari_image_model.trim() || process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL;
+  const kenariBudgetLeftIdr = Math.max(0, (settings?.kenari_monthly_budget_idr ?? 0) - Number(kenariSpent ?? 0));
 
   return (
     <div className="space-y-6">
@@ -62,6 +67,8 @@ export default async function HalamanGenerate({
         palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
         bannedWords={settings?.banned_words ?? []}
         initialTheme={tema?.slice(0, 120) ?? ""}
+        defaultImageModel={defaultImageModel}
+        kenariBudgetLeftIdr={kenariBudgetLeftIdr}
       />
     </div>
   );
