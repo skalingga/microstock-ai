@@ -1,13 +1,15 @@
-import { QC } from "./config";
+import { QC, type ComplexityLimits } from "./config";
 import { hammingHex } from "./hash";
 import { seamScore, seamsOk } from "./tile";
 import type { Box, HashPoolEntry, Pixels, QcNote } from "./types";
 
 // Individual QC checks. Each is a pure function of measurements, so they can be tested without a browser.
 
-export function checkComplexity(stats: { shapeCount: number; pointCount: number }): QcNote {
+export function checkComplexity(
+  stats: { shapeCount: number; pointCount: number },
+  c: ComplexityLimits = QC.complexity,
+): QcNote {
   const { shapeCount, pointCount } = stats;
-  const c = QC.complexity;
   if (shapeCount > c.failShapes) {
     return { check: "kerumitan", status: "gagal", message: `Terlalu rumit: ${shapeCount} bentuk (batas ${c.failShapes}).` };
   }

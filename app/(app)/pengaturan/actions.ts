@@ -35,6 +35,7 @@ export async function simpanPengaturan(formData: FormData): Promise<SaveResult> 
     default_style: formData.get("default_style"),
     palettes: parsePalettes(String(formData.get("palettes") ?? "")),
     kenari_text_model: String(formData.get("kenari_text_model") ?? ""),
+    kenari_image_model: String(formData.get("kenari_image_model") ?? ""),
     kenari_monthly_budget_idr: Number(formData.get("kenari_monthly_budget_idr")),
     recraft_monthly_budget_usd: Number(formData.get("recraft_monthly_budget_usd")),
   });

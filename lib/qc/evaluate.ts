@@ -9,7 +9,7 @@ import {
   checkText,
   checkTransparentBackground,
 } from "./checks";
-import { STYLE_RULES } from "./config";
+import { STYLE_RULES, complexityFor } from "./config";
 import { dHash } from "./hash";
 import { checkMetadata } from "./metadata-checks";
 import type { Box, HashPoolEntry, MetadataFields, Pixels, QcNote, QcStatus } from "./types";
@@ -37,7 +37,7 @@ export function evaluateVisual(input: VisualInput): { notes: QcNote[]; phash: st
     notes.push({ check: "sanitasi", status: "ok", message: `Dibersihkan otomatis: ${input.sanitizeNotes.join(", ")}.` });
   }
   notes.push(checkText(input.stats.hasText));
-  notes.push(checkComplexity(input.stats));
+  notes.push(checkComplexity(input.stats, complexityFor(input.style)));
   notes.push(checkEmpty(input.pixels));
   if (rules.boundsCheck) notes.push(checkBounds(input.bbox, input.viewBox));
   if (rules.transparentBackground) notes.push(checkTransparentBackground(input.pixels));

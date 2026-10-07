@@ -7,7 +7,17 @@ export const STYLES = [
   { value: "flat_illustration", label: "Ilustrasi flat sederhana" },
   { value: "badge_label", label: "Badge / label" },
   { value: "abstract_background", label: "Background geometris abstrak" },
+  // Drawn by a Kenari image model and converted to SVG on the server (stage 7). Always black.
+  { value: "silhouette", label: "Siluet (gambar AI, berbayar)" },
+  { value: "line_art", label: "Line art (gambar AI, berbayar)" },
 ] as const;
+
+/** Styles drawn by an image model and traced to SVG instead of written as SVG by a text model. */
+export const IMAGE_STYLES = ["silhouette", "line_art"] as const;
+export type ImageStyleId = (typeof IMAGE_STYLES)[number];
+export function isImageStyle(style: string): style is ImageStyleId {
+  return (IMAGE_STYLES as readonly string[]).includes(style);
+}
 
 // Recraft is not listed: it only runs from an explicit button, never as automatic fallback.
 export const AUTO_PROVIDERS = [
@@ -55,6 +65,7 @@ export const settingsSchema = z.object({
   default_style: z.enum(styleValues),
   palettes: palettesSchema,
   kenari_text_model: z.string().trim().max(120, "Nama model terlalu panjang."),
+  kenari_image_model: z.string().trim().max(120, "Nama model terlalu panjang."),
   kenari_monthly_budget_idr: z
     .number({ error: "Batas biaya Kenari harus berupa angka." })
     .int("Batas biaya Kenari harus bilangan bulat.")
