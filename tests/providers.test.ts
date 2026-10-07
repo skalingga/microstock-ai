@@ -346,8 +346,8 @@ describe("GeminiProvider", () => {
     const before = process.env.GEMINI_DEFAULT_MODEL;
     delete process.env.GEMINI_DEFAULT_MODEL;
     try {
-      expect(resolveProvider({ provider: "gemini", model: "" }).model).toBe("gemini-3.5-flash");
-      expect(resolveProvider({ provider: "gemini", model: "gemini-3.5-flash-lite" }).model).toBe("gemini-3.5-flash-lite");
+      expect(resolveProvider({ provider: "gemini", model: "" }).model).toBe("gemini-3.5-flash-lite");
+      expect(resolveProvider({ provider: "gemini", model: "gemini-3.5-flash" }).model).toBe("gemini-3.5-flash");
     } finally {
       if (before !== undefined) process.env.GEMINI_DEFAULT_MODEL = before;
     }
@@ -355,7 +355,7 @@ describe("GeminiProvider", () => {
 });
 
 describe("fetchGeminiModels", () => {
-  it("keeps only text models, without the models/ prefix, newest first", async () => {
+  it("keeps only usable text models, without the models/ prefix, newest first", async () => {
     const fetchImpl = (async () =>
       new Response(
         JSON.stringify({
@@ -366,11 +366,18 @@ describe("fetchGeminiModels", () => {
             { id: "models/gemini-3.1-flash-image" },
             { id: "models/gemini-embedding-2" },
             { id: "models/gemini-3.10-flash" },
+            { id: "models/gemini-3.5-flash-lite" },
+            { id: "models/gemini-3.8-flash" },
+            { id: "models/gemini-3.1-pro-preview" },
+            { id: "models/gemini-2.5-pro" },
+            { id: "models/gemini-flash-latest" },
+            { id: "models/gemma-4-31b-it" },
           ],
         }),
       )) as unknown as typeof fetch;
     expect(await fetchGeminiModels({ apiKey: "k", fetchImpl })).toEqual([
       "gemini-3.10-flash",
+      "gemini-3.5-flash-lite",
       "gemini-3.5-flash",
       "gemini-2.5-flash",
     ]);
