@@ -127,7 +127,8 @@ export async function runJob(p: RunJobParams): Promise<void> {
       try {
         made = await callWithRetry(
           (ctx) => makeAsset(p, jobId!, item.concept, gate, pool, ctx),
-          retryOpts((message) => emit({ message })),
+          // A traced style pays per picture, and a timed-out picture may still be charged: one retry only.
+          { ...retryOpts((message) => emit({ message })), maxAttempts: isImageStyle(p.style) ? 2 : 3 },
         );
       } catch (err) {
         if (p.signal.aborted) break;

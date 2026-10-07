@@ -224,7 +224,7 @@ Risiko terbesar adalah ketergantungan pada free tier Gemini, karena batasnya bis
 | Variasi terlalu mirip | Ditolak sebagai konten berulang | Perceptual hash dan batas variasi per tema |
 | Google Trends tidak punya jaminan akses gratis | Riset gagal atau lambat | Cache hasil; cadangan kalender event + skor manual |
 | Vercel Hobby hanya untuk non-komersial ([Vercel](https://vercel.com/docs/plans/hobby)) | Tidak boleh dipakai saat dijual | Pindah ke Vercel Pro saat mulai menjual |
-| Batas durasi function Hobby 60 detik, patokan aman karena sumber berbeda-beda ([Vercel](https://vercel.com/docs/plans/hobby)) | Proses panjang terputus | Satu panggilan pendek per aset, antrean di browser |
+| Batas durasi function Hobby: 300 detik dengan Fluid compute ([Vercel](https://vercel.com/docs/functions/limitations), dicek 7 Oktober 2026); aplikasi memakai 60 detik untuk teks dan 120 detik untuk route SVG (model gambar) | Proses panjang terputus | Satu panggilan pendek per aset, antrean di browser; untuk gaya gambar hanya satu kali ulang |
 | Free tier tidak cocok untuk data sensitif ([Wikipedia](https://en.wikipedia.org/wiki/Google_AI_Studio)) | Privasi | Hanya kirim tema dan SVG, tanpa data pribadi |
 | Kebijakan Adobe berubah | Aturan QC usang | Aturan disimpan sebagai konfigurasi yang mudah diubah |
 | Biaya Recraft melewati anggaran (bila dibangun) | Pengeluaran lebih dari $10 per bulan | Tombol eksplisit, estimasi biaya sebelum proses, kunci otomatis di $10 |

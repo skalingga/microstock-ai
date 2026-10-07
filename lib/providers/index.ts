@@ -2,7 +2,7 @@ import type { ProviderEntry } from "@/lib/settings/schema";
 import { ProviderError, canFallBack } from "./errors";
 import { GEMINI_FALLBACK_MODEL, GEMINI_TIMEOUT_MS, GeminiProvider } from "./gemini";
 import { KENARI_TIMEOUT_MS, KenariProvider } from "./kenari";
-import { KenariImageProvider } from "./kenari-image";
+import { KENARI_IMAGE_TIMEOUT_MS, KenariImageProvider } from "./kenari-image";
 import { KENARI_IMAGE_FALLBACK_MODEL, imagePriceIdr } from "./kenari-image-pricing";
 import type { ProviderId, SvgProvider } from "./types";
 
@@ -74,7 +74,7 @@ export function resolveProvider(
         );
       }
       if (entry.image) {
-        return { provider: new KenariImageProvider(model, { timeoutMs: cap(KENARI_TIMEOUT_MS) }), model };
+        return { provider: new KenariImageProvider(model, { timeoutMs: cap(KENARI_IMAGE_TIMEOUT_MS) }), model };
       }
       return { provider: new KenariProvider(model, { timeoutMs: cap(KENARI_TIMEOUT_MS) }), model };
     }

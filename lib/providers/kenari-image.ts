@@ -1,12 +1,15 @@
 import { isImageStyle } from "@/lib/settings/schema";
 import { ProviderError } from "./errors";
-import { KENARI_TIMEOUT_MS, kenariHttpError, readRateLimit } from "./kenari";
+import { kenariHttpError, readRateLimit } from "./kenari";
 import { imagePriceIdr } from "./kenari-image-pricing";
 import { imagePrompt } from "./prompts";
 import type { SvgInput, SvgProvider } from "./types";
 
 const DEFAULT_BASE_URL = "https://kenari.id/v1";
-// gpt-image-2 needed 13-35s per picture in the Oktober 2026 test; tracing adds well under a second.
+// gpt-image-2 needed 13-57s per picture in the Oktober 2026 tests; tracing adds well under a second.
+// The SVG route allows 120s for the traced styles (app/api/generate/svg/route.ts).
+export const IMAGE_REQUEST_BUDGET_MS = 115_000;
+export const KENARI_IMAGE_TIMEOUT_MS = 105_000;
 const DOWNLOAD_TIMEOUT_MS = 10_000;
 
 export type KenariImageConfig = {
@@ -33,7 +36,7 @@ export class KenariImageProvider implements SvgProvider {
     this.model = model;
     this.apiKey = config.apiKey ?? process.env.KENARI_API_KEY;
     this.baseUrl = (config.baseUrl ?? process.env.KENARI_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
-    this.timeoutMs = config.timeoutMs ?? KENARI_TIMEOUT_MS;
+    this.timeoutMs = config.timeoutMs ?? KENARI_IMAGE_TIMEOUT_MS;
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
 
