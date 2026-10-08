@@ -85,7 +85,7 @@ export function AcceptanceReport({ rows, awaiting }: { rows: ReviewedAsset[]; aw
           {awaiting > 0 && (
             <>
               {" "}
-              <Link href="/aset?adobe=belum" className="font-semibold text-foreground underline underline-offset-4 hover:decoration-2">
+              <Link href="/aset/tinjau" className="font-semibold text-foreground underline underline-offset-4 hover:decoration-2">
                 Catat {awaiting} aset yang belum
               </Link>
             </>

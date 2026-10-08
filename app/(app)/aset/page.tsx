@@ -1,67 +1,41 @@
 import { ChevronLeft, ChevronRight, Spline } from "lucide-react";
 import Link from "next/link";
+import { InfoTip } from "@/components/info-tip";
 import { PageHeader } from "@/components/page-header";
 import { PenPath } from "@/components/pen-motif";
 import { buttonVariants } from "@/components/ui/button";
-import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
+import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
+import { applyGalleryFilter, FILTERS, galleryQuery, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
 
 const PAGE_SIZE = 24;
 
-const FILTERS = [
-  { value: "semua", label: "Semua" },
-  { value: "menunggu", label: "Menunggu" },
-  { value: "lolos", label: "Lolos" },
-  { value: "perlu_cek", label: "Perlu cek" },
-  { value: "gagal", label: "Gagal" },
-] as const;
-
-type FilterValue = (typeof FILTERS)[number]["value"];
-
-export default async function HalamanAset({
-  searchParams,
-}: {
-  searchParams: Promise<{ job?: string; status?: string; page?: string; adobe?: string }>;
-}) {
-  const params = await searchParams;
-  const job = params.job && UUID_RE.test(params.job) ? params.job : undefined;
-  // Exported assets still waiting for Adobe's decision (link from the export page).
-  const adobePending = params.adobe === "belum";
-  const status = (FILTERS.find((f) => f.value === params.status)?.value ?? "semua") as FilterValue;
-  const page = Math.max(1, Math.floor(Number(params.page)) || 1);
+export default async function HalamanAset({ searchParams }: { searchParams: Promise<GalleryParams> }) {
+  const filter = parseGalleryFilter(await searchParams);
+  const { job, status, adobePending, page } = filter;
   const from = (page - 1) * PAGE_SIZE;
+  const href = (over: Partial<typeof filter>) => withQuery("/aset", galleryQuery(filter, over));
 
   const supabase = await createClient();
 
-  let query = supabase
-    .from("assets")
-    .select("id, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(from, from + PAGE_SIZE - 1);
-  if (job) query = query.eq("job_id", job);
-  if (adobePending) query = query.not("exported_at", "is", null).is("adobe_status", null);
-  if (status !== "semua") query = query.eq("qc_status", status);
+  const query = applyGalleryFilter(
+    supabase
+      .from("assets")
+      .select("id, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1),
+    filter,
+  );
 
-  const countAdobePending = () => {
-    let q = supabase.from("assets").select("id", { count: "exact", head: true }).not("exported_at", "is", null).is("adobe_status", null);
-    if (job) q = q.eq("job_id", job);
-    return q;
-  };
+  const countOf = (qc?: FilterValue) =>
+    applyGalleryFilter(supabase.from("assets").select("id", { count: "exact", head: true }), { ...filter, status: qc ?? "semua" });
 
-  const countOf = (qc?: string) => {
-    let q = supabase.from("assets").select("id", { count: "exact", head: true });
-    if (job) q = q.eq("job_id", job);
-    if (adobePending) q = q.not("exported_at", "is", null).is("adobe_status", null);
-    if (qc) q = q.eq("qc_status", qc);
-    return q;
-  };
-
-  const [{ data: assets, count, error }, all, menunggu, lolos, perluCek, gagal, pending, adobeCount, settings] = await Promise.all([
+  const [{ data: assets, count, error }, all, menunggu, lolos, perluCek, gagal, pending, adobeCount, settings, jobInfo] = await Promise.all([
     query,
     countOf(),
     countOf("menunggu"),
@@ -69,8 +43,9 @@ export default async function HalamanAset({
     countOf("perlu_cek"),
     countOf("gagal"),
     countPending(supabase, job),
-    countAdobePending(),
+    applyGalleryFilter(supabase.from("assets").select("id", { count: "exact", head: true }), { ...filter, status: "semua", adobePending: true }),
     supabase.from("user_settings").select("banned_words").maybeSingle(),
+    job ? supabase.from("generation_jobs").select("themes(title)").eq("id", job).maybeSingle() : null,
   ]);
   const counts: Record<FilterValue, number> = {
     semua: all.count ?? 0,
@@ -79,6 +54,7 @@ export default async function HalamanAset({
     perlu_cek: perluCek.count ?? 0,
     gagal: gagal.count ?? 0,
   };
+  const adobeWaiting = adobeCount.count ?? 0;
 
   // The bucket is private, so thumbnails need short-lived signed URLs.
   const paths = (assets ?? []).flatMap((a) => (a.preview_path ? [a.preview_path] : []));
@@ -87,16 +63,10 @@ export default async function HalamanAset({
 
   const total = count ?? 0;
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const href = (over: { status?: FilterValue; page?: number; adobe?: boolean }) => {
-    const qs = new URLSearchParams();
-    if (job) qs.set("job", job);
-    if (over.adobe ?? adobePending) qs.set("adobe", "belum");
-    const s = over.status ?? status;
-    if (s !== "semua") qs.set("status", s);
-    if (over.page && over.page > 1) qs.set("page", String(over.page));
-    const text = qs.toString();
-    return text ? `/aset?${text}` : "/aset";
-  };
+  const scope = [
+    job && `batch "${jobInfo?.data?.themes?.title ?? "tanpa tema"}"`,
+    adobePending && "sudah diekspor, keputusan Adobe belum dicatat",
+  ].filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -110,17 +80,9 @@ export default async function HalamanAset({
           </Link>
         }
       >
-        {adobePending && (
+        {scope.length > 0 && (
           <p className="inline-flex flex-wrap items-center gap-2 rounded-md bg-secondary px-3 py-1 text-sm text-secondary-foreground">
-            Aset yang sudah diekspor tapi keputusan Adobe-nya belum dicatat.
-            <Link href="/aset" className={cn("inline-flex items-center font-semibold underline underline-offset-4", tapTarget)}>
-              Lihat semua aset
-            </Link>
-          </p>
-        )}
-        {job && (
-          <p className="inline-flex flex-wrap items-center gap-2 rounded-md bg-secondary px-3 py-1 text-sm text-secondary-foreground">
-            Menampilkan hasil satu job.
+            Hanya {scope.join(" dan ")}.
             <Link href="/aset" className={cn("inline-flex items-center font-semibold underline underline-offset-4", tapTarget)}>
               Lihat semua aset
             </Link>
@@ -130,46 +92,60 @@ export default async function HalamanAset({
 
       <AssetToolbar pending={pending} bannedWords={settings.data?.banned_words ?? []} job={job} />
 
-      <nav aria-label="Filter status" className="flex flex-wrap gap-1 rounded-xl border bg-card p-1 sm:inline-flex">
-        {FILTERS.map((f) => {
-          const active = status === f.value;
-          return (
-            <Link
-              key={f.value}
-              href={href({ status: f.value, page: 1 })}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "inline-flex min-h-9 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors duration-150",
-                tapTarget,
-                active ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {f.label}
-              <span
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <nav aria-label="Filter status" className="flex flex-wrap gap-1 rounded-md border bg-card p-1 sm:inline-flex">
+          {FILTERS.map((f) => {
+            const active = status === f.value;
+            return (
+              <Link
+                key={f.value}
+                href={href({ status: f.value, page: 1 })}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded-sm px-1.5 py-px text-xs tabular-nums",
-                  active ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground",
+                  "inline-flex min-h-9 items-center gap-2 rounded-sm px-3.5 text-sm font-medium transition-colors duration-150",
+                  tapTarget,
+                  active ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
-                {counts[f.value]}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+                {f.label}
+                <span
+                  className={cn(
+                    "rounded-sm px-1.5 py-px text-xs tabular-nums",
+                    active ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {counts[f.value]}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+        <InfoTip align="start" label="Arti status">
+          Lolos: siap diekspor. Perlu cek: boleh diekspor setelah kamu periksa sendiri. Gagal: tidak bisa diekspor; jalankan QC ulang atau hapus.
+          Menunggu: belum punya QC atau metadata.
+        </InfoTip>
+      </div>
 
-      <Link
-        href={adobePending ? href({ adobe: false }) : href({ adobe: true, page: 1 })}
-        aria-pressed={adobePending}
-        className={cn(
-          "ml-1 inline-flex items-center gap-2 text-sm underline-offset-4 hover:underline sm:ml-3",
-          tapTarget,
-          adobePending ? "font-semibold text-foreground underline" : "text-muted-foreground",
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <Link
+          href={href({ adobePending: !adobePending, page: 1 })}
+          aria-current={adobePending ? "true" : undefined}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-md border px-3",
+            tapTarget,
+            "min-h-9",
+            adobePending ? "border-foreground bg-secondary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          Diekspor, belum dicatat Adobe
+          <span className="rounded-sm bg-muted px-1.5 py-px text-xs text-muted-foreground tabular-nums">{adobeWaiting}</span>
+        </Link>
+        {adobeWaiting > 0 && (
+          <Link href={withQuery("/aset/tinjau", job ? `job=${job}` : "")} className={cn("font-semibold underline underline-offset-4 hover:decoration-2", tapTarget, "inline-flex items-center")}>
+            Tinjau satu per satu
+          </Link>
         )}
-      >
-        Diekspor, belum dicatat Adobe
-        <span className="rounded-sm bg-muted px-1.5 py-px text-xs tabular-nums text-muted-foreground no-underline">{adobeCount.count ?? 0}</span>
-      </Link>
+      </div>
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -178,6 +154,7 @@ export default async function HalamanAset({
       ) : assets && assets.length > 0 ? (
         <>
           <AssetGrid
+            detailQuery={galleryQuery(filter)}
             assets={assets.map((asset) => ({
               id: asset.id,
               previewUrl: (asset.preview_path && urlByPath.get(asset.preview_path)) || undefined,
@@ -197,7 +174,7 @@ export default async function HalamanAset({
                   Sebelumnya
                 </Link>
               ) : (
-                <span className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
+                <span aria-disabled="true" className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
                   <ChevronLeft />
                   Sebelumnya
                 </span>
@@ -211,7 +188,7 @@ export default async function HalamanAset({
                   <ChevronRight />
                 </Link>
               ) : (
-                <span className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
+                <span aria-disabled="true" className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
                   Berikutnya
                   <ChevronRight />
                 </span>
@@ -220,7 +197,7 @@ export default async function HalamanAset({
           )}
         </>
       ) : (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-4 rounded-md border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
           <PenPath className="max-w-56" />
           {status === "semua" && !adobePending && !job ? (
             <>

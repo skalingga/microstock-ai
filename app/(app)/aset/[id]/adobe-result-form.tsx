@@ -1,69 +1,83 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { selectClass } from "@/lib/ui";
 import { simpanHasilAdobe } from "../actions";
+import { AdobeDecision, type AdobeDecisionValue } from "../adobe-decision";
 
-type Status = "belum" | "diterima" | "ditolak";
+const dateFormat = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "Asia/Jakarta" });
 
 /** Records whether Adobe Stock accepted or rejected this asset (stage 6 data). */
 export function AdobeResultForm({
   id,
   status,
   reason,
+  reviewedAt,
 }: {
   id: string;
   status: string | null;
   reason: string | null;
+  reviewedAt: string | null;
 }) {
-  const [value, setValue] = useState<Status>(status === "diterima" || status === "ditolak" ? status : "belum");
+  const saved: AdobeDecisionValue | null = status === "diterima" || status === "ditolak" ? status : null;
+  const [value, setValue] = useState<AdobeDecisionValue | null>(saved);
   const [text, setText] = useState(reason ?? "");
+  const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
+  const dirty = value !== saved || (value === "ditolak" && text !== (reason ?? ""));
 
-  function save() {
+  function save(next: AdobeDecisionValue | "belum") {
     startTransition(async () => {
-      const result = await simpanHasilAdobe(id, { status: value, reason: text });
-      if (result.ok) toast.success("Hasil review disimpan.");
-      else toast.error(result.error);
+      const result = await simpanHasilAdobe(id, { status: next, reason: text });
+      if (!result.ok) {
+        setMessage({ text: result.error, error: true });
+        return;
+      }
+      if (next === "belum") {
+        setValue(null);
+        setText("");
+      }
+      setMessage({ text: next === "belum" ? "Catatan Adobe dihapus." : "Hasil review disimpan." });
     });
   }
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <Label htmlFor="adobe-status">Keputusan Adobe Stock</Label>
-        <select
-          id="adobe-status"
-          value={value}
-          onChange={(e) => setValue(e.target.value as Status)}
-          disabled={pending}
-          className={selectClass}
-        >
-          <option value="belum">Belum diketahui</option>
-          <option value="diterima">Diterima</option>
-          <option value="ditolak">Ditolak</option>
-        </select>
-      </div>
-      {value === "ditolak" && (
-        <div className="space-y-2">
-          <Label htmlFor="adobe-reason">Alasan penolakan (salin dari email Adobe)</Label>
-          <Input
-            id="adobe-reason"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={500}
+      <AdobeDecision
+        name="adobe-detail"
+        legend="Keputusan Adobe Stock"
+        value={value}
+        onChange={(v) => {
+          setValue(v);
+          setMessage(null);
+        }}
+        reason={text}
+        onReasonChange={setText}
+        disabled={pending}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" onClick={() => value && save(value)} disabled={pending || !value || !dirty}>
+          {pending ? "Menyimpan..." : "Simpan hasil review"}
+        </Button>
+        {saved && (
+          <button
+            type="button"
+            onClick={() => save("belum")}
             disabled={pending}
-            placeholder="mis. Similar content, Intellectual property, Quality"
-          />
-        </div>
+            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Hapus catatan
+          </button>
+        )}
+      </div>
+      {message ? (
+        <p role={message.error ? "alert" : "status"} className={message.error ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
+          {message.text}
+        </p>
+      ) : (
+        saved &&
+        reviewedAt && <p className="text-xs text-muted-foreground">Dicatat {dateFormat.format(new Date(reviewedAt))}.</p>
       )}
-      <Button size="sm" onClick={save} disabled={pending}>
-        {pending ? "Menyimpan..." : "Simpan hasil review"}
-      </Button>
     </div>
   );
 }

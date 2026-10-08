@@ -7,10 +7,10 @@ import { useState, useTransition } from "react";
 import { SelectionHandles } from "@/components/pen-motif";
 import { QcBadge } from "@/components/qc-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { hapusBanyakAset, simpanHasilAdobeBanyak } from "./actions";
+import { AdobeDecision, type AdobeDecisionValue } from "./adobe-decision";
+import { withQuery } from "./filters";
 
 export type GridAsset = {
   id: string;
@@ -25,20 +25,12 @@ export type GridAsset = {
 
 type Mode = "pilih" | "adobe" | "hapus";
 
-const ADOBE_CHOICES = [
-  { value: "diterima", label: "Diterima" },
-  { value: "ditolak", label: "Ditolak" },
-  { value: "belum", label: "Hapus catatan" },
-] as const;
-
-type AdobeChoice = (typeof ADOBE_CHOICES)[number]["value"];
-
 /** The gallery grid. Ticking assets opens a bar to export them, record Adobe's decision, or delete them together. */
-export function AssetGrid({ assets }: { assets: GridAsset[] }) {
+export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Gallery filter, carried into the detail page. */ detailQuery: string }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<Mode>("pilih");
-  const [adobeStatus, setAdobeStatus] = useState<AdobeChoice>("diterima");
+  const [adobeStatus, setAdobeStatus] = useState<AdobeDecisionValue | null>(null);
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -49,6 +41,7 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
   const exportedCount = picked.filter((a) => a.exported || a.adobeStatus).length;
   const exportable = picked.filter((a) => a.exportable);
   const notExported = picked.filter((a) => !a.exported).length;
+  const exportedBefore = exportable.filter((a) => a.exported).length;
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -74,10 +67,10 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
     });
   }
 
-  function saveAdobe() {
+  function saveAdobe(status: AdobeDecisionValue | "belum") {
     const ids = picked.map((a) => a.id);
     startTransition(async () => {
-      const result = await simpanHasilAdobeBanyak(ids, { status: adobeStatus, reason });
+      const result = await simpanHasilAdobeBanyak(ids, { status, reason });
       if (!result.ok) {
         setMessage({ text: result.error, error: true });
         return;
@@ -85,8 +78,8 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
       setMode("pilih");
       setSelected(new Set());
       setReason("");
-      const what =
-        adobeStatus === "belum" ? "Catatan Adobe dihapus" : `Dicatat ${adobeStatus === "diterima" ? "Diterima" : "Ditolak"} Adobe`;
+      setAdobeStatus(null);
+      const what = status === "belum" ? "Catatan Adobe dihapus" : `Dicatat ${status === "diterima" ? "Diterima" : "Ditolak"} Adobe`;
       setMessage({ text: `${what} untuk ${result.saved} aset.` });
       router.refresh();
     });
@@ -98,7 +91,10 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
         className={cn(
           "space-y-2 rounded-md border p-2 text-sm transition-colors duration-150",
           // Only pinned while something is picked, so it does not take phone screen space the rest of the time.
-          picked.length > 0 ? "sticky top-16 z-20 border-foreground/30 bg-card shadow-md lg:top-3" : "bg-card/70",
+          // Phones: pinned to the bottom, within thumb reach. Larger screens: pinned under the header.
+          picked.length > 0
+            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 sm:sticky sm:top-16 lg:top-3"
+            : "bg-card/70",
         )}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -148,57 +144,49 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
           )}
         </div>
 
-        {picked.length > 0 && mode === "pilih" && exportable.length < picked.length && (
+        {picked.length > 0 && mode === "pilih" && (exportable.length < picked.length || exportedBefore > 0) && (
           <p className="px-1 text-xs text-muted-foreground">
-            {picked.length - exportable.length} aset tidak ikut ekspor: belum Lolos/Perlu cek atau belum punya metadata.
+            {exportable.length < picked.length &&
+              `${picked.length - exportable.length} aset tidak ikut ekspor: belum Lolos/Perlu cek atau belum punya metadata. `}
+            {exportedBefore > 0 && `${exportedBefore} sudah pernah diekspor dan akan diekspor lagi.`}
           </p>
         )}
 
         {picked.length > 0 && mode === "adobe" && (
-          <div className="flex flex-wrap items-end gap-3 border-t pt-2">
-            <fieldset className="space-y-1">
-              <legend className="text-xs font-semibold text-muted-foreground">Keputusan Adobe untuk {picked.length} aset</legend>
-              <div className="flex flex-wrap gap-1">
-                {ADOBE_CHOICES.map((c) => (
-                  <label
-                    key={c.value}
-                    className={cn(
-                      "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3",
-                      tapTarget,
-                      adobeStatus === c.value ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="adobe-massal"
-                      value={c.value}
-                      checked={adobeStatus === c.value}
-                      onChange={() => setAdobeStatus(c.value)}
-                      className="accent-foreground"
-                    />
-                    {c.label}
-                  </label>
-                ))}
+          <div className="space-y-2 border-t pt-2">
+            <div className="flex flex-wrap items-end gap-3">
+              <AdobeDecision
+                name="adobe-massal"
+                legend={`Keputusan Adobe untuk ${picked.length} aset`}
+                value={adobeStatus}
+                onChange={setAdobeStatus}
+                reason={reason}
+                onReasonChange={setReason}
+                disabled={pending}
+              />
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={() => adobeStatus && saveAdobe(adobeStatus)} disabled={pending || !adobeStatus}>
+                  {pending ? "Menyimpan..." : "Simpan"}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setMode("pilih")} disabled={pending}>
+                  Batal
+                </Button>
               </div>
-            </fieldset>
-            {adobeStatus === "ditolak" && (
-              <label className="min-w-48 flex-1 space-y-1">
-                <span className="block text-xs font-semibold text-muted-foreground">Alasan (opsional, salin dari email Adobe)</span>
-                <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="mis. Quality issues" />
-              </label>
-            )}
-            <div className="flex gap-2">
-              <Button type="button" size="sm" onClick={saveAdobe} disabled={pending}>
-                {pending ? "Menyimpan..." : "Simpan"}
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setMode("pilih")} disabled={pending}>
-                Batal
-              </Button>
             </div>
-            {notExported > 0 && adobeStatus !== "belum" && (
-              <p className="w-full text-xs text-warning-foreground">
+            {notExported > 0 && adobeStatus && (
+              <p className="text-xs text-warning-foreground">
                 {notExported} di antaranya belum pernah diekspor dari aplikasi ini. Pastikan memang sudah kamu unggah ke Adobe.
               </p>
+            )}
+            {exportedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => saveAdobe("belum")}
+                disabled={pending}
+                className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Hapus catatan Adobe dari aset terpilih
+              </button>
             )}
           </div>
         )}
@@ -225,14 +213,15 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
         )}
       </div>
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      {/* Room under the grid on phones so the fixed bar never hides the last row. */}
+      <ul className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6", picked.length > 0 && "max-sm:pb-40")}>
         {assets.map((asset) => {
           const isPicked = selected.has(asset.id);
           return (
             <li
               key={asset.id}
               className={cn(
-                "group relative flex flex-col gap-2 rounded-xl border bg-card p-2 text-xs transition-colors duration-150 hover:border-foreground/40",
+                "group relative flex flex-col gap-2 rounded-md border bg-card p-2 text-xs transition-colors duration-150 hover:border-foreground/40",
               )}
             >
               {isPicked && <SelectionHandles />}
@@ -253,8 +242,8 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
                   aria-label={`Pilih ${asset.label}`}
                 />
               </label>
-              <Link href={`/aset/${asset.id}`} className="block">
-                <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-lg">
+              <Link href={withQuery(`/aset/${asset.id}`, detailQuery)} className="block" tabIndex={-1} aria-hidden>
+                <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-sm">
                   {asset.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={asset.previewUrl} alt={asset.label} className="size-full object-contain" loading="lazy" />
@@ -263,7 +252,12 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
                   )}
                 </div>
               </Link>
-              <p className="line-clamp-2 min-h-8 px-1 font-medium leading-4">{asset.label}</p>
+              <Link
+                href={withQuery(`/aset/${asset.id}`, detailQuery)}
+                className="line-clamp-2 min-h-8 px-1 leading-4 font-medium underline-offset-2 hover:underline"
+              >
+                {asset.label}
+              </Link>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 pb-1">
                 <QcBadge status={asset.qcStatus} />
                 {asset.exported && <span className="text-muted-foreground">Diekspor</span>}

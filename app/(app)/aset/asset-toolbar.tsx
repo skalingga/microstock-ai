@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { processPending, type BatchProgress } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/client";
@@ -44,10 +43,7 @@ export function AssetToolbar({ pending, bannedWords, job }: { pending: number; b
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft/60 p-3 text-sm text-warning-foreground">
-      <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning-foreground ring-1 ring-warning/30">
-        <ScanSearch className="size-4" />
-      </span>
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning/30 bg-warning-soft/60 p-3 text-sm text-warning-foreground">
       {!running && pending > 0 && (
         <>
           <span className="font-medium">{pending} aset belum punya QC atau metadata</span>
