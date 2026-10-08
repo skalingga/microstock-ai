@@ -46,4 +46,4 @@ Sudut kecil (`--radius: 0.375rem`), selaras dengan titik jangkar persegi. Kartu 
 
 ## Tema
 
-Terang sebagai bawaan, tombol mode gelap di menu akun. Kedua mode wajib berfungsi penuh. Pratinjau aset tetap di atas papan catur terang di kedua mode, agar warna karya terlihat seperti di Adobe Stock.
+Mengikuti pengaturan terang/gelap sistem (diubah 8 Oktober 2026 setelah kritik login: HP di malam hari tidak lagi menampilkan kertas terang); tombol mode di menu akun dan di halaman masuk menyimpan pilihan manual. Kedua mode wajib berfungsi penuh. Pratinjau aset tetap di atas papan catur terang di kedua mode, agar warna karya terlihat seperti di Adobe Stock.

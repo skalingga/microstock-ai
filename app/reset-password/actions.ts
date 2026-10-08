@@ -4,14 +4,21 @@ import { redirect } from "next/navigation";
 import { newPasswordSchema } from "@/lib/auth/schema";
 import { createClient } from "@/lib/supabase/server";
 
-export type ResetState = { error?: string };
+export type ResetField = "password" | "confirm";
+
+export type ResetState = { error?: string; fieldErrors?: Partial<Record<ResetField, string>> };
 
 export async function ubahPassword(_prev: ResetState, formData: FormData): Promise<ResetState> {
   const parsed = newPasswordSchema.safeParse({
     password: formData.get("password"),
     confirm: formData.get("confirm"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) {
+    // First message per field, shown under that field.
+    const fieldErrors: ResetState["fieldErrors"] = {};
+    for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as ResetField] ??= issue.message;
+    return { fieldErrors };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });

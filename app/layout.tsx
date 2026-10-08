@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MicroStock Vector AI",
+  title: { default: "MicroStock Vector AI", template: "%s · MicroStock Vector AI" },
   description: "Buat aset vektor SVG siap upload ke Adobe Stock dari satu tema.",
 };
 
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // next-themes sets the class before hydration, so the server and client class lists differ on purpose.
     <html lang="id" suppressHydrationWarning className={`${bricolage.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster richColors position="top-center" />
         </ThemeProvider>

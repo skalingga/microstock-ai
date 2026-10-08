@@ -102,6 +102,7 @@ Centang tahap setelah selesai dan diverifikasi pengguna.
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=      # server saja
+AUTH_SIGNUP_ENABLED=false       # tampilkan form daftar; kosong/false = tertutup (v1 satu pemilik)
 KENARI_API_KEY=                 # server saja, berawalan kn-
 KENARI_BASE_URL=https://kenari.id/v1
 KENARI_DEFAULT_MODEL=            # model bawaan bila pengaturan kosong, mis. model :free
