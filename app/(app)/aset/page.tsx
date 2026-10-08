@@ -26,10 +26,12 @@ type FilterValue = (typeof FILTERS)[number]["value"];
 export default async function HalamanAset({
   searchParams,
 }: {
-  searchParams: Promise<{ job?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ job?: string; status?: string; page?: string; adobe?: string }>;
 }) {
   const params = await searchParams;
   const job = params.job && UUID_RE.test(params.job) ? params.job : undefined;
+  // Exported assets still waiting for Adobe's decision (link from the export page).
+  const adobePending = params.adobe === "belum";
   const status = (FILTERS.find((f) => f.value === params.status)?.value ?? "semua") as FilterValue;
   const page = Math.max(1, Math.floor(Number(params.page)) || 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -42,11 +44,13 @@ export default async function HalamanAset({
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
   if (job) query = query.eq("job_id", job);
+  if (adobePending) query = query.not("exported_at", "is", null).is("adobe_status", null);
   if (status !== "semua") query = query.eq("qc_status", status);
 
   const countOf = (qc?: string) => {
     let q = supabase.from("assets").select("id", { count: "exact", head: true });
     if (job) q = q.eq("job_id", job);
+    if (adobePending) q = q.not("exported_at", "is", null).is("adobe_status", null);
     if (qc) q = q.eq("qc_status", qc);
     return q;
   };
@@ -79,6 +83,7 @@ export default async function HalamanAset({
   const href = (over: { status?: FilterValue; page?: number }) => {
     const qs = new URLSearchParams();
     if (job) qs.set("job", job);
+    if (adobePending) qs.set("adobe", "belum");
     const s = over.status ?? status;
     if (s !== "semua") qs.set("status", s);
     if (over.page && over.page > 1) qs.set("page", String(over.page));
@@ -98,6 +103,14 @@ export default async function HalamanAset({
           </Link>
         }
       >
+        {adobePending && (
+          <p className="inline-flex flex-wrap items-center gap-2 rounded-md bg-secondary px-3 py-1 text-sm text-secondary-foreground">
+            Aset yang sudah diekspor tapi keputusan Adobe-nya belum dicatat.
+            <Link href="/aset" className={cn("inline-flex items-center font-semibold underline underline-offset-4", tapTarget)}>
+              Lihat semua aset
+            </Link>
+          </p>
+        )}
         {job && (
           <p className="inline-flex flex-wrap items-center gap-2 rounded-md bg-secondary px-3 py-1 text-sm text-secondary-foreground">
             Menampilkan hasil satu job.
