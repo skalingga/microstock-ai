@@ -10,6 +10,8 @@ const percent = (rate: number) => `${Math.round(rate * 100)}%`;
 
 /** Below this many decisions a rate is too noisy to act on. */
 const MIN_SAMPLE = 30;
+/** Rows with fewer decisions than this get an asterisk. */
+const SMALL_GROUP = 5;
 
 function GroupTable({ title, column, groups, label }: { title: string; column: string; groups: Group[]; label?: (g: string) => string }) {
   if (groups.length === 0) return null;
@@ -43,7 +45,7 @@ function GroupTable({ title, column, groups, label }: { title: string; column: s
               <td className="py-1 pr-2 text-right">{g.rejected}</td>
               <td className="py-1 text-right font-semibold">
                 {percent(g.rate)}
-                {g.accepted + g.rejected < 5 && <span className="font-normal text-muted-foreground">*</span>}
+                {g.accepted + g.rejected < SMALL_GROUP && <span className="font-normal text-muted-foreground">*</span>}
               </td>
             </tr>
           ))}
@@ -58,6 +60,9 @@ export function AcceptanceReport({ rows, awaiting }: { rows: ReviewedAsset[]; aw
   const report = buildReport(rows);
   const styleLabel = (v: string) => STYLES.find((s) => s.value === v)?.label ?? v;
   const { overall } = report;
+  const anySmall = [report.byProvider, report.byStyle, report.byQc, report.byShapes].some((groups) =>
+    groups.some((g) => g.accepted + g.rejected < SMALL_GROUP),
+  );
 
   return (
     <details className="group rounded-md border bg-card">
@@ -100,7 +105,7 @@ export function AcceptanceReport({ rows, awaiting }: { rows: ReviewedAsset[]; aw
               <GroupTable title="Per status QC kita" column="Status QC" groups={report.byQc} label={(v) => QC_LABEL[v] ?? v} />
               <GroupTable title="Per jumlah bentuk (path)" column="Bentuk" groups={report.byShapes} />
             </div>
-            <p className="text-xs text-muted-foreground">* kurang dari 5 keputusan</p>
+            {anySmall && <p className="text-xs text-muted-foreground">* kurang dari {SMALL_GROUP} keputusan</p>}
             {report.reasons.length > 0 && (
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold">Alasan penolakan terbanyak</h3>

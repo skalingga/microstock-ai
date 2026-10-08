@@ -8,6 +8,7 @@ import { STYLES } from "@/lib/settings/schema";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AcceptanceReport } from "./acceptance-report";
+import { ExportHistory } from "./export-history";
 import { ExportPanel, type Candidate } from "./export-panel";
 
 const dayFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
@@ -46,7 +47,7 @@ export default async function HalamanEkspor() {
   ] = await Promise.all([
     supabase
       .from("assets")
-      .select("id, title, qc_status, exported_at, preview_path, job_id")
+      .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release")
       .not("title", "is", null)
       .in("qc_status", ["lolos", "perlu_cek"])
       .order("created_at", { ascending: false })
@@ -120,6 +121,7 @@ export default async function HalamanEkspor() {
             title: a.title,
             status: a.qc_status,
             exportedAt: a.exported_at,
+            needsRelease: a.needs_release,
             thumbUrl: a.preview_path ? (thumbByPath.get(a.preview_path) ?? null) : null,
             ...groupOf(a.job_id),
           },
@@ -160,34 +162,17 @@ export default async function HalamanEkspor() {
             Riwayat ekspor tidak bisa dimuat. Muat ulang halaman.
           </p>
         ) : history && history.length > 0 ? (
-          <ul className="divide-y rounded-md border bg-card px-4 text-sm">
-            {history.map((h) => {
-              const zip = h.zip_path ? fileByPath.get(h.zip_path) : undefined;
-              const csv = h.csv_path ? fileByPath.get(h.csv_path) : undefined;
-              return (
-                <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span>
-                    {dateFormat.format(new Date(h.created_at))} · {h.asset_count} aset
-                  </span>
-                  <span className="flex gap-1">
-                    {!zip && !csv && <span className="text-muted-foreground">File tidak tersedia</span>}
-                    {zip && (
-                      <a href={zip} className={cn("inline-flex items-center px-2 underline underline-offset-4", tapTarget)}>
-                        ZIP
-                      </a>
-                    )}
-                    {csv && (
-                      <a href={csv} className={cn("inline-flex items-center px-2 underline underline-offset-4", tapTarget)}>
-                        CSV
-                      </a>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <ExportHistory
+            rows={history.map((h) => ({
+              id: h.id,
+              dateLabel: dateFormat.format(new Date(h.created_at)),
+              count: h.asset_count,
+              zipUrl: (h.zip_path && fileByPath.get(h.zip_path)) || null,
+              csvUrl: (h.csv_path && fileByPath.get(h.csv_path)) || null,
+            }))}
+          />
         ) : (
-          <p className="text-sm text-muted-foreground">Belum ada ekspor. File ZIP dan CSV yang kamu buat akan muncul di sini, siap diunduh ulang.</p>
+          <p className="text-sm text-muted-foreground">Belum ada ekspor. Setiap ekspor muncul di sini dengan file dan checklist unggahnya, jadi bisa dilanjutkan nanti di PC.</p>
         )}
       </section>
 
