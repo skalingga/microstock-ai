@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCells, quotaGroup, suggest, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
+import { cellsToRedo, estimateRemainingMs, parseCells, quotaGroup, suggest, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
 
 const cell = (model: string, patch: Partial<BenchCell> = {}): BenchCell => ({
   theme: "autumn",
@@ -78,5 +78,39 @@ describe("parseCells", () => {
     const good = cell("a:free");
     expect(parseCells([good, { foo: 1 }, null, "x"] as never)).toEqual([good]);
     expect(parseCells({} as never)).toEqual([]);
+  });
+});
+
+describe("cellsToRedo", () => {
+  const cells = [
+    cell("a", { status: "selesai" }),
+    cell("b", { status: "gagal", errorCode: "timeout" }),
+    cell("c", { status: "menunggu" }),
+    cell("d", { status: "berjalan" }),
+  ];
+
+  it("continues the cells that never finished", () => {
+    expect(cellsToRedo(cells, false)).toEqual([2, 3]);
+  });
+
+  it("also redraws the failed cells when asked, never the finished ones", () => {
+    expect(cellsToRedo(cells, true)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("estimateRemainingMs", () => {
+  it("multiplies the median time of finished cells by the cells left", () => {
+    const cells = [
+      cell("a", { durationMs: 4_000 }),
+      cell("a", { durationMs: 6_000 }),
+      cell("a", { durationMs: 20_000 }),
+      cell("b", { status: "menunggu", durationMs: undefined }),
+      cell("b", { status: "berjalan", durationMs: undefined }),
+    ];
+    expect(estimateRemainingMs(cells)).toBe(12_000);
+  });
+
+  it("has no estimate before the first cell is done", () => {
+    expect(estimateRemainingMs([cell("a", { status: "menunggu", durationMs: undefined })])).toBeNull();
   });
 });

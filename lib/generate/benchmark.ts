@@ -22,6 +22,9 @@ export type BenchCell = {
   theme: string;
   style: StyleId;
   concept: string;
+  /** The rest of the concept, so a continued run draws the same input. Missing on runs before 2026-10-09. */
+  composition?: string;
+  palette?: string[];
   provider: BenchModel["provider"];
   model: string;
   status: CellStatus;
@@ -139,8 +142,29 @@ function stopsEverything(code: string): boolean {
   return code === "unauthenticated" || code === "storage";
 }
 
-export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
-  let state: BenchState = { phase: "mulai", setup: p.setup, cells: [] };
+/** Cells to draw again when a saved run continues: never finished, and with `retryFailed` the failed ones too. */
+export function cellsToRedo(cells: BenchCell[], retryFailed: boolean): number[] {
+  return cells.flatMap((c, i) =>
+    c.status === "menunggu" || c.status === "berjalan" || (retryFailed && c.status === "gagal") ? [i] : [],
+  );
+}
+
+/** Rough time left: the median time per finished cell times the cells still waiting. Null until one cell is done. */
+export function estimateRemainingMs(cells: BenchCell[]): number | null {
+  const times = cells.filter((c) => c.status === "selesai" && c.durationMs !== undefined).map((c) => c.durationMs!);
+  const left = cells.filter((c) => c.status === "menunggu" || c.status === "berjalan").length;
+  const m = median(times);
+  return m === null ? null : m * left;
+}
+
+/** The concept a cell was drawn from. Older runs stored the subject only. */
+function conceptOf(cell: BenchCell): Concept {
+  return { subject: cell.concept, composition: cell.composition ?? "", palette: cell.palette ?? [] };
+}
+
+/** State, saving and the per-cell drawing shared by a new run and a continued one. */
+function createRunner(p: RunBenchmarkParams, initial: BenchState) {
+  let state = initial;
   const emit = (patch: Partial<BenchState>) => {
     state = { ...state, ...patch };
     p.onState(state);
@@ -149,15 +173,14 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
     emit({ cells: state.cells.map((c, i) => (i === index ? { ...c, ...patch } : c)) });
   };
 
-  let benchmarkId: string | undefined;
   // Saved after every cell, so a closed tab keeps what was done. Preview URLs are local and never stored.
   const save = async (status?: string) => {
-    if (!benchmarkId) return;
+    if (!state.benchmarkId) return;
     const results = state.cells.map((c) => ({ ...c, previewUrl: undefined }));
     await p.supabase
       .from("model_benchmarks")
       .update({ results: results as unknown as Json, setup: state.setup as unknown as Json, ...(status ? { status } : {}) })
-      .eq("id", benchmarkId)
+      .eq("id", state.benchmarkId)
       .then(() => undefined, () => undefined);
   };
 
@@ -168,6 +191,131 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
     return gate;
   };
 
+  /** One SVG call for one cell. Returns false when nothing else can succeed (stop the run). */
+  async function drawCell(cellIndex: number, pool: Awaited<ReturnType<typeof fetchHashPool>>): Promise<boolean> {
+    const cell = state.cells[cellIndex];
+    const t = state.setup.themes.find((x) => x.theme === cell.theme);
+    if (!t?.jobId) {
+      patchCell(cellIndex, { status: "gagal", errorCode: "internal", error: "Job tema tidak ditemukan." });
+      return true;
+    }
+    const m: BenchModel = { provider: cell.provider, model: cell.model };
+    patchCell(cellIndex, { status: "berjalan", errorCode: undefined, error: undefined });
+
+    const assetId = crypto.randomUUID();
+    let durationMs = 0;
+    try {
+      const draw = { ...p, theme: t.theme, style: t.style, model: m };
+      const gate = gateFor(quotaGroup(m));
+      const concept = conceptOf(cell);
+      // One attempt: a timeout or unusable reply counts against the model. Only quota waits are retried.
+      const draft = await callWithRetry(
+        async (ctx) => {
+          const started = performance.now();
+          try {
+            return await draftSvg(draw, concept, gate, pool, assetId, ctx);
+          } finally {
+            durationMs = Math.round(performance.now() - started);
+          }
+        },
+        { gate, signal: p.signal, maxAttempts: 1, onStatus: (message) => emit({ message }) },
+      );
+      const made = await storeDraft(draw, t.jobId, concept, assetId, draft);
+      patchCell(cellIndex, {
+        status: "selesai",
+        assetId: made.assetId,
+        qc: visualStatus(draft.qc.notes),
+        durationMs,
+        costIdr: draft.res.costIdr,
+        shapes: draft.stats.shapeCount,
+        previewUrl: made.previewUrl,
+      });
+      emit({ message: undefined });
+    } catch (err) {
+      if (p.signal.aborted) throw err;
+      const apiErr = err instanceof ApiError ? err : new ApiError("internal", "Terjadi kesalahan tak terduga.");
+      patchCell(cellIndex, { status: "gagal", errorCode: apiErr.code, error: apiErr.message, durationMs });
+      if (stopsEverything(apiErr.code)) {
+        emit({ message: apiErr.message });
+        return false;
+      }
+    }
+    await save();
+    return true;
+  }
+
+  async function closeJobs() {
+    for (const t of state.setup.themes) {
+      if (!t.jobId) continue;
+      const made = state.cells.some((c) => c.theme === t.theme && c.status === "selesai");
+      await p.supabase
+        .from("generation_jobs")
+        .update({ status: made ? "selesai" : "gagal" })
+        .eq("id", t.jobId)
+        .then(() => undefined, () => undefined);
+    }
+  }
+
+  async function finish() {
+    const stopped = p.signal.aborted;
+    const leftover = state.cells.some((c) => c.status === "menunggu" || c.status === "berjalan");
+    emit({
+      phase: stopped ? "dihentikan" : leftover ? "gagal" : "selesai",
+      message: stopped ? "Dihentikan. Hasil yang sudah jadi tetap tersimpan." : state.message,
+      cells: state.cells.map((c) => (c.status === "berjalan" ? { ...c, status: "menunggu" as const } : c)),
+    });
+    await save(stopped ? "dihentikan" : leftover ? "gagal" : "selesai");
+    await closeJobs();
+  }
+
+  async function fail(err: unknown) {
+    const message = p.signal.aborted
+      ? "Dihentikan. Hasil yang sudah jadi tetap tersimpan."
+      : err instanceof ApiError
+        ? err.message
+        : "Terjadi kesalahan tak terduga.";
+    emit({
+      phase: p.signal.aborted ? "dihentikan" : "gagal",
+      message,
+      cells: state.cells.map((c) => (c.status === "berjalan" ? { ...c, status: "menunggu" as const } : c)),
+    });
+    await save(p.signal.aborted ? "dihentikan" : "gagal");
+    await closeJobs();
+  }
+
+  /** Draws the given cells in order, then records how the run ended and closes the theme jobs. */
+  async function drawAll(indices: number[]) {
+    try {
+      // Same similarity pool for every model: compared with the history only, not with each other's drawing of the
+      // same concept (that would punish whichever model runs later).
+      const pool = await fetchHashPool(p.supabase);
+      emit({ phase: "antrean" });
+      for (const i of indices) {
+        if (p.signal.aborted) break;
+        if (!(await drawCell(i, pool))) break;
+      }
+      await finish();
+    } catch (err) {
+      await fail(err);
+    }
+  }
+
+  return {
+    emit,
+    save,
+    gateFor,
+    drawAll,
+    fail,
+    get state() {
+      return state;
+    },
+  };
+}
+
+export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
+  const runner = createRunner(p, { phase: "mulai", setup: p.setup, cells: [] });
+  const { emit } = runner;
+
   try {
     const row = await p.supabase
       .from("model_benchmarks")
@@ -175,17 +323,11 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
       .select("id")
       .single();
     if (row.error) throw new ApiError("storage", "Gagal menyimpan uji model.");
-    benchmarkId = row.data.id;
-    emit({ benchmarkId });
-
-    // Same similarity pool for every model: compared with the history only, not with each other's drawing of the
-    // same concept (that would punish whichever model runs later).
-    const pool = await fetchHashPool(p.supabase);
+    emit({ benchmarkId: row.data.id });
 
     // 1. Concepts and a job per theme, before any SVG call.
     const themes: BenchTheme[] = [];
     const cells: BenchCell[] = [];
-    const concepts: Concept[][] = [];
     const skipped: string[] = [];
     for (const [i, t] of p.setup.themes.entries()) {
       if (p.signal.aborted) break;
@@ -206,7 +348,7 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
               },
               p.signal,
             ),
-          { gate: gateFor("concepts"), signal: p.signal, onStatus: (message) => emit({ message }) },
+          { gate: runner.gateFor("concepts"), signal: p.signal, onStatus: (message) => emit({ message }) },
         );
       } catch (err) {
         // A theme without concepts is skipped; the other themes still compare the models.
@@ -231,100 +373,58 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
       if (job.error) throw new ApiError("storage", "Gagal membuat job generate.");
 
       themes.push({ ...t, jobId: job.data.id });
-      concepts.push(res.concepts);
       for (const concept of res.concepts) {
         for (const m of p.setup.models) {
-          cells.push({ theme: t.theme, style: t.style, concept: concept.subject, ...m, status: "menunggu" });
+          // The whole concept is kept, so a continued run draws exactly the same input.
+          cells.push({
+            theme: t.theme,
+            style: t.style,
+            concept: concept.subject,
+            composition: concept.composition,
+            palette: concept.palette,
+            ...m,
+            status: "menunggu",
+          });
         }
       }
     }
     if (themes.length === 0) throw new ApiError("bad_output", `Konsep tidak bisa dibuat untuk tema mana pun: ${skipped.join("; ")}`);
     emit({
-      phase: "antrean",
       message: skipped.length > 0 ? `Dilewati karena konsep gagal: ${skipped.join("; ")}` : undefined,
       setup: { ...p.setup, themes },
       cells,
     });
-    await save();
-
-    // 2. One SVG call per cell. Models take turns, so the free models' shared quota gets breathing room.
-    let index = 0;
-    outer: for (const [ti, t] of themes.entries()) {
-      for (const concept of concepts[ti]) {
-        for (const m of p.setup.models) {
-          const cellIndex = index++;
-          if (p.signal.aborted) break outer;
-          patchCell(cellIndex, { status: "berjalan" });
-
-          const assetId = crypto.randomUUID();
-          let durationMs = 0;
-          try {
-            const draw = { ...p, theme: t.theme, style: t.style, model: m };
-            const gate = gateFor(quotaGroup(m));
-            // One attempt: a timeout or unusable reply counts against the model. Only quota waits are retried.
-            const draft = await callWithRetry(
-              async (ctx) => {
-                const started = performance.now();
-                try {
-                  return await draftSvg(draw, concept, gate, pool, assetId, ctx);
-                } finally {
-                  durationMs = Math.round(performance.now() - started);
-                }
-              },
-              { gate, signal: p.signal, maxAttempts: 1, onStatus: (message) => emit({ message }) },
-            );
-            const made = await storeDraft(draw, t.jobId!, concept, assetId, draft);
-            patchCell(cellIndex, {
-              status: "selesai",
-              assetId: made.assetId,
-              qc: visualStatus(draft.qc.notes),
-              durationMs,
-              costIdr: draft.res.costIdr,
-              shapes: draft.stats.shapeCount,
-              previewUrl: made.previewUrl,
-            });
-            emit({ message: undefined });
-          } catch (err) {
-            if (p.signal.aborted) break outer;
-            const apiErr = err instanceof ApiError ? err : new ApiError("internal", "Terjadi kesalahan tak terduga.");
-            patchCell(cellIndex, { status: "gagal", errorCode: apiErr.code, error: apiErr.message, durationMs });
-            if (stopsEverything(apiErr.code)) {
-              emit({ message: apiErr.message });
-              break outer;
-            }
-          }
-          await save();
-        }
-      }
-    }
-
-    const stopped = p.signal.aborted;
-    const leftover = state.cells.some((c) => c.status === "menunggu" || c.status === "berjalan");
-    emit({
-      phase: stopped ? "dihentikan" : leftover ? "gagal" : "selesai",
-      message: stopped ? "Dihentikan. Hasil yang sudah jadi tetap tersimpan." : state.message,
-      cells: state.cells.map((c) => (c.status === "berjalan" ? { ...c, status: "menunggu" as const } : c)),
-    });
-    await save(stopped ? "dihentikan" : leftover ? "gagal" : "selesai");
+    await runner.save();
   } catch (err) {
-    const message = p.signal.aborted
-      ? "Dihentikan. Hasil yang sudah jadi tetap tersimpan."
-      : err instanceof ApiError
-        ? err.message
-        : "Terjadi kesalahan tak terduga.";
-    emit({ phase: p.signal.aborted ? "dihentikan" : "gagal", message });
-    await save(p.signal.aborted ? "dihentikan" : "gagal");
-  } finally {
-    for (const t of state.setup.themes) {
-      if (!t.jobId) continue;
-      const made = state.cells.some((c) => c.theme === t.theme && c.status === "selesai");
-      await p.supabase
-        .from("generation_jobs")
-        .update({ status: made ? "selesai" : "gagal" })
-        .eq("id", t.jobId)
-        .then(() => undefined, () => undefined);
-    }
+    await runner.fail(err);
+    return;
   }
+
+  // 2. One SVG call per cell, in order. Models take turns, so the free models' shared quota gets breathing room.
+  await runner.drawAll(runner.state.cells.map((_, i) => i));
+}
+
+/**
+ * Continues a saved run in place: cells that never finished, and with `retryFailed` the failed ones, are drawn again
+ * with the same concepts and the same theme jobs. Finished cells keep their result.
+ */
+export async function continueBenchmark(
+  p: RunBenchmarkParams & { benchmarkId: string; cells: BenchCell[]; retryFailed: boolean },
+): Promise<void> {
+  const indices = cellsToRedo(p.cells, p.retryFailed);
+  const cells = p.cells.map((c, i) => (indices.includes(i) ? { ...c, status: "menunggu" as const } : c));
+  const runner = createRunner(p, { phase: "mulai", benchmarkId: p.benchmarkId, setup: p.setup, cells });
+  runner.emit({ phase: "antrean" });
+  for (const t of p.setup.themes) {
+    if (!t.jobId) continue;
+    await p.supabase
+      .from("generation_jobs")
+      .update({ status: "berjalan" })
+      .eq("id", t.jobId)
+      .then(() => undefined, () => undefined);
+  }
+  await runner.save("berjalan");
+  await runner.drawAll(indices);
 }
 
 /** Results read back from the database. Unknown shapes are dropped rather than trusted. */
