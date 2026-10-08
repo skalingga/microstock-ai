@@ -227,6 +227,10 @@ export type Database = {
       }
       research_runs: {
         Row: {
+          cost_idr: number
+          model: string | null
+          provider: string | null
+          trends_missing: boolean
           created_at: string
           id: string
           period_end: string
@@ -235,6 +239,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cost_idr?: number
+          model?: string | null
+          provider?: string | null
+          trends_missing?: boolean
           created_at?: string
           id?: string
           period_end: string
@@ -243,6 +251,10 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          cost_idr?: number
+          model?: string | null
+          provider?: string | null
+          trends_missing?: boolean
           created_at?: string
           id?: string
           period_end?: string
@@ -254,6 +266,9 @@ export type Database = {
       }
       themes: {
         Row: {
+          ai_competition: number | null
+          ai_demand: number | null
+          event_weight: number
           competition_score: number | null
           country: string | null
           created_at: string
@@ -270,6 +285,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_competition?: number | null
+          ai_demand?: number | null
+          event_weight?: number
           competition_score?: number | null
           country?: string | null
           created_at?: string
@@ -286,6 +304,9 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          ai_competition?: number | null
+          ai_demand?: number | null
+          event_weight?: number
           competition_score?: number | null
           country?: string | null
           created_at?: string

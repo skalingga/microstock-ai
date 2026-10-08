@@ -16,6 +16,7 @@ import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
 import { formatIdr } from "@/lib/budget";
 import { KENARI_IMAGE_PRICES_IDR, imagePriceIdr } from "@/lib/providers/kenari-image-pricing";
 import { findBannedWords } from "@/lib/settings/banned";
+import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import { STYLES, isImageStyle, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
@@ -45,6 +46,7 @@ export function GenerateForm({
   palettes,
   bannedWords,
   initialTheme = "",
+  uploadBy,
   defaultImageModel,
   kenariBudgetLeftIdr,
   providerOrder,
@@ -57,6 +59,8 @@ export function GenerateForm({
   palettes: Palette[];
   bannedWords: string[];
   initialTheme?: string;
+  /** Upload deadline of a theme picked on Riset (ISO date), shown under the theme field. */
+  uploadBy?: string;
   /** Image model the server uses for the traced styles when none is picked here. */
   defaultImageModel: string;
   /** What is left of this month's Kenari budget; null when it could not be read. */
@@ -360,6 +364,12 @@ export function GenerateForm({
               <p id="theme-hint" className="text-sm text-muted-foreground">
                 Bahasa Inggris. Tanpa merek, tokoh, atau karakter: Adobe menolaknya.
               </p>
+              {uploadBy && theme === initialTheme && (
+                <p className="text-sm font-medium">
+                  Dari Riset: upload sebelum{" "}
+                  {new Date(`${uploadBy}T00:00:00Z`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -490,7 +500,7 @@ export function GenerateForm({
                         geminiModels={geminiModels}
                         tested={tested}
                         svgCostIdr={svgCostIdr}
-                        defaultLabel={settingsLabel(providerOrder)}
+                        defaultLabel={orderLabel(providerOrder)}
                       />
                     ) : (
                       <Input
@@ -642,17 +652,6 @@ function ModelSelect({
   );
 }
 
-function entryLabel(entry: ProviderEntry) {
-  return `${entry.provider} · ${entry.model || "bawaan server"}`;
-}
-
-/** "kenari · x, cadangan gemini · y": what the SVG calls use when nothing is picked here. */
-function settingsLabel(order: ProviderEntry[]) {
-  if (order.length === 0) return "bawaan";
-  const [first, ...backups] = order;
-  return backups.length > 0 ? `${entryLabel(first)}, cadangan ${backups.map(entryLabel).join(", ")}` : entryLabel(first);
-}
-
 /** Estimated cost of the batch's drawing calls, as shown before it starts. Concepts and metadata are not included. */
 function estimateCost(p: {
   traced: boolean;
@@ -682,7 +681,7 @@ function estimateCost(p: {
   }
   if (entry.provider !== "kenari" || entry.model.endsWith(":free")) {
     // A paid backup only runs when the free model fails, so it is mentioned, not counted.
-    const paidBackup = picked ? undefined : p.providerOrder.slice(1).find((e) => e.provider === "kenari" && e.model && !e.model.endsWith(":free"));
+    const paidBackup = picked ? undefined : p.providerOrder.slice(1).find(isPaidEntry);
     return {
       paid: false,
       chip: "Gratis",

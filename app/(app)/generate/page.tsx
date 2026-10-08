@@ -7,8 +7,8 @@ import { fetchActiveJob } from "@/lib/generate/active-job";
 import { parseCells, summarize } from "@/lib/generate/benchmark";
 import { createClient } from "@/lib/supabase/server";
 import { withPresetPalettes } from "@/lib/settings/palettes";
-import { GEMINI_FALLBACK_MODEL } from "@/lib/providers/gemini";
 import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
+import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { STYLES, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
 import { ActiveJobCard } from "./active-job-card";
 import { GenerateForm, type TestedModel } from "./generate-form";
@@ -21,9 +21,9 @@ const DAILY_LOLOS_TARGET = 33;
 export default async function HalamanGenerate({
   searchParams,
 }: {
-  searchParams: Promise<{ tema?: string }>;
+  searchParams: Promise<{ tema?: string; batas?: string }>;
 }) {
-  const { tema } = await searchParams;
+  const { tema, batas } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -54,13 +54,7 @@ export default async function HalamanGenerate({
   const budget = settings?.kenari_monthly_budget_idr ?? 0;
   const spent = Number(kenariSpent ?? 0);
   const kenariBudgetLeftIdr = Math.max(0, budget - spent);
-  // An empty model means the server's env default (resolveProvider); name it, so the page can say which model and price.
-  const providerOrder = (settings ? toProviderOrder(settings.provider_order) : []).map((e) => ({
-    ...e,
-    model:
-      e.model ||
-      (e.provider === "kenari" ? (process.env.KENARI_DEFAULT_MODEL ?? "") : process.env.GEMINI_DEFAULT_MODEL || GEMINI_FALLBACK_MODEL),
-  }));
+  const providerOrder = withEnvDefaults(settings ? toProviderOrder(settings.provider_order) : []);
 
   // The latest benchmark run that has results: shown next to the models it tested.
   const cells = (benchmarks ?? []).map((b) => parseCells(b.results)).find((c) => c.length > 0) ?? [];
@@ -110,6 +104,7 @@ export default async function HalamanGenerate({
         palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
         bannedWords={settings?.banned_words ?? []}
         initialTheme={tema?.slice(0, 120) ?? ""}
+        uploadBy={batas && /^\d{4}-\d{2}-\d{2}$/.test(batas) ? batas : undefined}
         defaultImageModel={defaultImageModel}
         kenariBudgetLeftIdr={spentError ? null : kenariBudgetLeftIdr}
         providerOrder={providerOrder}
