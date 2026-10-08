@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
-import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
+import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { createClient } from "@/lib/supabase/server";
 import type { ReviewedAsset } from "@/lib/adobe/stats";
 import { STYLES } from "@/lib/settings/schema";
@@ -30,7 +30,14 @@ function LoadError({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function HalamanEkspor() {
+export default async function HalamanEkspor({ searchParams }: { searchParams: Promise<{ pilih?: string }> }) {
+  // Assets picked in the gallery arrive as ?pilih=id,id,...
+  const { pilih } = await searchParams;
+  const preselect = (pilih ?? "")
+    .split(",")
+    .filter((id) => UUID_RE.test(id))
+    .slice(0, MAX_BULK_DELETE);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -150,7 +157,7 @@ export default async function HalamanEkspor() {
       {assetsError ? (
         <LoadError>Daftar aset untuk ekspor tidak bisa dimuat. Muat ulang halaman.</LoadError>
       ) : (
-        <ExportPanel userId={user.id} candidates={candidates} />
+        <ExportPanel userId={user.id} candidates={candidates} preselect={preselect.length > 0 ? preselect : undefined} />
       )}
 
       <section className="space-y-3" aria-labelledby="riwayat-heading">

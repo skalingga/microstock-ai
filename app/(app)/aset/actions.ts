@@ -146,3 +146,33 @@ export async function simpanHasilAdobe(id: string, input: unknown): Promise<Adob
   revalidatePath("/ekspor");
   return { ok: true };
 }
+
+export type BulkAdobeResult = { ok: true; saved: number } | { ok: false; error: string };
+
+/** Records one Adobe decision for several assets at once, e.g. a whole upload batch that was accepted. */
+export async function simpanHasilAdobeBanyak(ids: string[], input: unknown): Promise<BulkAdobeResult> {
+  const unique = [...new Set(Array.isArray(ids) ? ids : [])];
+  if (unique.length === 0) return { ok: false, error: "Belum ada aset yang dipilih." };
+  if (unique.length > MAX_BULK_DELETE) return { ok: false, error: `Maksimal ${MAX_BULK_DELETE} aset sekaligus.` };
+  if (!unique.every((id) => typeof id === "string" && UUID_RE.test(id))) return { ok: false, error: "ID aset tidak valid." };
+  const parsed = adobeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
+  const { status, reason } = parsed.data;
+
+  const supabase = await createClient();
+  // Row Level Security limits this to the caller's own assets.
+  const { data, error } = await supabase
+    .from("assets")
+    .update({
+      adobe_status: status === "belum" ? null : status,
+      adobe_reason: status === "ditolak" && reason ? reason : null,
+      adobe_reviewed_at: status === "belum" ? null : new Date().toISOString(),
+    })
+    .in("id", unique)
+    .select("id");
+  if (error) return { ok: false, error: "Gagal menyimpan hasil review. Coba lagi." };
+
+  revalidatePath("/aset");
+  revalidatePath("/ekspor");
+  return { ok: true, saved: data?.length ?? 0 };
+}

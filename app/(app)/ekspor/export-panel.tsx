@@ -28,7 +28,12 @@ export type Candidate = {
   groupDetail: string;
 };
 
-type Props = { userId: string; candidates: Candidate[] };
+type Props = {
+  userId: string;
+  candidates: Candidate[];
+  /** Asset ids picked in the gallery; replaces the default selection. */
+  preselect?: string[];
+};
 
 type Group = { id: string; label: string; detail: string; items: Candidate[] };
 
@@ -47,14 +52,23 @@ const CEK_NAMES_SHOWN = 3;
 
 const linkClass = cn("inline-flex items-center font-semibold underline underline-offset-4 hover:decoration-2", tapTarget);
 
-export function ExportPanel({ userId, candidates }: Props) {
+export function ExportPanel({ userId, candidates, preselect }: Props) {
   const router = useRouter();
-  const [onlyNew, setOnlyNew] = useState(true);
+  const fromGallery = useMemo(() => (preselect ? candidates.filter((c) => preselect.includes(c.id)) : null), [candidates, preselect]);
+  // Exported assets picked in the gallery stay visible: the user asked for them.
+  const [onlyNew, setOnlyNew] = useState(() => !fromGallery?.some((c) => c.exportedAt));
   const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(candidates.filter((c) => c.status === "lolos" && !c.exportedAt).map((c) => c.id)),
+    () =>
+      new Set(
+        fromGallery
+          ? fromGallery.map((c) => c.id)
+          : candidates.filter((c) => c.status === "lolos" && !c.exportedAt).map((c) => c.id),
+      ),
   );
   const [cleared, setCleared] = useState<Set<string> | null>(null);
   const [open, setOpen] = useState<Set<string>>(() => {
+    // Gallery picks: show the batches they came from.
+    if (fromGallery) return new Set(fromGallery.map((c) => c.groupId));
     // A single batch has nothing to hide behind: show it.
     const ids = new Set(candidates.filter((c) => !c.exportedAt).map((c) => c.groupId));
     return ids.size === 1 ? ids : new Set();
@@ -297,6 +311,16 @@ export function ExportPanel({ userId, candidates }: Props) {
           </div>
         </div>
 
+        {fromGallery && !result && (
+          <p className="text-sm" role="status">
+            {fromGallery.length} aset dipilih dari galeri.
+            {preselect && preselect.length > fromGallery.length &&
+              ` ${preselect.length - fromGallery.length} lainnya tidak bisa diekspor (belum Lolos/Perlu cek atau tanpa metadata).`}{" "}
+            <Link href="/aset" className="font-semibold underline underline-offset-4 hover:decoration-2">
+              Kembali ke galeri
+            </Link>
+          </p>
+        )}
         {cleared && cleared.size > 0 && (
           <p className="text-sm text-muted-foreground" role="status">
             {cleared.size} pilihan dikosongkan.{" "}

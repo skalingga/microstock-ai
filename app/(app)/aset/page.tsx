@@ -47,6 +47,12 @@ export default async function HalamanAset({
   if (adobePending) query = query.not("exported_at", "is", null).is("adobe_status", null);
   if (status !== "semua") query = query.eq("qc_status", status);
 
+  const countAdobePending = () => {
+    let q = supabase.from("assets").select("id", { count: "exact", head: true }).not("exported_at", "is", null).is("adobe_status", null);
+    if (job) q = q.eq("job_id", job);
+    return q;
+  };
+
   const countOf = (qc?: string) => {
     let q = supabase.from("assets").select("id", { count: "exact", head: true });
     if (job) q = q.eq("job_id", job);
@@ -55,7 +61,7 @@ export default async function HalamanAset({
     return q;
   };
 
-  const [{ data: assets, count, error }, all, menunggu, lolos, perluCek, gagal, pending, settings] = await Promise.all([
+  const [{ data: assets, count, error }, all, menunggu, lolos, perluCek, gagal, pending, adobeCount, settings] = await Promise.all([
     query,
     countOf(),
     countOf("menunggu"),
@@ -63,6 +69,7 @@ export default async function HalamanAset({
     countOf("perlu_cek"),
     countOf("gagal"),
     countPending(supabase, job),
+    countAdobePending(),
     supabase.from("user_settings").select("banned_words").maybeSingle(),
   ]);
   const counts: Record<FilterValue, number> = {
@@ -80,10 +87,10 @@ export default async function HalamanAset({
 
   const total = count ?? 0;
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const href = (over: { status?: FilterValue; page?: number }) => {
+  const href = (over: { status?: FilterValue; page?: number; adobe?: boolean }) => {
     const qs = new URLSearchParams();
     if (job) qs.set("job", job);
-    if (adobePending) qs.set("adobe", "belum");
+    if (over.adobe ?? adobePending) qs.set("adobe", "belum");
     const s = over.status ?? status;
     if (s !== "semua") qs.set("status", s);
     if (over.page && over.page > 1) qs.set("page", String(over.page));
@@ -151,6 +158,19 @@ export default async function HalamanAset({
         })}
       </nav>
 
+      <Link
+        href={adobePending ? href({ adobe: false }) : href({ adobe: true, page: 1 })}
+        aria-pressed={adobePending}
+        className={cn(
+          "ml-1 inline-flex items-center gap-2 text-sm underline-offset-4 hover:underline sm:ml-3",
+          tapTarget,
+          adobePending ? "font-semibold text-foreground underline" : "text-muted-foreground",
+        )}
+      >
+        Diekspor, belum dicatat Adobe
+        <span className="rounded-sm bg-muted px-1.5 py-px text-xs tabular-nums text-muted-foreground no-underline">{adobeCount.count ?? 0}</span>
+      </Link>
+
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           Aset tidak bisa dimuat. Muat ulang halaman.
@@ -165,6 +185,7 @@ export default async function HalamanAset({
               qcStatus: asset.qc_status,
               exported: Boolean(asset.exported_at),
               adobeStatus: asset.adobe_status,
+              exportable: Boolean(asset.title) && (asset.qc_status === "lolos" || asset.qc_status === "perlu_cek"),
             }))}
           />
 
@@ -201,7 +222,7 @@ export default async function HalamanAset({
       ) : (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
           <PenPath className="max-w-56" />
-          {status === "semua" ? (
+          {status === "semua" && !adobePending && !job ? (
             <>
               Belum ada aset.{" "}
               <Link href="/generate" className="font-medium text-foreground underline underline-offset-4">
@@ -210,7 +231,12 @@ export default async function HalamanAset({
               .
             </>
           ) : (
-            "Tidak ada aset dengan status ini."
+            <>
+              Tidak ada aset di filter ini.{" "}
+              <Link href="/aset" className="font-medium text-foreground underline underline-offset-4">
+                Lihat semua aset
+              </Link>
+            </>
           )}
         </div>
       )}
