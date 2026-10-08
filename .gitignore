@@ -39,6 +39,8 @@ yarn-error.log*
 
 # impeccable: per-machine settings (hook consent, local overrides)
 .impeccable/*.local.json
+.impeccable/hook.cache.json
+.impeccable/live/
 
 # typescript
 *.tsbuildinfo

@@ -1,7 +1,7 @@
 # Progress
 
 ## Status terakhir
-Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model utama Gemini 3.5 Flash-Lite, cadangan Kenari deepseek-v4-flash (disetujui pengguna). Tahap 6 (uji ke Adobe): alat sudah di produksi, batch ujinya belum jalan. Kerja di branch `dev`, bukan `main`.
+Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 6 (uji ke Adobe) menunggu data pengguna. 8 Okt 2026: halaman Masuk, Generate, dan Riset diperbaiki dari kritik Impeccable (di branch `dev`, belum digabung ke `main`).
 
 ## Sudah selesai
 - [2026-10-08] Perbaikan `/riset` dari `/impeccable critique` (skor awal 22/40): skor peluang bertanda sumber ("dari data", "sebagian data"; tanpa angka bila dua-duanya tebakan AI, `provenanceOf` di `lib/research/score.ts`), urutan data nyata dulu lalu tebakan menurut batas terdekat, rumus di InfoTip. Migrasi `20261012000000_research_provenance.sql` (sudah diterapkan): `themes.event_weight/ai_demand/ai_competition`, `research_runs.trends_missing/provider/model/cost_idr`, jadi skor tidak bergeser setelah muat ulang. Keterangan "Riset [tanggal] · pasar · periode · model" di atas daftar, periode dipulihkan, model + biaya sebelum mulai, garis progress `role=status`, tombol Batalkan, error menetap + "Coba lagi". Isian Hasil Adobe: simpan hanya bila berubah, tanda tersimpan, arti angka, tombol "Urutkan ulang". Daftar datar (bukan kartu bertumpuk), form terlipat bila ada hasil, filter lewat batas, tanda "sudah di-generate", batas upload dibawa ke Generate (`?batas=`). Helper bersama `lib/settings/provider-label.ts` dan `provider-defaults.ts`
@@ -30,12 +30,17 @@ Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 4: model ut
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-1. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
-2. Tahap 6: unggah batch 50-100 aset (boleh termasuk Siluet/Line art dan aset uji model yang bagus setelah dibuatkan metadata), catat keputusan Adobe, lalu setel ambang QC (terutama pemeriksa kemiripan).
-3. Opsional: ulangi `/uji-model` sesekali, karena daftar dan kecepatan model gratis Kenari berubah.
-4. Bila ingin, ganti nilai yang dipilih Claude di `DESIGN.md` (warna aksen vermilion, font Bricolage Grotesque): cukup ubah token di `app/globals.css` dan font di `app/layout.tsx`.
+1. Uji langsung hasil perbaikan 8 Okt yang belum bisa dicek tanpa data sungguhan: (a) keluar, buka `/aset`, masuk lagi: harus kembali ke `/aset`; (b) batch kecil 2 variasi model gratis, buka `/generate` di HP selama berjalan: kartu "Antrean sedang berjalan", judul tab "(x/2)", ringkasan selesai + biaya; (c) riset 3 tema: progress, Batalkan, model dan biaya tersimpan di keterangan riset. Lalu gabungkan `dev` ke `main` lewat PR.
+2. Kritik ulang (`/impeccable critique landing`, `/generate`, `riset`) untuk melihat kenaikan skor (awal 23, 25, 22 dari 40); snapshot ada di `.impeccable/critique/`. Halaman yang belum dikritik: `/aset`, `/ekspor`, `/pengaturan`, `/uji-model`.
+3. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
+4. Tahap 6: unggah batch 50-100 aset (boleh termasuk Siluet/Line art dan aset uji model yang bagus setelah dibuatkan metadata), catat keputusan Adobe, lalu setel ambang QC (terutama pemeriksa kemiripan).
+5. Opsional: ulangi `/uji-model` sesekali, karena daftar dan kecepatan model gratis Kenari berubah.
+6. Bila ingin, ganti nilai yang dipilih Claude di `DESIGN.md` (warna aksen vermilion, font Bricolage Grotesque): cukup ubah token di `app/globals.css` dan font di `app/layout.tsx`.
 
 ## Catatan penting
+- Migrasi dibuat lewat MCP Supabase memakai versi waktu-terap (mis. `research_provenance`), jadi nama file lokal (`20261012000000_...`) tidak sama dengan versi di `supabase_migrations`; isinya sama.
+- Fokus tombol kini `outline` 2 px ber-offset (`components/ui/button.tsx`); kontrol khusus lain masih `ring-2 ring-ring`.
+- `AUTH_SIGNUP_ENABLED` kosong/false = form daftar tersembunyi dan action `daftar` menolak.
 - Skill desain: Impeccable. Konteksnya `PRODUCT.md` (produk) dan `DESIGN.md` (visual). Hook detektornya ada di `.claude/settings.local.json` (lokal PC, tidak di-commit), jadi cloud session tidak menjalankan hook itu dan juga belum tentu punya skill-nya. Mode live Impeccable belum disetel (perlu menyisipkan skrip ke layout; minta izin dulu).
 - Aksesibilitas: kontrol baru wajib 44 px di HP/sentuh (pakai `tapTarget` atau `max-sm:min-h-11 pointer-coarse:min-h-11`), fokus pakai `focus-visible:ring-2 focus-visible:ring-ring` (bukan `ring-ring/50`, hanya 2:1), dan setiap query halaman menampilkan pesan error, bukan tampilan kosong. Halaman yang perlu login belum diuji klik di browser (tidak ada akun uji); halaman login sudah.
 - UI: label dulu, penjelasan maksimal satu baris; yang panjang masuk `InfoTip`. Peringatan yang mendorong tindakan tetap terlihat. Pakai token semantik (`bg-success-soft`, `text-warning-foreground`, `bg-danger-soft`, `bg-brand`, dst.), jangan warna Tailwind mentah. Arah visual ada di `DESIGN.md` (baca sebelum mengubah UI): tombol utama berwarna tinta, vermilion (`brand`) hanya untuk titik jangkar dan momen kunci, tanpa gradien/glow/bayangan berwarna, tautan selalu bergaris bawah (warna tautan sama dengan teks). Kedua tema wajib diuji. Komponen bersama: `components/page-header.tsx`, `components/stat-card.tsx`, `components/brand.tsx`, `components/pen-motif.tsx`, `components/theme-toggle.tsx`.
