@@ -31,7 +31,7 @@ Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 6 (uji ke A
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-0. Baca `docs/PLAN-tahap-10-13.md`, jawab pertanyaan terbuka di bagian akhirnya, tambahkan Tahap 10-13 ke Roadmap CLAUDE.md, lalu mulai Tahap 10 (gaya baru).
+0. Mulai Tahap 10 (gaya baru) sesuai `docs/PLAN-tahap-10-13.md`. Keputusan pengguna sudah dicatat di sana (bundle 16 ikon, screenshot dibuang, mau buat API key Adobe/Shutterstock).
 1. Uji langsung hasil perbaikan 8 Okt yang belum bisa dicek tanpa data sungguhan: (a) keluar, buka `/aset`, masuk lagi: harus kembali ke `/aset`; (b) batch kecil 2 variasi model gratis, buka `/generate` di HP selama berjalan: kartu "Antrean sedang berjalan", judul tab "(x/2)", ringkasan selesai + biaya; (c) riset 3 tema: progress, Batalkan, model dan biaya tersimpan di keterangan riset. Lalu gabungkan `dev` ke `main` lewat PR.
 2. Kritik ulang (`/impeccable critique landing`, `/generate`, `riset`) untuk melihat kenaikan skor (awal 23, 25, 22 dari 40); snapshot ada di `.impeccable/critique/`. Halaman yang belum dikritik: `/aset`, `/ekspor`, `/pengaturan`, `/uji-model`.
 3. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).

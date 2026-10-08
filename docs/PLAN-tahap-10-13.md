@@ -85,10 +85,10 @@ Tujuan: ikon seperti contoh (eco line icons, awan/ikon 1 warna, ubin geometris h
 - Doodle hitam: varian prompt "hand-drawn doodle" untuk gaya Line art yang ada (gambar AI, Rp125).
 - Doodle berwarna dengan arsiran: perlu trace multi-warna (posterize → potrace per warna) di `lib/svg/trace.ts`. Mahal dan rumit.
 
-## Pertanyaan yang masih terbuka untuk pengguna
+## Keputusan pengguna (8 Okt 2026)
 
-1. Urutan di atas disetujui? (Diusulkan: 10 → 11 → 12 → 13.)
-2. Ukuran bundle: 9, 16, atau 25 ikon?
-3. Bersedia membuat API key Adobe Stock (dan Shutterstock)?
-4. Screenshot riset disimpan di Storage atau dibuang setelah dianalisis?
-5. Roadmap di CLAUDE.md: tambahkan Tahap 10–13 sebelum mulai.
+1. Urutan disetujui: 10 → 11 → 12 → 13.
+2. Satu bundle = **16 ikon** (grid 4×4, artboard persegi).
+3. Pengguna bersedia membuat API key Adobe Stock (dan Shutterstock). Minta saat mulai Tahap 13.
+4. Screenshot riset **dibuang** setelah dianalisis (tidak disimpan di Storage).
+5. Tahap 10–13 sudah ditambahkan ke Roadmap CLAUDE.md.
