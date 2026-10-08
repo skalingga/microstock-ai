@@ -1,14 +1,4 @@
-import {
-  ArrowLeft,
-  BadgeCheck,
-  CircleCheck,
-  CircleX,
-  Download,
-  ShieldCheck,
-  Tags,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowLeft, CircleCheck, CircleX, Download, TriangleAlert, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { notFound } from "next/navigation";
@@ -35,11 +25,10 @@ const NOTE_MARK: Record<NoteStatus, { icon: LucideIcon; className: string }> = {
   gagal: { icon: CircleX, className: "text-destructive" },
 };
 
-function Section({ id, icon: Icon, title, children }: { id: string; icon: LucideIcon; title: string; children: React.ReactNode }) {
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby={id}>
-      <h2 id={id} className="flex items-center gap-2 font-semibold">
-        <Icon className="size-4 text-primary" />
+    <section className="space-y-3 rounded-2xl border bg-card p-5" aria-labelledby={id}>
+      <h2 id={id} className="text-lg font-bold">
         {title}
       </h2>
       {children}
@@ -88,7 +77,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <Link
         href={`/aset?job=${asset.job_id}`}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg pr-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg pr-2 text-sm font-medium max-sm:min-h-11 pointer-coarse:min-h-11 text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Kembali ke aset
@@ -96,7 +85,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-2xl border shadow-sm">
+          <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-2xl border">
             {svgUrl ? (
               // Shown through <img>, never inline, so scripts in an SVG can never run.
               // eslint-disable-next-line @next/next/no-img-element
@@ -123,11 +112,11 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
         <div className="space-y-6">
           <div className="space-y-2">
             <QcBadge status={asset.qc_status} />
-            <h1 className="text-2xl font-bold">{asset.title ?? "Aset tanpa judul"}</h1>
+            <h1 className="text-3xl leading-tight font-extrabold">{asset.title ?? "Aset tanpa judul"}</h1>
             {asset.concept && <p className="leading-relaxed text-muted-foreground">{asset.concept}</p>}
           </div>
 
-          <Section id="qc-heading" icon={ShieldCheck} title="Hasil QC">
+          <Section id="qc-heading" title="Hasil QC">
             {notes.length === 0 ? (
               <p className="text-sm text-muted-foreground">QC belum dijalankan untuk aset ini.</p>
             ) : (
@@ -166,7 +155,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
             />
           </Section>
 
-          <Section id="meta-heading" icon={Tags} title="Metadata">
+          <Section id="meta-heading" title="Metadata">
             <MetadataForm
               key={`${asset.title}-${asset.keywords.length}-${asset.category}`}
               id={asset.id}
@@ -177,11 +166,11 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
             />
           </Section>
 
-          <Section id="adobe-heading" icon={BadgeCheck} title="Hasil review Adobe">
+          <Section id="adobe-heading" title="Hasil review Adobe">
             <AdobeResultForm key={`${asset.adobe_status}-${asset.adobe_reason}`} id={asset.id} status={asset.adobe_status} reason={asset.adobe_reason} />
           </Section>
 
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl border bg-card p-5 text-sm shadow-xs">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl border bg-card p-5 text-sm">
             {rows.map(([label, value]) => (
               <div key={label} className="contents">
                 <dt className="text-muted-foreground">{label}</dt>

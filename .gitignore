@@ -37,6 +37,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# impeccable: per-machine settings (hook consent, local overrides)
+.impeccable/*.local.json
+.impeccable/hook.cache.json
+.impeccable/live/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

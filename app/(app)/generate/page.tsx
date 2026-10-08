@@ -1,87 +1,102 @@
-import { Activity, CircleCheck, Sparkles, Wallet } from "lucide-react";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
+import { fetchActiveJob } from "@/lib/generate/active-job";
+import { parseCells, summarize } from "@/lib/generate/benchmark";
 import { createClient } from "@/lib/supabase/server";
 import { withPresetPalettes } from "@/lib/settings/palettes";
 import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
-import { STYLES, toPalettes, type StyleId } from "@/lib/settings/schema";
-import { GenerateForm } from "./generate-form";
+import { withEnvDefaults } from "@/lib/settings/provider-defaults";
+import { STYLES, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
+import { ActiveJobCard } from "./active-job-card";
+import { GenerateForm, type TestedModel } from "./generate-form";
+
+export const metadata: Metadata = { title: "Generate" };
+
+/** PRODUCT.md: more than 1.000 Lolos SVGs a month, about 33 a day. */
+const DAILY_LOLOS_TARGET = 33;
 
 export default async function HalamanGenerate({
   searchParams,
 }: {
-  searchParams: Promise<{ tema?: string }>;
+  searchParams: Promise<{ tema?: string; batas?: string }>;
 }) {
-  const { tema } = await searchParams;
+  const { tema, batas } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: settings }, { data: usage }, { data: kenariSpent }] = await Promise.all([
+  const [
+    { data: settings, error: settingsError },
+    { data: kenariSpent, error: spentError },
+    { count: lolosToday, error: lolosError },
+    activeJob,
+    { data: benchmarks },
+    { data: svgCosts },
+  ] = await Promise.all([
     supabase.from("user_settings").select("*").maybeSingle(),
-    supabase.from("provider_usage").select("provider, ok").gte("created_at", startOfDayWib()).limit(1000),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
+    supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "lolos").gte("created_at", startOfDayWib()),
+    fetchActiveJob(supabase),
+    supabase.from("model_benchmarks").select("results").order("created_at", { ascending: false }).limit(5),
+    // What paid SVG calls really cost, per model: the estimate shown before a batch.
+    supabase.from("provider_usage").select("model, cost_idr").eq("kind", "svg").eq("provider", "kenari").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(500),
   ]);
-
-  const usageByProvider: Record<string, { total: number; failed: number }> = {};
-  for (const row of usage ?? []) {
-    const entry = (usageByProvider[row.provider] ??= { total: 0, failed: 0 });
-    entry.total += 1;
-    if (!row.ok) entry.failed += 1;
-  }
-
-  const totalCalls = Object.values(usageByProvider).reduce((sum, u) => sum + u.total, 0);
-  const totalFailed = Object.values(usageByProvider).reduce((sum, u) => sum + u.failed, 0);
 
   const defaultStyle = (STYLES.find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
   // Same order as the server's imageOrder(): settings, then env, then the built-in model.
   const defaultImageModel =
     settings?.kenari_image_model.trim() || process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL;
-  const kenariBudgetLeftIdr = Math.max(0, (settings?.kenari_monthly_budget_idr ?? 0) - Number(kenariSpent ?? 0));
+  const budget = settings?.kenari_monthly_budget_idr ?? 0;
+  const spent = Number(kenariSpent ?? 0);
+  const kenariBudgetLeftIdr = Math.max(0, budget - spent);
+  const providerOrder = withEnvDefaults(settings ? toProviderOrder(settings.provider_order) : []);
+
+  // The latest benchmark run that has results: shown next to the models it tested.
+  const cells = (benchmarks ?? []).map((b) => parseCells(b.results)).find((c) => c.length > 0) ?? [];
+  const tested: TestedModel[] = summarize(cells).map((r) => ({
+    key: `${r.provider}|${r.model}`,
+    label: `${r.lolos}/${r.total} lolos${r.medianMs !== null ? ` · ${Math.round(r.medianMs / 1000)} dtk` : ""}`,
+    score: r.score,
+  }));
+
+  const svgCostIdr: Record<string, number> = {};
+  const costRuns: Record<string, number[]> = {};
+  for (const row of svgCosts ?? []) (costRuns[row.model] ??= []).push(Number(row.cost_idr));
+  for (const [model, costs] of Object.entries(costRuns)) svgCostIdr[model] = costs.reduce((a, b) => a + b, 0) / costs.length;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={Sparkles}
-        title="Generate"
-        description="Biarkan tab ini terbuka selama antrean berjalan."
-      >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
+      <PageHeader title="Generate" description="Biarkan tab ini terbuka selama antrean berjalan.">
+        <div className="grid grid-cols-2 gap-3 sm:max-w-xl">
+          <StatCard
+            label="Lolos hari ini"
+            value={lolosError ? "–" : `${lolosToday ?? 0}/${DAILY_LOLOS_TARGET}`}
+            progress={lolosError ? undefined : (lolosToday ?? 0) / DAILY_LOLOS_TARGET}
+            tone="goal"
+            detail={lolosError ? "Data aset tidak bisa dimuat" : "target harian"}
+          />
           {settings && (
             <StatCard
-              icon={Wallet}
-              tone="amber"
-              label="Biaya Kenari bulan ini"
-              value={formatIdr(Number(kenariSpent ?? 0))}
-              progress={settings.kenari_monthly_budget_idr > 0 ? Number(kenariSpent ?? 0) / settings.kenari_monthly_budget_idr : undefined}
-              detail={`dari batas ${formatIdr(settings.kenari_monthly_budget_idr)}`}
+              label="Sisa anggaran"
+              value={spentError ? "–" : formatIdr(kenariBudgetLeftIdr)}
+              progress={!spentError && budget > 0 ? spent / budget : undefined}
+              detail={spentError ? "Biaya tidak bisa dimuat" : `Kenari: terpakai ${formatIdr(spent)} dari ${formatIdr(budget)}`}
             />
           )}
-          <StatCard
-            icon={Activity}
-            label="Panggilan AI hari ini"
-            value={totalCalls}
-            detail={
-              totalCalls === 0
-                ? "Belum ada panggilan hari ini"
-                : Object.entries(usageByProvider)
-                    .map(([provider, u]) => `${provider} ${u.total}`)
-                    .join(" · ")
-            }
-          />
-          <StatCard
-            icon={CircleCheck}
-            tone="emerald"
-            label="Berhasil hari ini"
-            value={totalCalls === 0 ? "–" : `${Math.round(((totalCalls - totalFailed) / totalCalls) * 100)}%`}
-            detail={totalFailed > 0 ? `${totalFailed} gagal` : undefined}
-          />
         </div>
       </PageHeader>
+
+      {settingsError && (
+        <p role="alert" className="text-sm text-destructive">
+          Pengaturan tidak bisa dimuat, jadi form memakai nilai bawaan (palet, kata terlarang, batas biaya). Muat ulang halaman
+          sebelum generate.
+        </p>
+      )}
 
       <GenerateForm
         userId={user.id}
@@ -89,8 +104,13 @@ export default async function HalamanGenerate({
         palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
         bannedWords={settings?.banned_words ?? []}
         initialTheme={tema?.slice(0, 120) ?? ""}
+        uploadBy={batas && /^\d{4}-\d{2}-\d{2}$/.test(batas) ? batas : undefined}
         defaultImageModel={defaultImageModel}
-        kenariBudgetLeftIdr={kenariBudgetLeftIdr}
+        kenariBudgetLeftIdr={spentError ? null : kenariBudgetLeftIdr}
+        providerOrder={providerOrder}
+        tested={tested}
+        svgCostIdr={svgCostIdr}
+        activeJob={activeJob ? <ActiveJobCard initial={activeJob} /> : null}
       />
     </div>
   );

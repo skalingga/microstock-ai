@@ -22,7 +22,17 @@ export type Scores = {
   opportunity: number;
   /** True when competition comes from real data rather than a guess or nothing. */
   competitionKnown: boolean;
+  /** True when demand comes from Google Trends rather than the model's guess. */
+  demandKnown: boolean;
 };
+
+/** Where an opportunity score comes from: both inputs measured, one of them, or none (only AI guesses). */
+export type Provenance = "data" | "sebagian" | "perkiraan";
+
+export function provenanceOf(s: Scores): Provenance {
+  if (s.demandKnown && s.competitionKnown) return "data";
+  return s.demandKnown || s.competitionKnown ? "sebagian" : "perkiraan";
+}
 
 /** Opportunity multiplier by time left: a missed deadline halves it, a tight one trims it. */
 export function timingFactor(daysLeft: number | null | undefined): number {
@@ -76,5 +86,5 @@ export function scoreTheme(input: ScoreInput): Scores {
 
   // Unknown competition counts as middling so a theme is neither rewarded nor punished for it.
   const opportunity = clamp(((demand * (100 - (competition ?? 50))) / 100) * timingFactor(input.daysLeft));
-  return { demand, competition, opportunity, competitionKnown: hasCount };
+  return { demand, competition, opportunity, competitionKnown: hasCount, demandKnown: input.trendScore != null };
 }

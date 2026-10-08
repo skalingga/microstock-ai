@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/auth/next-path";
 import type { Database } from "@/lib/database.types";
 
 // Refreshes the Supabase session cookie and gates every page except /login and the reset callback.
@@ -43,20 +44,32 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user && !isPublic) {
+    const { pathname, search } = request.nextUrl;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
+    if (pathname === "/reset-password") {
+      // Without the session from the email link there is nothing to reset.
+      url.searchParams.set("tautan", "kedaluwarsa");
+    } else {
+      if (pathname !== "/") url.searchParams.set("lanjut", safeNextPath(pathname + search));
+      // An auth cookie that no longer yields a user means the session ran out, not a first visit.
+      if (hasAuthCookie(request)) url.searchParams.set("sesi", "berakhir");
+    }
     return redirectWithCookies(url, response);
   }
 
   if (user && isLoginPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/generate";
-    url.search = "";
+    const url = new URL(safeNextPath(request.nextUrl.searchParams.get("lanjut")), request.url);
     return redirectWithCookies(url, response);
   }
 
   return response;
+}
+
+// Supabase stores the session as sb-<project>-auth-token, split into .0/.1 chunks when large.
+function hasAuthCookie(request: NextRequest) {
+  return request.cookies.getAll().some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
 }
 
 function redirectWithCookies(url: URL, from: NextResponse) {

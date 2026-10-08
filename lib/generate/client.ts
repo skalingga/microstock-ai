@@ -95,5 +95,5 @@ export type ResearchThemeResult = {
   demandGuess: number;
   competitionGuess: number;
 };
-export type ThemesResponse = { themes: ResearchThemeResult[]; model: string; provider: string };
+export type ThemesResponse = { themes: ResearchThemeResult[]; model: string; provider: string; costIdr?: number };
 export type TrendsResponse = { scores: Record<string, number>; unavailable?: boolean };

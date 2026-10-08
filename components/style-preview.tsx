@@ -41,9 +41,9 @@ export function StylePreview({ style, palette }: { style: StyleId; palette: stri
   const transparent = style === "icon_set" || style === "badge_label" || style === "silhouette" || style === "line_art";
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-3 sm:flex-row sm:items-center">
-      <div className={`relative w-full max-w-40 shrink-0 overflow-hidden rounded-lg border ${transparent ? "bg-checker" : ""}`}>
-        <span className="absolute top-1.5 left-1.5 rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-xs">
+    <div className="flex items-center gap-4">
+      <div className={`relative w-full max-w-28 shrink-0 sm:max-w-40 overflow-hidden rounded-lg border ${transparent ? "bg-checker" : ""}`}>
+        <span className="absolute top-1.5 left-1.5 rounded-sm bg-card px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
           Contoh
         </span>
         <svg viewBox={VIEWBOX[style]} className="block h-auto w-full" role="img" aria-label={`Contoh gaya ${STYLES.find((s) => s.value === style)?.label ?? style}`}>

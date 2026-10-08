@@ -83,6 +83,23 @@ describe("callWithRetry", () => {
     expect(c.waits.filter((w) => w === 12_000)).toHaveLength(2);
   });
 
+  it("reports a quota wait through onWait and clears it once the wait is over", async () => {
+    const { gate, base } = setup();
+    const waits: number[] = [];
+    const statuses: string[] = [];
+    let calls = 0;
+    await callWithRetry(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw new ApiError("rate_limit", "limit", 20);
+        return "ok";
+      },
+      { gate, ...base, onWait: (ms) => waits.push(ms), onStatus: (m) => statuses.push(m) },
+    );
+    expect(waits).toEqual([20_000, 0]);
+    expect(statuses).toEqual([]);
+  });
+
   it("retries timeouts and bad output, then gives up after maxAttempts", async () => {
     const { gate, base } = setup();
     let calls = 0;

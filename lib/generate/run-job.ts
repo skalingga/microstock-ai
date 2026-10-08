@@ -45,6 +45,12 @@ export type JobState = {
   jobId?: string;
   message?: string;
   providerNote?: string;
+  /** Epoch ms until which the queue waits for provider quota; the page counts down to it. */
+  waitUntil?: number;
+  /** Provider of the last stored asset, so the page can say when the backup took over. */
+  lastProvider?: string;
+  /** When the job row was made, to read this batch's spending afterwards. */
+  startedAt?: string;
   items: JobItem[];
 };
 
@@ -79,13 +85,19 @@ export async function runJob(p: RunJobParams): Promise<void> {
   };
 
   const gate = new RateGate();
-  const retryOpts = (onStatus?: (m: string) => void) => ({ gate, signal: p.signal, onStatus });
+  const retryOpts = (onStatus?: (m: string) => void) => ({
+    gate,
+    signal: p.signal,
+    onStatus,
+    // Short spacing waits between calls are not worth showing; quota waits get a countdown.
+    onWait: (ms: number) => emit({ waitUntil: ms >= 3000 ? Date.now() + ms : undefined }),
+  });
 
   let jobId: string | undefined;
   let created = 0;
 
   try {
-    emit({ phase: "konsep", message: "Menyusun konsep variasi..." });
+    emit({ phase: "konsep", message: "Menyusun konsep variasi...", startedAt: new Date().toISOString() });
 
     const conceptsRes = await callWithRetry(
       (ctx) =>
@@ -146,7 +158,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
 
       created += 1;
       pool.push({ id: made.assetId, phash: made.phash });
-      emit({ message: undefined, providerNote: `${made.provider} · ${made.model}` });
+      emit({ message: undefined, providerNote: `${made.provider} · ${made.model}`, lastProvider: made.provider });
       patchItem(item.index, {
         status: "selesai",
         assetId: made.assetId,

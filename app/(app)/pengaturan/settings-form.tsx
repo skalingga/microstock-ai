@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Ban, Bot, Loader2, Palette, Save, Wallet } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { InfoTip } from "@/components/info-tip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,8 +45,7 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
     <form onSubmit={onSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="size-4 text-primary" />
+          <CardTitle className="flex items-center gap-1">
             Model AI
             <InfoTip align="start">
               Provider utama dipakai dulu. Saat kena limit, terlalu lama, atau error, aplikasi pindah ke cadangan.
@@ -129,8 +128,7 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Ban className="size-4 text-primary" />
+          <CardTitle className="flex items-center gap-1">
             Kata terlarang
             <InfoTip align="start">
               Nama artis, tokoh, karakter fiksi, merek, atau IP lain. Dipakai untuk menyaring tema, prompt, dan metadata.
@@ -153,10 +151,7 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="size-4 text-primary" />
-            Gaya dan palet bawaan
-          </CardTitle>
+          <CardTitle>Gaya dan palet bawaan</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -191,8 +186,7 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="size-4 text-primary" />
+          <CardTitle className="flex items-center gap-1">
             Batas biaya Kenari per bulan
             <InfoTip align="start">
               Setelah tercapai, model berbayar berhenti sampai bulan berikutnya. Model gratis tidak dihitung. Isi 0 untuk
@@ -229,7 +223,7 @@ export function SettingsForm({ settings }: { settings: Tables<"user_settings"> }
       )}
 
       <div className="sticky bottom-4 z-10 flex justify-end">
-        <Button type="submit" size="lg" disabled={pending} className="shadow-lg shadow-primary/30">
+        <Button type="submit" size="lg" disabled={pending} className="shadow-md">
           {pending ? <Loader2 className="animate-spin" /> : <Save />}
           {pending ? "Menyimpan..." : "Simpan pengaturan"}
         </Button>

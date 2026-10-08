@@ -1,4 +1,3 @@
-import { Settings } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsForm } from "./settings-form";
@@ -12,10 +11,7 @@ export default async function HalamanPengaturan() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={Settings}
-        title="Pengaturan"
-      />
+      <PageHeader title="Pengaturan" />
 
       {error || !settings ? (
         <p role="alert" className="text-sm text-destructive">

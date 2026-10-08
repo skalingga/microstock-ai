@@ -89,7 +89,7 @@ export function MetadataForm(props: Props) {
         </select>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2 text-sm max-sm:min-h-11 pointer-coarse:min-h-11">
         <input type="checkbox" checked={needsRelease} onChange={(e) => setNeedsRelease(e.target.checked)} />
         Perlu Release (menggambarkan orang atau properti nyata)
       </label>

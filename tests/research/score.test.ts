@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { competitionFromCount, daysUntil, deadlineStatus, demandFromRatio, scoreTheme, timingFactor } from "@/lib/research/score";
+import { competitionFromCount, daysUntil, deadlineStatus, demandFromRatio, provenanceOf, scoreTheme, timingFactor } from "@/lib/research/score";
 
 describe("competitionFromCount", () => {
   it("is 0 for small niches and 100 for huge ones", () => {
@@ -62,4 +62,13 @@ describe("deadline timing", () => {
     expect(missed.opportunity).toBeLessThan(open.opportunity);
   });
   it("leaves evergreen themes alone", () => expect(timingFactor(null)).toBe(1));
+});
+
+describe("provenanceOf", () => {
+  it("says which inputs were measured", () => {
+    expect(provenanceOf(scoreTheme({ trendScore: 60, adobeResultCount: 20_000 }))).toBe("data");
+    expect(provenanceOf(scoreTheme({ trendScore: 60, aiCompetition: 40 }))).toBe("sebagian");
+    expect(provenanceOf(scoreTheme({ aiDemand: 60, adobeResultCount: 20_000 }))).toBe("sebagian");
+    expect(provenanceOf(scoreTheme({ aiDemand: 60, aiCompetition: 40 }))).toBe("perkiraan");
+  });
 });

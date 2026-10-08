@@ -76,6 +76,8 @@ export type RetryOptions = {
   maxRateLimitWaits?: number;
   retryDelayMs?: number;
   onStatus?: (message: string) => void;
+  /** Called with the wait in ms before a quota wait, and with 0 once it is over. Replaces the wait message. */
+  onWait?: (ms: number) => void;
   sleepImpl?: Sleep;
 };
 
@@ -96,7 +98,13 @@ export async function callWithRetry<T>(fn: (ctx: AttemptContext) => Promise<T>, 
   let skipPrimary = false;
 
   for (;;) {
-    await opts.gate.acquire(opts.signal, (ms) => opts.onStatus?.(`Menunggu kuota provider (${Math.ceil(ms / 1000)} dtk)...`));
+    let waited = false;
+    await opts.gate.acquire(opts.signal, (ms) => {
+      waited = true;
+      if (opts.onWait) opts.onWait(ms);
+      else opts.onStatus?.(`Menunggu kuota provider (${Math.ceil(ms / 1000)} dtk)...`);
+    });
+    if (waited) opts.onWait?.(0);
     try {
       return await fn({ skipPrimary });
     } catch (err) {
