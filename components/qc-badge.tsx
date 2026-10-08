@@ -7,25 +7,19 @@ const LABEL: Record<string, string> = {
   gagal: "Gagal",
 };
 
-// Color plus a dot and the word itself, so the status never depends on color alone.
-const STYLE: Record<string, { pill: string; dot: string }> = {
-  menunggu: { pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/60" },
-  lolos: { pill: "bg-success-soft text-success-foreground ring-success/20", dot: "bg-success" },
-  perlu_cek: { pill: "bg-warning-soft text-warning-foreground ring-warning/30", dot: "bg-warning" },
-  gagal: { pill: "bg-danger-soft text-danger-foreground ring-destructive/20", dot: "bg-destructive" },
+// Color plus a square anchor and the word itself, so the status never depends on color alone.
+const STYLE: Record<string, { pill: string; anchor: string }> = {
+  menunggu: { pill: "bg-muted text-muted-foreground", anchor: "border-muted-foreground bg-card" },
+  lolos: { pill: "bg-success-soft text-success-foreground", anchor: "border-success bg-success" },
+  perlu_cek: { pill: "bg-warning-soft text-warning-foreground", anchor: "border-warning-foreground bg-warning" },
+  gagal: { pill: "bg-danger-soft text-danger-foreground", anchor: "border-destructive bg-destructive" },
 };
 
 export function QcBadge({ status, className }: { status: string; className?: string }) {
   const style = STYLE[status] ?? STYLE.menunggu;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset",
-        style.pill,
-        className,
-      )}
-    >
-      <span aria-hidden className={cn("size-1.5 rounded-full", style.dot)} />
+    <span className={cn("inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-xs font-semibold", style.pill, className)}>
+      <span aria-hidden className={cn("size-1.5 border", style.anchor)} />
       {LABEL[status] ?? status}
     </span>
   );

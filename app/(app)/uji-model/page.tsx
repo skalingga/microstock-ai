@@ -1,4 +1,3 @@
-import { FlaskConical, History } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
@@ -51,7 +50,6 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={FlaskConical}
         title="Uji model"
         description="Konsep yang sama digambar beberapa model, lalu dinilai QC."
       />
@@ -67,17 +65,14 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
       {selected && (
         <section className="space-y-4">
           <div className="space-y-1">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <History className="size-5 text-primary" />
-              Hasil uji tersimpan
-            </h2>
+            <h2 className="text-2xl font-extrabold">Hasil uji tersimpan</h2>
             <div className="flex flex-wrap gap-2 text-sm">
               {runs!.map((r) => (
                 <Link
                   key={r.id}
                   href={`/uji-model?run=${r.id}`}
                   className={cn(
-                    "inline-flex items-center rounded-full border bg-card px-3 py-1.5 transition-colors duration-150",
+                    "inline-flex items-center rounded-md border bg-card px-3 py-1.5 transition-colors duration-150",
                     tapTarget,
                     r.id === selected.id ? "border-primary bg-secondary font-medium text-secondary-foreground" : "text-muted-foreground hover:bg-muted",
                   )}

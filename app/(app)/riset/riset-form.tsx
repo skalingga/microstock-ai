@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Search, Sparkles, TrendingUp } from "lucide-react";
+import { ExternalLink, Spline } from "lucide-react";
 import { InfoTip } from "@/components/info-tip";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -197,8 +197,7 @@ export function RisetForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="size-4 text-primary" />
+          <CardTitle className="flex items-center gap-1">
             Riset baru
             <InfoTip align="start">
               Periode maksimal 12 bulan. Tanggal event bergerak (Ramadan, Diwali, Imlek, Paskah) hanya perkiraan: cek lagi
@@ -247,8 +246,7 @@ export function RisetForm({
       {sorted.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="size-4 text-primary" />
+            <CardTitle className="flex items-center gap-1">
               Tema berdasarkan peluang
               <InfoTip align="start">
                 Peluang tinggi = permintaan tinggi dan persaingan rendah. Isi “Hasil Adobe” (jumlah hasil pencarian di Adobe
@@ -267,22 +265,22 @@ export function RisetForm({
               return (
                 <div
                   key={row.id ?? `${row.title}-${index}`}
-                  className="space-y-3 rounded-2xl border bg-card p-4 transition-[border-color,box-shadow] duration-200 hover:border-primary/30 hover:shadow-md"
+                  className="space-y-3 rounded-xl border bg-card p-4 transition-colors duration-150 hover:border-foreground/40"
                 >
                   <div className="flex flex-wrap items-start gap-3">
                     <div
                       className={cn(
-                        "flex size-14 shrink-0 flex-col items-center justify-center rounded-2xl ring-1 ring-inset",
+                        "flex size-16 shrink-0 flex-col items-center justify-center rounded-lg",
                         s.opportunity >= 60
-                          ? "bg-success-soft text-success-foreground ring-success/25"
+                          ? "bg-success-soft text-success-foreground"
                           : s.opportunity >= 40
-                            ? "bg-warning-soft text-warning-foreground ring-warning/30"
-                            : "bg-muted text-muted-foreground ring-border",
+                            ? "bg-warning-soft text-warning-foreground"
+                            : "bg-muted text-muted-foreground",
                       )}
                       title="Skor peluang"
                     >
-                      <span className="text-lg leading-none font-bold tabular-nums">{s.opportunity}</span>
-                      <span className="text-[10px] font-medium uppercase">peluang</span>
+                      <span className="text-2xl leading-none font-extrabold tabular-nums">{s.opportunity}</span>
+                      <span className="text-xs font-semibold">peluang</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">{row.title}</p>
@@ -300,7 +298,7 @@ export function RisetForm({
                       )}
                     </div>
                     <Link href={generateHref} className={buttonVariants({ size: "sm" })}>
-                      <Sparkles />
+                      <Spline />
                       Generate dari tema ini
                     </Link>
                   </div>
@@ -312,7 +310,7 @@ export function RisetForm({
                   {row.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {row.keywords.map((k, i) => (
-                        <span key={`${k}-${i}`} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        <span key={`${k}-${i}`} className="rounded-sm bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                           {k}
                         </span>
                       ))}
@@ -334,7 +332,7 @@ export function RisetForm({
                       href={`https://stock.adobe.com/search?k=${encodeURIComponent(query)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={cn("inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline", tapTarget)}
+                      className={cn("inline-flex items-center gap-1 text-xs font-semibold text-foreground underline underline-offset-4 hover:decoration-2", tapTarget)}
                     >
                       <ExternalLink className="size-3" />
                       Cari “{query}” di Adobe Stock

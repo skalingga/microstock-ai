@@ -91,9 +91,9 @@ export function ExportPanel({ userId, candidates }: Props) {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="pilih-heading">
+      <section className="space-y-3 rounded-2xl border bg-card p-5" aria-labelledby="pilih-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="pilih-heading" className="font-semibold">
+          <h2 id="pilih-heading" className="text-lg font-bold">
             Pilih aset ({chosen.length} dipilih)
           </h2>
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -173,8 +173,8 @@ export function ExportPanel({ userId, candidates }: Props) {
       )}
 
       {result && (
-        <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="hasil-heading">
-          <h2 id="hasil-heading" className="font-semibold">
+        <section className="space-y-3 rounded-2xl border bg-card p-5" aria-labelledby="hasil-heading">
+          <h2 id="hasil-heading" className="text-lg font-bold">
             {result.data.included.length} aset siap diunduh
           </h2>
           <div className="flex flex-wrap gap-2">

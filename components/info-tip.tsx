@@ -1,7 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,6 +23,7 @@ export function InfoTip({
   const tipId = useId();
   const rootRef = useRef<HTMLSpanElement>(null);
   const pointerRef = useRef("");
+  const tipRef = useRef<HTMLSpanElement>(null);
 
   // iOS Safari never focuses a tapped button, so a tap toggles it and a tap elsewhere closes it.
   useEffect(() => {
@@ -37,6 +38,16 @@ export function InfoTip({
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open]);
+
+  // Nudge the tip sideways so it stays 16px inside the screen edges on phones.
+  useLayoutEffect(() => {
+    const tip = tipRef.current;
+    if (!open || !tip) return;
+    const { left, right } = tip.getBoundingClientRect();
+    const overflowRight = right - (window.innerWidth - 16);
+    const shift = overflowRight > 0 ? -overflowRight : left < 16 ? 16 - left : 0;
+    tip.style.marginLeft = `${shift}px`;
   }, [open]);
 
   return (
@@ -55,8 +66,9 @@ export function InfoTip({
         onPointerDown={(e) => (pointerRef.current = e.pointerType)}
         // A mouse click keeps the hover-opened tip; touch and the keyboard toggle it.
         onClick={() => {
-          setOpen((v) => (pointerRef.current === "mouse" ? true : !v));
+          const byMouse = pointerRef.current === "mouse";
           pointerRef.current = "";
+          setOpen((v) => (byMouse ? true : !v));
         }}
         onFocus={() => !pointerRef.current && setOpen(true)}
         onBlur={(e) => !rootRef.current?.contains(e.relatedTarget as Node) && setOpen(false)}
@@ -67,10 +79,11 @@ export function InfoTip({
       {open && (
         // The padding (not a margin) bridges the gap, so the pointer can move onto the text without closing it.
         <span
+          ref={tipRef}
           id={tipId}
           role="tooltip"
           className={cn(
-            "absolute top-full z-50 w-72 max-w-[80vw] pt-1.5",
+            "absolute top-full z-50 w-72 max-w-[calc(100vw-2rem)] pt-1.5",
             align === "start" && "left-0",
             align === "center" && "left-1/2 -translate-x-1/2",
             align === "end" && "right-0",

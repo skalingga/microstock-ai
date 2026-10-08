@@ -7,7 +7,7 @@ import {
   Menu,
   PackageCheck,
   Settings,
-  Sparkles,
+  Spline,
   Telescope,
   X,
   type LucideIcon,
@@ -16,6 +16,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Brand } from "@/components/brand";
+import { Anchor } from "@/components/pen-motif";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
@@ -26,7 +28,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: "Produksi",
     items: [
       { href: "/riset", label: "Riset", icon: Telescope },
-      { href: "/generate", label: "Generate", icon: Sparkles },
+      { href: "/generate", label: "Generate", icon: Spline },
       { href: "/aset", label: "Aset", icon: LayoutGrid },
       { href: "/ekspor", label: "Ekspor", icon: PackageCheck },
     ],
@@ -49,7 +51,7 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
     <nav aria-label="Navigasi utama" className="space-y-6">
       {groups.map((group) => (
         <div key={group.label} className="space-y-1">
-          <p className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{group.label}</p>
+          <p className="px-3 text-xs font-semibold text-muted-foreground">{group.label}</p>
           <ul className="space-y-0.5">
             {group.items.map(({ href, label, icon: Icon }) => {
               const active = isActive(pathname, href);
@@ -60,23 +62,16 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-[15px] transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       active
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-sidebar-accent font-bold text-sidebar-accent-foreground"
+                        : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-150",
-                        active
-                          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30"
-                          : "bg-muted text-muted-foreground group-hover:bg-card group-hover:text-primary",
-                      )}
-                    >
-                      <Icon className="size-4" />
-                    </span>
-                    {label}
+                    <Icon className="size-4 shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {/* The active page carries the selected anchor, like the point being edited. */}
+                    {active && <Anchor filled />}
                   </Link>
                 </li>
               );
@@ -90,16 +85,11 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
 
 function Account({ email, logout }: { email: string; logout: () => Promise<void> }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border bg-muted/50 p-2.5">
-      <span
-        aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground uppercase"
-      >
-        {email.slice(0, 1)}
-      </span>
+    <div className="flex items-center gap-1 rounded-lg border bg-muted/50 py-1 pr-1 pl-3">
       <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={email}>
         {email}
       </span>
+      <ThemeToggle />
       <form action={logout}>
         <button
           type="submit"
@@ -166,7 +156,7 @@ export function AppNav({ email, logout }: { email: string; logout: () => Promise
         </div>
       </aside>
 
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card/90 px-4 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card px-4 lg:hidden">
         <Link href="/generate" className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Brand />
         </Link>

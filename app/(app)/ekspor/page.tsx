@@ -1,4 +1,3 @@
-import { CircleX, Hourglass, ListChecks, PackageCheck } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -121,27 +120,24 @@ export default async function HalamanEkspor() {
   return (
     <div className="space-y-8">
       <PageHeader
-        icon={PackageCheck}
         title="Ekspor"
         description="ZIP berisi SVG dan CSV metadata untuk Adobe Stock."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
-          <StatCard icon={PackageCheck} tone="emerald" label="Siap diekspor" value={assetsError ? "–" : readyCount} />
+          <StatCard label="Siap diekspor" value={assetsError ? "–" : readyCount} />
           <StatCard
-            icon={Hourglass}
-            tone="amber"
             label="Menunggu QC"
             value={waiting.error ? "–" : (waiting.count ?? 0)}
             detail={
               <Link
                 href="/aset?status=menunggu"
-                className={cn("inline-flex items-center font-medium text-primary underline-offset-4 hover:underline", tapTarget)}
+                className={cn("inline-flex items-center font-semibold text-foreground underline underline-offset-4 hover:decoration-2", tapTarget)}
               >
                 Proses di Aset
               </Link>
             }
           />
-          <StatCard icon={CircleX} tone="rose" label="Gagal QC" value={failed.error ? "–" : (failed.count ?? 0)} />
+          <StatCard label="Gagal QC" value={failed.error ? "–" : (failed.count ?? 0)} />
         </div>
       </PageHeader>
 
@@ -157,18 +153,14 @@ export default async function HalamanEkspor() {
         <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
       )}
 
-      <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="checklist-heading">
-        <h2 id="checklist-heading" className="flex items-center gap-2 font-semibold">
-          <ListChecks className="size-4 text-primary" />
+      <section className="space-y-4 rounded-2xl border bg-card p-5" aria-labelledby="checklist-heading">
+        <h2 id="checklist-heading" className="text-lg font-bold">
           Checklist upload ke Adobe Stock
         </h2>
         <ol className="space-y-2.5 text-sm">
           {CHECKLIST.map((step, i) => (
             <li key={step} className="flex gap-3">
-              <span
-                aria-hidden
-                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground"
-              >
+              <span aria-hidden className="w-5 shrink-0 pt-0.5 text-right font-extrabold tabular-nums">
                 {i + 1}
               </span>
               <span className="pt-0.5 leading-relaxed">{step}</span>
@@ -177,8 +169,8 @@ export default async function HalamanEkspor() {
         </ol>
       </section>
 
-      <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="riwayat-heading">
-        <h2 id="riwayat-heading" className="font-semibold">
+      <section className="space-y-3 rounded-2xl border bg-card p-5" aria-labelledby="riwayat-heading">
+        <h2 id="riwayat-heading" className="text-lg font-bold">
           Riwayat ekspor
         </h2>
         {historyError ? (

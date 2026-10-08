@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Clock, LayoutGrid, Loader2, Sparkles, Square, Wallet, Wand2 } from "lucide-react";
+import { Clock, LayoutGrid, Loader2, Spline, Square, Wallet } from "lucide-react";
+import { ProgressLine } from "@/components/pen-motif";
 import { InfoTip } from "@/components/info-tip";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,10 +151,7 @@ export function GenerateForm({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wand2 className="size-4 text-primary" />
-            Tema baru
-          </CardTitle>
+          <CardTitle>Tema baru</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={start} className="space-y-4">
@@ -300,7 +298,7 @@ export function GenerateForm({
                 {palette.length > 0 && (
                   <div className="flex gap-1" aria-hidden>
                     {palette.map((c) => (
-                      <span key={c} className="size-4 rounded-full border" style={{ backgroundColor: c }} />
+                      <span key={c} className="size-4 rounded-sm border" style={{ backgroundColor: c }} />
                     ))}
                   </div>
                 )}
@@ -330,7 +328,7 @@ export function GenerateForm({
 
             <div className="flex flex-wrap items-center gap-2">
               <Button type="submit" size="lg" disabled={running || theme.trim().length < 2}>
-                {running ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                {running ? <Loader2 className="animate-spin" /> : <Spline />}
                 {running ? "Sedang berjalan..." : "Mulai generate"}
               </Button>
               {running && (
@@ -339,12 +337,12 @@ export function GenerateForm({
                   Hentikan
                 </Button>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 <Clock className="size-3.5" />±{estimatedMinutes} menit
               </span>
               {traced && (
                 <span
-                  className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground"
                   title={imageCost === undefined ? undefined : `${count} × ${formatIdr(imagePrice!)}`}
                 >
                   <Wallet className="size-3.5" />
@@ -377,28 +375,23 @@ export function GenerateForm({
           </CardHeader>
           <CardContent className="space-y-4">
             {total > 0 && (
-              <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-[width] duration-300"
-                  style={{ width: `${Math.round(((done + failed) / total) * 100)}%` }}
-                />
-              </div>
+              <ProgressLine value={(done + failed) / total} label="Kemajuan antrean" />
             )}
 
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {state.items.map((item) => (
-                <li key={item.index} className="space-y-1.5 rounded-2xl border bg-card p-2 text-xs shadow-xs">
+                <li key={item.index} className="space-y-1.5 rounded-2xl border bg-card p-2 text-xs">
                   <div
                     className={cn(
                       "bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-xl",
-                      item.status === "berjalan" && "animate-pulse ring-2 ring-primary/40",
+                      item.status === "berjalan" && "animate-pulse ring-2 ring-brand",
                     )}
                   >
                     {item.previewUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={item.previewUrl} alt={item.concept.subject} className="size-full object-contain" />
                     ) : (
-                      <span className="rounded-full bg-card/90 px-2.5 py-1 font-medium text-muted-foreground shadow-xs">
+                      <span className="rounded-sm bg-card px-2.5 py-1 font-medium text-muted-foreground">
                         {STATUS_LABEL[item.status]}
                       </span>
                     )}

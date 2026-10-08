@@ -89,7 +89,7 @@ export function LoginForm({ notice }: { notice?: string }) {
           <button
             type="button"
             onClick={() => setMode("masuk")}
-            className={cn("inline-flex items-center font-semibold text-primary underline-offset-4 hover:underline", tapTarget)}
+            className={cn("inline-flex items-center font-semibold text-foreground underline underline-offset-4 hover:decoration-2", tapTarget)}
           >
             Kembali ke halaman masuk
           </button>
@@ -99,7 +99,7 @@ export function LoginForm({ notice }: { notice?: string }) {
             <button
               type="button"
               onClick={() => setMode(isMasuk ? "daftar" : "masuk")}
-              className={cn("inline-flex items-center px-1 font-semibold text-primary underline-offset-4 hover:underline", tapTarget)}
+              className={cn("inline-flex items-center px-1 font-semibold text-foreground underline underline-offset-4 hover:decoration-2", tapTarget)}
             >
               {isMasuk ? "Daftar" : "Masuk"}
             </button>

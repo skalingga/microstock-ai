@@ -1,4 +1,3 @@
-import { Activity, CircleCheck, Sparkles, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -46,15 +45,12 @@ export default async function HalamanGenerate({
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Sparkles}
         title="Generate"
         description="Biarkan tab ini terbuka selama antrean berjalan."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
           {settings && (
             <StatCard
-              icon={Wallet}
-              tone="amber"
               label="Biaya Kenari bulan ini"
               value={spentError ? "–" : formatIdr(Number(kenariSpent ?? 0))}
               progress={!spentError && settings.kenari_monthly_budget_idr > 0 ? Number(kenariSpent ?? 0) / settings.kenari_monthly_budget_idr : undefined}
@@ -62,7 +58,6 @@ export default async function HalamanGenerate({
             />
           )}
           <StatCard
-            icon={Activity}
             label="Panggilan AI hari ini"
             value={usageError ? "–" : totalCalls}
             detail={
@@ -76,8 +71,6 @@ export default async function HalamanGenerate({
             }
           />
           <StatCard
-            icon={CircleCheck}
-            tone="emerald"
             label="Berhasil hari ini"
             value={usageError || totalCalls === 0 ? "–" : `${Math.round(((totalCalls - totalFailed) / totalCalls) * 100)}%`}
             detail={totalFailed > 0 ? `${totalFailed} gagal` : undefined}

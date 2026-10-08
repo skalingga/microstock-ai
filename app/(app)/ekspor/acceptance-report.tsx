@@ -1,4 +1,3 @@
-import { BadgeCheck } from "lucide-react";
 import { InfoTip } from "@/components/info-tip";
 import { buildReport, type Group, type ReviewedAsset } from "@/lib/adobe/stats";
 import { STYLES } from "@/lib/settings/schema";
@@ -41,10 +40,9 @@ export function AcceptanceReport({ rows, awaiting }: { rows: ReviewedAsset[]; aw
   const styleLabel = (v: string) => STYLES.find((s) => s.value === v)?.label ?? v;
 
   return (
-    <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="acceptance-heading">
+    <section className="space-y-4 rounded-2xl border bg-card p-5" aria-labelledby="acceptance-heading">
       <div className="space-y-1">
-        <h2 id="acceptance-heading" className="flex items-center gap-2 font-semibold">
-          <BadgeCheck className="size-4 text-primary" />
+        <h2 id="acceptance-heading" className="flex items-center gap-1 text-lg font-bold">
           Tingkat penerimaan Adobe
           <InfoTip align="start">Isi keputusan Adobe di halaman detail tiap aset. Data ini dipakai untuk menyetel batas QC.</InfoTip>
         </h2>

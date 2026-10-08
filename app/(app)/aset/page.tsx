@@ -1,6 +1,7 @@
-import { ChevronLeft, ChevronRight, LayoutGrid, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Spline } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { PenPath } from "@/components/pen-motif";
 import { buttonVariants } from "@/components/ui/button";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
@@ -88,18 +89,17 @@ export default async function HalamanAset({
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={LayoutGrid}
         title="Aset"
         description="Semua aset SVG beserta status QC."
         actions={
           <Link href="/generate" className={buttonVariants({ size: "lg" })}>
-            <Sparkles />
+            <Spline />
             Generate baru
           </Link>
         }
       >
         {job && (
-          <p className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground">
+          <p className="inline-flex flex-wrap items-center gap-2 rounded-md bg-secondary px-3 py-1 text-sm text-secondary-foreground">
             Menampilkan hasil satu job.
             <Link href="/aset" className={cn("inline-flex items-center font-semibold underline underline-offset-4", tapTarget)}>
               Lihat semua aset
@@ -110,7 +110,7 @@ export default async function HalamanAset({
 
       <AssetToolbar pending={pending} bannedWords={settings.data?.banned_words ?? []} job={job} />
 
-      <nav aria-label="Filter status" className="flex flex-wrap gap-1 rounded-2xl border bg-card p-1 shadow-xs sm:inline-flex">
+      <nav aria-label="Filter status" className="flex flex-wrap gap-1 rounded-xl border bg-card p-1 sm:inline-flex">
         {FILTERS.map((f) => {
           const active = status === f.value;
           return (
@@ -119,15 +119,15 @@ export default async function HalamanAset({
               href={href({ status: f.value, page: 1 })}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-9 items-center gap-2 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150",
+                "inline-flex min-h-9 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors duration-150",
                 tapTarget,
-                active ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                active ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               {f.label}
               <span
                 className={cn(
-                  "rounded-full px-1.5 py-px text-xs tabular-nums",
+                  "rounded-sm px-1.5 py-px text-xs tabular-nums",
                   active ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground",
                 )}
               >
@@ -186,10 +186,8 @@ export default async function HalamanAset({
           )}
         </>
       ) : (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
-          <span aria-hidden className="flex size-12 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
-            <LayoutGrid className="size-6" />
-          </span>
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
+          <PenPath className="max-w-56" />
           {status === "semua" ? (
             <>
               Belum ada aset.{" "}

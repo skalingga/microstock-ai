@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Clock, FlaskConical, Loader2, Shapes, Square, Trophy, Wallet } from "lucide-react";
+import { Clock, FlaskConical, Loader2, Shapes, Square, Wallet } from "lucide-react";
 import { InfoTip } from "@/components/info-tip";
+import { Anchor, ProgressLine } from "@/components/pen-motif";
 import { QcBadge } from "@/components/qc-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,8 +154,7 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FlaskConical className="size-4 text-primary" />
+          <CardTitle className="flex items-center gap-1">
             Uji baru
             <InfoTip align="start">
               Konsep dibuat sekali per tema (model teks dari Pengaturan), lalu tiap model menggambar konsep yang sama satu
@@ -278,15 +278,15 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
                   Hentikan
                 </Button>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 <Shapes className="size-3.5" />
                 {cellCount} SVG
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 <Clock className="size-3.5" />±{Math.max(1, Math.ceil((cellCount * SECONDS_PER_SVG) / 60))} menit
               </span>
               {paidKenari > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground">
                   <Wallet className="size-3.5" />
                   {paidKenari} model berbayar
                 </span>
@@ -311,9 +311,7 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
           </CardHeader>
           <CardContent className="space-y-4">
             {total > 0 && (
-              <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
-                <div className="h-full bg-primary transition-all" style={{ width: `${Math.round((finished / total) * 100)}%` }} />
-              </div>
+              <ProgressLine value={finished / total} label="Kemajuan uji" />
             )}
             <BenchResults setup={state.setup} cells={state.cells} previews={{}} />
           </CardContent>
@@ -387,7 +385,7 @@ function SummaryTable({ rows }: { rows: ModelSummary[] }) {
       </div>
       {primary && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-4 py-3 text-sm text-secondary-foreground">
-          <Trophy className="size-4" />
+          <Anchor filled />
           <span>
             Utama: <span className="font-mono font-semibold">{primary.model}</span>
             {backup && (
@@ -401,7 +399,7 @@ function SummaryTable({ rows }: { rows: ModelSummary[] }) {
             Skor = (Lolos + ½ Perlu cek) ÷ percobaan, dari QC visual saja; seri diurutkan dari yang tercepat. Cadangan dipilih
             dari kuota yang terpisah dari model utama. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya.
           </InfoTip>
-          <Link href="/pengaturan" className={cn("ml-auto inline-flex items-center font-semibold underline-offset-4 hover:underline", tapTarget)}>
+          <Link href="/pengaturan" className={cn("ml-auto inline-flex items-center font-semibold underline underline-offset-4 hover:decoration-2", tapTarget)}>
             Atur di Pengaturan
           </Link>
         </div>

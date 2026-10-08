@@ -1,4 +1,3 @@
-import { Telescope } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -39,7 +38,6 @@ export default async function HalamanRiset() {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Telescope}
         title="Riset tema"
         description="Ide tema dari event dan musim, diurutkan menurut peluang."
       />
