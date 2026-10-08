@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/password-input";
+import { tapTarget } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 import { daftar, lupaPassword, masuk, type AuthState } from "./actions";
 
 const initialState: AuthState = {};
@@ -54,7 +56,7 @@ export function LoginForm({ notice }: { notice?: string }) {
               <button
                 type="button"
                 onClick={() => setMode("lupa")}
-                className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                className={cn("inline-flex items-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground", tapTarget)}
               >
                 Lupa password?
               </button>
@@ -87,7 +89,7 @@ export function LoginForm({ notice }: { notice?: string }) {
           <button
             type="button"
             onClick={() => setMode("masuk")}
-            className="font-semibold text-primary underline-offset-4 hover:underline"
+            className={cn("inline-flex items-center font-semibold text-primary underline-offset-4 hover:underline", tapTarget)}
           >
             Kembali ke halaman masuk
           </button>
@@ -97,7 +99,7 @@ export function LoginForm({ notice }: { notice?: string }) {
             <button
               type="button"
               onClick={() => setMode(isMasuk ? "daftar" : "masuk")}
-              className="font-semibold text-primary underline-offset-4 hover:underline"
+              className={cn("inline-flex items-center px-1 font-semibold text-primary underline-offset-4 hover:underline", tapTarget)}
             >
               {isMasuk ? "Daftar" : "Masuk"}
             </button>

@@ -24,7 +24,8 @@ import {
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { STYLES, isImageStyle, type StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
-import { selectClass } from "@/lib/ui";
+import { selectClass, tapTarget } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 const TEXT_STYLES = STYLES.filter((s) => !isImageStyle(s.value));
 
@@ -195,7 +196,7 @@ export function BenchmarkRunner({ userId, bannedWords }: { userId: string; banne
               <legend className="text-sm font-medium">Model yang dibandingkan</legend>
               <div className="grid gap-1 sm:grid-cols-2">
                 {models.map((m) => (
-                  <label key={key(m)} className="flex items-center gap-2 text-sm">
+                  <label key={key(m)} className={cn("flex items-center gap-2 text-sm", tapTarget)}>
                     <input
                       type="checkbox"
                       checked={checked.has(key(m))}
@@ -400,7 +401,7 @@ function SummaryTable({ rows }: { rows: ModelSummary[] }) {
             Skor = (Lolos + ½ Perlu cek) ÷ percobaan, dari QC visual saja; seri diurutkan dari yang tercepat. Cadangan dipilih
             dari kuota yang terpisah dari model utama. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya.
           </InfoTip>
-          <Link href="/pengaturan" className="ml-auto font-semibold underline-offset-4 hover:underline">
+          <Link href="/pengaturan" className={cn("ml-auto inline-flex items-center font-semibold underline-offset-4 hover:underline", tapTarget)}>
             Atur di Pengaturan
           </Link>
         </div>
@@ -452,7 +453,7 @@ export function BenchResults({
                     <p className="font-medium">{row.theme}</p>
                     <p className="line-clamp-3 text-muted-foreground">{row.concept}</p>
                     {job && (
-                      <Link href={`/aset?job=${job}`} className="underline underline-offset-4">
+                      <Link href={`/aset?job=${job}`} className={cn("inline-flex items-center underline underline-offset-4", tapTarget)}>
                         Lihat di Aset
                       </Link>
                     )}

@@ -405,7 +405,7 @@ export function GenerateForm({
                   </div>
                   <p className="line-clamp-2 text-muted-foreground">{item.concept.subject}</p>
                   {item.qc && <QcBadge status={item.qc} />}
-                  {item.note && <p className="text-amber-700 dark:text-amber-400">{item.note}</p>}
+                  {item.note && <p className="text-warning-foreground">{item.note}</p>}
                   {item.error && <p className="text-destructive">{item.error}</p>}
                 </li>
               ))}

@@ -15,7 +15,7 @@ import { REGIONS } from "@/lib/research/calendar";
 import { MAX_THEMES } from "@/lib/research/schemas";
 import { daysUntil, deadlineStatus, scoreTheme } from "@/lib/research/score";
 import { createClient } from "@/lib/supabase/client";
-import { selectClass } from "@/lib/ui";
+import { selectClass, tapTarget } from "@/lib/ui";
 
 export type ThemeRow = {
   id?: string;
@@ -292,7 +292,7 @@ export function RisetForm({
                       </p>
                       {deadlineStatus(daysLeftOf(row)) === "terlewat" && (
                         <p className="text-xs text-destructive">
-                          Batas upload sudah lewat; peluang diturunkan. Masih bisa dikejar bila Anda siap upload cepat.
+                          Batas upload sudah lewat; peluang diturunkan. Masih bisa dikejar bila kamu siap upload cepat.
                         </p>
                       )}
                       {deadlineStatus(daysLeftOf(row)) === "mendesak" && (
@@ -334,7 +334,7 @@ export function RisetForm({
                       href={`https://stock.adobe.com/search?k=${encodeURIComponent(query)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                      className={cn("inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline", tapTarget)}
                     >
                       <ExternalLink className="size-3" />
                       Cari “{query}” di Adobe Stock

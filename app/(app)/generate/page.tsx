@@ -21,7 +21,7 @@ export default async function HalamanGenerate({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: settings }, { data: usage }, { data: kenariSpent }] = await Promise.all([
+  const [{ data: settings, error: settingsError }, { data: usage, error: usageError }, { data: kenariSpent, error: spentError }] = await Promise.all([
     supabase.from("user_settings").select("*").maybeSingle(),
     supabase.from("provider_usage").select("provider, ok").gte("created_at", startOfDayWib()).limit(1000),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
@@ -56,32 +56,41 @@ export default async function HalamanGenerate({
               icon={Wallet}
               tone="amber"
               label="Biaya Kenari bulan ini"
-              value={formatIdr(Number(kenariSpent ?? 0))}
-              progress={settings.kenari_monthly_budget_idr > 0 ? Number(kenariSpent ?? 0) / settings.kenari_monthly_budget_idr : undefined}
-              detail={`dari batas ${formatIdr(settings.kenari_monthly_budget_idr)}`}
+              value={spentError ? "–" : formatIdr(Number(kenariSpent ?? 0))}
+              progress={!spentError && settings.kenari_monthly_budget_idr > 0 ? Number(kenariSpent ?? 0) / settings.kenari_monthly_budget_idr : undefined}
+              detail={spentError ? "Biaya tidak bisa dimuat" : `dari batas ${formatIdr(settings.kenari_monthly_budget_idr)}`}
             />
           )}
           <StatCard
             icon={Activity}
             label="Panggilan AI hari ini"
-            value={totalCalls}
+            value={usageError ? "–" : totalCalls}
             detail={
-              totalCalls === 0
-                ? "Belum ada panggilan hari ini"
-                : Object.entries(usageByProvider)
-                    .map(([provider, u]) => `${provider} ${u.total}`)
-                    .join(" · ")
+              usageError
+                ? "Data panggilan tidak bisa dimuat"
+                : totalCalls === 0
+                  ? "Belum ada panggilan hari ini"
+                  : Object.entries(usageByProvider)
+                      .map(([provider, u]) => `${provider} ${u.total}`)
+                      .join(" · ")
             }
           />
           <StatCard
             icon={CircleCheck}
             tone="emerald"
             label="Berhasil hari ini"
-            value={totalCalls === 0 ? "–" : `${Math.round(((totalCalls - totalFailed) / totalCalls) * 100)}%`}
+            value={usageError || totalCalls === 0 ? "–" : `${Math.round(((totalCalls - totalFailed) / totalCalls) * 100)}%`}
             detail={totalFailed > 0 ? `${totalFailed} gagal` : undefined}
           />
         </div>
       </PageHeader>
+
+      {settingsError && (
+        <p role="alert" className="text-sm text-destructive">
+          Pengaturan tidak bisa dimuat, jadi form memakai nilai bawaan (palet, kata terlarang, batas biaya). Muat ulang halaman
+          sebelum generate.
+        </p>
+      )}
 
       <GenerateForm
         userId={user.id}

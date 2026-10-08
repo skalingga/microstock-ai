@@ -88,7 +88,7 @@ export default async function HalamanDetailAset({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <Link
         href={`/aset?job=${asset.job_id}`}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg pr-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg pr-2 text-sm font-medium max-sm:min-h-11 pointer-coarse:min-h-11 text-muted-foreground transition-colors hover:text-primary"
       >
         <ArrowLeft className="size-4" />
         Kembali ke aset

@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ADOBE } from "@/lib/adobe/rules";
 import { buildExport, downloadBlob, exportStamp, saveExport, type ExportResult } from "@/lib/export/build";
 import { createClient } from "@/lib/supabase/client";
+import { tapTarget } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 export type Candidate = {
   id: string;
@@ -89,13 +91,13 @@ export function ExportPanel({ userId, candidates }: Props) {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-3" aria-labelledby="pilih-heading">
+      <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="pilih-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="pilih-heading" className="font-medium">
+          <h2 id="pilih-heading" className="font-semibold">
             Pilih aset ({chosen.length} dipilih)
           </h2>
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <label className="flex items-center gap-2">
+            <label className={cn("flex items-center gap-2", tapTarget)}>
               <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
               Hanya yang belum diekspor
             </label>
@@ -109,16 +111,16 @@ export function ExportPanel({ userId, candidates }: Props) {
         </div>
 
         {visible.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-2xl border border-dashed bg-card/60 p-6 text-center text-sm text-muted-foreground">
             Belum ada aset yang siap diekspor. Aset harus punya metadata dan berstatus Lolos atau Perlu Cek.
           </p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((c) => (
               <li key={c.id}>
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-2 text-sm hover:bg-muted/50">
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-2 text-sm hover:bg-muted/50">
                   <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
-                  <span className="bg-checker flex size-12 shrink-0 items-center justify-center overflow-hidden rounded border">
+                  <span className="bg-checker flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
                     {c.thumbUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={c.thumbUrl} alt="" className="size-full object-contain" loading="lazy" />
@@ -138,7 +140,7 @@ export function ExportPanel({ userId, candidates }: Props) {
         )}
 
         {cekCount > 0 && (
-          <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
+          <label className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
             <input type="checkbox" className="mt-1" checked={confirmCek} onChange={(e) => setConfirmCek(e.target.checked)} />
             <span>
               {cekCount} aset yang dipilih berstatus <strong>Perlu Cek</strong>. Saya sudah memeriksanya satu per satu dan
@@ -171,8 +173,8 @@ export function ExportPanel({ userId, candidates }: Props) {
       )}
 
       {result && (
-        <section className="space-y-3 rounded-lg border p-4" aria-labelledby="hasil-heading">
-          <h2 id="hasil-heading" className="font-medium">
+        <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="hasil-heading">
+          <h2 id="hasil-heading" className="font-semibold">
             {result.data.included.length} aset siap diunduh
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -194,7 +196,7 @@ export function ExportPanel({ userId, candidates }: Props) {
           </div>
           {result.saved === true && <p className="text-sm text-muted-foreground">Riwayat ekspor tersimpan. File bisa diunduh ulang dari daftar di bawah.</p>}
           {result.saved === false && (
-            <p role="alert" className="text-sm text-amber-700 dark:text-amber-400">
+            <p role="alert" className="text-sm text-warning-foreground">
               File berhasil dibuat tetapi riwayatnya gagal disimpan. Unduh sekarang; aset belum ditandai sebagai diekspor.
             </p>
           )}

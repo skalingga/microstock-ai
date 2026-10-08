@@ -9,13 +9,13 @@ export function PasswordInput(props: Omit<React.ComponentProps<typeof Input>, "t
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
-      <Input {...props} type={visible ? "text" : "password"} className="pr-9" />
+      <Input {...props} type={visible ? "text" : "password"} className="pr-11" />
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Sembunyikan password" : "Tampilkan password"}
         aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground"
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
       </button>

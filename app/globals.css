@@ -82,7 +82,8 @@
   --danger-soft: oklch(0.936 0.032 17.717);
   --danger-foreground: oklch(0.444 0.177 26.899);
   --border: oklch(0.918 0.01 274);
-  --input: oklch(0.89 0.012 274);
+  /* Field borders need 3:1 against card, background, and muted (WCAG 1.4.11). */
+  --input: oklch(0.64 0.015 274);
   --ring: oklch(0.585 0.233 277.117);
   --chart-1: oklch(0.585 0.233 277.117);
   --chart-2: oklch(0.769 0.188 70.08);
@@ -145,7 +146,13 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
+  }
+  /* Fallback focus ring for links and buttons without their own; utilities with outline-none override it. */
+  :focus-visible {
+    outline-style: solid;
+    outline-width: 2px;
+    outline-offset: 2px;
   }
   body {
     @apply bg-background text-foreground;

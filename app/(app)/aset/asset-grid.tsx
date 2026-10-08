@@ -58,8 +58,9 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
     <div className="space-y-4">
       <div
         className={cn(
-          "sticky top-16 z-20 flex min-h-13 flex-wrap items-center gap-2 rounded-2xl border p-2 text-sm transition-colors duration-150 lg:top-3",
-          picked.length > 0 ? "border-primary/30 bg-card shadow-lg shadow-primary/10" : "bg-card/70",
+          "flex min-h-13 flex-wrap items-center gap-2 rounded-2xl border p-2 text-sm transition-colors duration-150",
+          // Only pinned while something is picked, so it does not take phone screen space the rest of the time.
+          picked.length > 0 ? "sticky top-16 z-20 border-primary/30 bg-card shadow-lg shadow-primary/10 lg:top-3" : "bg-card/70",
         )}
       >
         {picked.length === 0 ? (
@@ -124,7 +125,7 @@ export function AssetGrid({ assets }: { assets: GridAsset[] }) {
             >
               <label
                 className={cn(
-                  "absolute top-3 left-3 z-[1] flex size-8 cursor-pointer items-center justify-center rounded-lg border bg-card/95 shadow-sm transition-opacity duration-150",
+                  "absolute top-3 left-3 z-[1] flex size-8 cursor-pointer max-sm:size-11 pointer-coarse:size-11 items-center justify-center rounded-lg border bg-card/95 shadow-sm transition-opacity duration-150",
                   // Hidden until hover on devices with a mouse, always shown when picked or on touch screens.
                   !isPicked && picked.length === 0 && "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-within:opacity-100",
                 )}

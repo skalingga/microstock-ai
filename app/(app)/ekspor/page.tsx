@@ -7,6 +7,8 @@ import { AI_LABEL_REMINDER } from "@/lib/adobe/rules";
 import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { createClient } from "@/lib/supabase/server";
 import type { ReviewedAsset } from "@/lib/adobe/stats";
+import { tapTarget } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 import { AcceptanceReport } from "./acceptance-report";
 import { ExportPanel, type Candidate } from "./export-panel";
 
@@ -25,6 +27,14 @@ const CHECKLIST = [
   "Aset dengan orang atau properti nyata butuh release.",
 ];
 
+function LoadError({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="text-sm text-destructive">
+      {children}
+    </p>
+  );
+}
+
 export default async function HalamanEkspor() {
   const supabase = await createClient();
   const {
@@ -32,7 +42,14 @@ export default async function HalamanEkspor() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: assets }, { data: history }, waiting, failed, { data: reviewed }, awaiting] = await Promise.all([
+  const [
+    { data: assets, error: assetsError },
+    { data: history, error: historyError },
+    waiting,
+    failed,
+    { data: reviewed, error: reviewedError },
+    awaiting,
+  ] = await Promise.all([
     supabase
       .from("assets")
       .select("id, title, qc_status, exported_at, preview_path")
@@ -109,30 +126,36 @@ export default async function HalamanEkspor() {
         description="ZIP berisi SVG dan CSV metadata untuk Adobe Stock."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
-          <StatCard
-            icon={PackageCheck}
-            tone="emerald"
-            label="Siap diekspor"
-            value={readyCount}
-          />
+          <StatCard icon={PackageCheck} tone="emerald" label="Siap diekspor" value={assetsError ? "–" : readyCount} />
           <StatCard
             icon={Hourglass}
             tone="amber"
             label="Menunggu QC"
-            value={waiting.count ?? 0}
+            value={waiting.error ? "–" : (waiting.count ?? 0)}
             detail={
-              <Link href="/aset?status=menunggu" className="font-medium text-primary underline-offset-4 hover:underline">
+              <Link
+                href="/aset?status=menunggu"
+                className={cn("inline-flex items-center font-medium text-primary underline-offset-4 hover:underline", tapTarget)}
+              >
                 Proses di Aset
               </Link>
             }
           />
-          <StatCard icon={CircleX} tone="rose" label="Gagal QC" value={failed.count ?? 0} />
+          <StatCard icon={CircleX} tone="rose" label="Gagal QC" value={failed.error ? "–" : (failed.count ?? 0)} />
         </div>
       </PageHeader>
 
-      <ExportPanel userId={user.id} candidates={candidates} />
+      {assetsError ? (
+        <LoadError>Daftar aset untuk ekspor tidak bisa dimuat. Muat ulang halaman.</LoadError>
+      ) : (
+        <ExportPanel userId={user.id} candidates={candidates} />
+      )}
 
-      <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
+      {reviewedError || awaiting.error ? (
+        <LoadError>Data penerimaan Adobe tidak bisa dimuat. Muat ulang halaman.</LoadError>
+      ) : (
+        <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
+      )}
 
       <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="checklist-heading">
         <h2 id="checklist-heading" className="flex items-center gap-2 font-semibold">
@@ -154,28 +177,32 @@ export default async function HalamanEkspor() {
         </ol>
       </section>
 
-      <section className="space-y-3" aria-labelledby="riwayat-heading">
-        <h2 id="riwayat-heading" className="font-medium">
+      <section className="space-y-3 rounded-2xl border bg-card p-5 shadow-xs" aria-labelledby="riwayat-heading">
+        <h2 id="riwayat-heading" className="font-semibold">
           Riwayat ekspor
         </h2>
-        {history && history.length > 0 ? (
-          <ul className="divide-y rounded-lg border text-sm">
+        {historyError ? (
+          <p role="alert" className="text-sm text-destructive">
+            Riwayat ekspor tidak bisa dimuat. Muat ulang halaman.
+          </p>
+        ) : history && history.length > 0 ? (
+          <ul className="divide-y text-sm">
             {history.map((h) => {
               const zip = h.zip_path ? fileByPath.get(h.zip_path) : undefined;
               const csv = h.csv_path ? fileByPath.get(h.csv_path) : undefined;
               return (
-                <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
+                <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span>
                     {dateFormat.format(new Date(h.created_at))} · {h.asset_count} aset
                   </span>
-                  <span className="flex gap-3">
+                  <span className="flex gap-1">
                     {zip && (
-                      <a href={zip} className="underline underline-offset-4">
+                      <a href={zip} className={cn("inline-flex items-center px-2 underline underline-offset-4", tapTarget)}>
                         ZIP
                       </a>
                     )}
                     {csv && (
-                      <a href={csv} className="underline underline-offset-4">
+                      <a href={csv} className={cn("inline-flex items-center px-2 underline underline-offset-4", tapTarget)}>
                         CSV
                       </a>
                     )}
@@ -185,7 +212,7 @@ export default async function HalamanEkspor() {
             })}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">Belum ada ekspor.</p>
+          <p className="text-sm text-muted-foreground">Belum ada ekspor. File ZIP dan CSV yang kamu buat di atas akan muncul di sini.</p>
         )}
       </section>
     </div>

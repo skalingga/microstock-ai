@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
+import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
@@ -100,7 +101,7 @@ export default async function HalamanAset({
         {job && (
           <p className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground">
             Menampilkan hasil satu job.
-            <Link href="/aset" className="font-semibold underline underline-offset-4">
+            <Link href="/aset" className={cn("inline-flex items-center font-semibold underline underline-offset-4", tapTarget)}>
               Lihat semua aset
             </Link>
           </p>
@@ -119,6 +120,7 @@ export default async function HalamanAset({
               aria-current={active ? "page" : undefined}
               className={cn(
                 "inline-flex min-h-9 items-center gap-2 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150",
+                tapTarget,
                 active ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
@@ -126,7 +128,7 @@ export default async function HalamanAset({
               <span
                 className={cn(
                   "rounded-full px-1.5 py-px text-xs tabular-nums",
-                  active ? "bg-white/20" : "bg-muted text-muted-foreground",
+                  active ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground",
                 )}
               >
                 {counts[f.value]}
