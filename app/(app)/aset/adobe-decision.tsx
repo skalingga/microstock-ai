@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils";
 
 export type AdobeDecisionValue = "diterima" | "ditolak";
 
+/** Adobe's usual rejection reasons: one tap instead of typing. Similar content feeds the warnings on Generate and Riset. */
+const REASON_CHIPS = ["Similar content", "Quality", "Metadata"];
+
 const CHOICES: { value: AdobeDecisionValue; label: string }[] = [
   { value: "diterima", label: "Diterima" },
   { value: "ditolak", label: "Ditolak" },
@@ -69,6 +72,24 @@ export function AdobeDecision({
             disabled={disabled}
             placeholder="mis. Similar content, Quality"
           />
+          <span className="flex flex-wrap gap-1 pt-1" role="group" aria-label="Alasan yang sering muncul">
+            {REASON_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                disabled={disabled}
+                onClick={() => onReasonChange(chip)}
+                aria-pressed={reason.trim().toLowerCase() === chip.toLowerCase()}
+                className={cn(
+                  "inline-flex min-h-8 items-center rounded-md border px-2.5 text-xs font-medium hover:bg-muted/50",
+                  tapTarget,
+                  reason.trim().toLowerCase() === chip.toLowerCase() && "border-foreground bg-secondary font-semibold",
+                )}
+              >
+                {chip}
+              </button>
+            ))}
+          </span>
         </label>
       )}
     </div>

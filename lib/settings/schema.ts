@@ -10,7 +10,29 @@ export const STYLES = [
   // Drawn by a Kenari image model and converted to SVG on the server (stage 7). Always black.
   { value: "silhouette", label: "Siluet (gambar AI, berbayar)" },
   { value: "line_art", label: "Line art (gambar AI, berbayar)" },
+  // Stage 10: written as SVG by the text model, like icon_set. These are real interface-style icons.
+  { value: "line_icon", label: "Ikon garis (outline)" },
+  { value: "glyph_icon", label: "Ikon glyph (solid)" },
+  { value: "geometric_tile", label: "Ubin geometris" },
 ] as const;
+
+/** The styles that make interface-style icons: unlike clipart, "icon" is the right word in their titles and keywords. */
+export const ICON_STYLES = ["line_icon", "glyph_icon"] as const;
+export function isIconStyle(style: string): boolean {
+  return (ICON_STYLES as readonly string[]).includes(style);
+}
+
+/** How many palette colors one concept of a style uses. Most styles mix two to five; the icon styles are near single color. */
+export type ColorRange = { min: number; max: number };
+export const DEFAULT_COLOR_RANGE: ColorRange = { min: 2, max: 5 };
+const COLOR_RANGES: Partial<Record<string, ColorRange>> = {
+  line_icon: { min: 1, max: 1 },
+  glyph_icon: { min: 1, max: 2 },
+  geometric_tile: { min: 1, max: 2 },
+};
+export function colorRangeFor(style: string): ColorRange {
+  return COLOR_RANGES[style] ?? DEFAULT_COLOR_RANGE;
+}
 
 /** Styles drawn by an image model and traced to SVG instead of written as SVG by a text model. */
 export const IMAGE_STYLES = ["silhouette", "line_art"] as const;

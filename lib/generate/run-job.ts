@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
 import type { Concept } from "@/lib/providers/types";
 import { combine, type Verdict } from "@/lib/qc/evaluate";
+import { QC } from "@/lib/qc/config";
 import { applyMetadata, fetchHashPool, runVisualQc } from "@/lib/qc/store";
 import type { HashPoolEntry, QcNote, QcStatus } from "@/lib/qc/types";
 import { isImageStyle, type StyleId } from "@/lib/settings/schema";
@@ -61,6 +62,10 @@ export type RunJobParams = {
   style: StyleId;
   palette: string[];
   count: number;
+  /** Subjects Adobe refused as similar content, kept out of the concepts. */
+  avoid?: string[];
+  /** One subject drawn many ways: the concepts differ in pose and detail, and QC compares them with each other loosely. */
+  variations?: boolean;
   /** Model picked on the Generate page for the SVG calls; empty = the order from Settings. */
   model?: { provider: "kenari" | "gemini"; model: string };
   /** From the user's settings: used to judge the generated metadata. */
@@ -70,7 +75,7 @@ export type RunJobParams = {
 };
 
 /** What drawing and storing one asset needs; the benchmark (lib/generate/benchmark.ts) shares these steps. */
-export type DrawParams = Pick<RunJobParams, "supabase" | "userId" | "theme" | "style" | "model" | "bannedWords" | "signal">;
+export type DrawParams = Pick<RunJobParams, "supabase" | "userId" | "theme" | "style" | "model" | "bannedWords" | "signal" | "variations">;
 
 const BUCKET = "assets";
 
@@ -103,7 +108,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
       (ctx) =>
         postJson<ConceptsResponse>(
           "/api/generate/concepts",
-          { theme: p.theme, style: p.style, palette: p.palette, count: p.count, ...skip(ctx) },
+          { theme: p.theme, style: p.style, palette: p.palette, count: p.count, avoid: p.avoid ?? [], variations: p.variations ?? false, ...skip(ctx) },
           p.signal,
         ).then((r) => {
           gate.update(r.rateLimit);
@@ -157,7 +162,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
       }
 
       created += 1;
-      pool.push({ id: made.assetId, phash: made.phash });
+      pool.push({ id: made.assetId, phash: made.phash, batch: true });
       emit({ message: undefined, providerNote: `${made.provider} · ${made.model}`, lastProvider: made.provider });
       patchItem(item.index, {
         status: "selesai",
@@ -346,7 +351,14 @@ export async function draftSvg(
   let qc: { notes: QcNote[]; phash: string };
   try {
     png = await renderPreviewPng(clean.svg);
-    qc = await runVisualQc({ svg: clean.svg, style: p.style, sanitizeNotes: clean.notes, pool, selfId: assetId });
+    qc = await runVisualQc({
+      svg: clean.svg,
+      style: p.style,
+      sanitizeNotes: clean.notes,
+      pool,
+      selfId: assetId,
+      batchMaxHamming: p.variations ? QC.similarity.maxHammingVariations : undefined,
+    });
   } catch {
     throw new ApiError("bad_svg", "SVG tidak bisa dirender.");
   }

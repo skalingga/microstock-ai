@@ -1,11 +1,23 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
-import { isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
+import { colorRangeFor, isIconStyle, isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
 import { SVG_EXAMPLES } from "./examples";
 import type { ConceptInput, MetadataInput, SvgInput, ThemesInput } from "./types";
 
 // Prompts to the AI are in English (CLAUDE.md).
 
-type StyleSpec = { viewBox: string; brief: string };
+type StyleSpec = {
+  viewBox: string;
+  brief: string;
+  /** What keeps the assets of one set looking alike. Defaults to flat fills without outlines. */
+  consistency?: string;
+  /** Fill and stroke rule in the technical list. Defaults to flat fills with at most two gradients. */
+  fills?: string;
+  /** Which colors to use, as a sentence. Defaults to "only these colors (plus white or near-black)". */
+  colors?: (palette: string) => string;
+};
+
+const DEFAULT_CONSISTENCY = "Set consistency: flat solid fills and no outlines, so this asset sits well next to the rest of its set.";
+const DEFAULT_FILLS = "- Flat solid fills. At most one or two simple linear gradients if really needed.";
 
 const STYLE_SPECS: Record<StyleId, StyleSpec> = {
   icon_set: {
@@ -33,6 +45,34 @@ const STYLE_SPECS: Record<StyleId, StyleSpec> = {
     viewBox: "0 0 1500 1000",
     brief:
       "An abstract geometric background that fills the whole canvas edge to edge. Overlapping simple shapes, balanced composition, calm area for placing text later.",
+  },
+  // Stage 10: interface-style icons and tiles, written by the text model. 512 grid, 48 px padding.
+  line_icon: {
+    viewBox: "0 0 512 512",
+    brief:
+      "One outline icon made of strokes only: stroke-width 24 on the 512 grid, stroke-linecap round, stroke-linejoin round, fill none. One color, centered with 48 px padding. TRANSPARENT background: do not draw any background rectangle or backdrop shape. Simple geometry that stays readable at 32px.",
+    consistency:
+      "Set consistency: every shape uses the same stroke width (24), round line caps, round line joins and the same single stroke color, so this icon sits well next to the rest of its set.",
+    fills: '- Outline only: every shape has fill="none" and a stroke. No gradients and no filled areas (a tiny solid dot such as an eye is fine).',
+    colors: (palette) => `Color: draw every stroke in this one color: ${palette.split(", ")[0]}.`,
+  },
+  glyph_icon: {
+    viewBox: "0 0 512 512",
+    brief:
+      "One solid glyph icon: bold filled shapes in one or two colors, no outlines, centered with 48 px padding. TRANSPARENT background: do not draw any background rectangle or backdrop shape. Simple geometry that stays readable at 32px.",
+    consistency:
+      "Set consistency: solid filled shapes only, no outlines, the same visual weight and the same corner rounding in every icon, so this icon sits well next to the rest of its set.",
+    fills: "- Flat solid fills in one or two colors. No strokes and no gradients.",
+    colors: (palette) => `Colors: use only these colors: ${palette}.`,
+  },
+  geometric_tile: {
+    viewBox: "0 0 512 512",
+    brief:
+      "One square geometric tile that fills the whole canvas: a solid rounded square (corner radius 48) with a bold symmetric motif built from lines and simple shapes (mirror or rotational symmetry). No text.",
+    consistency:
+      "Set consistency: the same tile shape, frame width and motif density in every tile, so this tile sits well next to the rest of its set.",
+    fills: "- Flat solid fills; the motif may use strokes of one constant width. No gradients.",
+    colors: (palette) => `Colors: use only these colors: ${palette}.`,
   },
   // Drawn by an image model and traced (stage 7): the viewBox is unused, the brief steers the concepts.
   silhouette: {
@@ -66,6 +106,8 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
   const traced = isImageStyle(input.style);
   // Traced styles are always black, so there is no palette to plan with.
   const palette = traced ? "black only" : input.palette.length > 0 ? input.palette.join(", ") : "any harmonious flat colors";
+  const range = colorRangeFor(input.style);
+  const icons = isIconStyle(input.style);
 
   return {
     system:
@@ -76,12 +118,27 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
       `Asset style: ${input.style} (${spec.brief})`,
       `Available palette: ${palette}`,
       "",
-      `Propose exactly ${input.count} clearly different concepts for this theme. Vary subject, composition, and color combination so no two assets look alike.`,
+      ...(input.variations
+        ? [
+            `Propose exactly ${input.count} variations of ONE subject: the subject of the theme. Every concept keeps the same kind of subject and the same visual language, but differs clearly in pose or direction, proportions, level of detail, pattern or decoration, so no two assets look alike. Never change the style.`,
+            // Adobe refuses "similar content": each variation still needs its own recognizable difference.
+            "Name each variation by what makes it different, for example the pattern, the pose or the accessory.",
+          ]
+        : [
+            `Propose exactly ${input.count} clearly different concepts for this theme. Vary subject, composition, and color combination so no two assets look alike.`,
+            // Adobe refuses "similar content": the plain version of a common object is already in its collection many times over.
+            "Every subject must be specific and distinctive, never the plain, most common version of an everyday object. Give each one a concrete differentiator: a particular variety, breed, or era, an unusual pairing of objects, or a distinctive pose or composition. No two concepts may share the same main object.",
+          ]),
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
       traced
         ? "Each concept must read clearly in black and white alone: a recognizable outline, no fine texture."
-        : "Each concept must be easy to draw with a handful of flat vector shapes.",
+        : icons
+          ? "Each concept must be one simple, instantly readable symbol that works at 32px."
+          : "Each concept must be easy to draw with a handful of flat vector shapes.",
       traced
-        ? "The concepts form ONE cohesive set sold together: the same visual language and level of detail. Vary the subject and composition, never the style. Prefer generic subjects; never a specific real product model."
+        ? "The concepts form ONE cohesive set sold together: the same visual language and level of detail. Vary the subject and composition, never the style. Subjects must be recognizable but specific; never a specific real product model."
         : "The concepts form ONE cohesive set sold together: the same visual language, the same level of detail, and colors only from the available palette. Vary the subject and composition, never the style.",
       ...SAFETY_RULES,
       "",
@@ -90,7 +147,11 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
       "- composition: layout and arrangement, max 20 words.",
       traced
         ? '- palette: always ["#000000"].'
-        : "- palette: 2 to 5 hex colors copied exactly from the available palette. Never invent a color.",
+        : `- palette: ${
+            range.max === 1
+              ? "exactly 1 hex color copied exactly from the available palette, the same color in every concept"
+              : `${range.min === range.max ? range.min : `${range.min} to ${range.max}`} hex colors copied exactly from the available palette`
+          }. Never invent a color.`,
     ].join("\n"),
   };
 }
@@ -108,14 +169,14 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       `Theme: ${input.theme}`,
       `Concept: ${input.concept.subject}. ${input.concept.composition}`,
       `Style: ${spec.brief}`,
-      `Colors: use only these colors (plus white or near-black if needed): ${palette}`,
+      spec.colors ? spec.colors(palette) : `Colors: use only these colors (plus white or near-black if needed): ${palette}`,
       "",
-      "Set consistency: flat solid fills and no outlines, so this asset sits well next to the rest of its set.",
+      spec.consistency ?? DEFAULT_CONSISTENCY,
       "",
       "Technical rules:",
       `- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="${spec.viewBox}">.`,
       "- Use simple <path>, <rect>, <circle>, <ellipse>, <polygon> elements and <g> groups. Keep it under 60 shapes in total.",
-      "- Flat solid fills. At most one or two simple linear gradients if really needed.",
+      spec.fills ?? DEFAULT_FILLS,
       "- NO <text>, <image>, <foreignObject>, <script>, <style>, filters, masks, or external links.",
       "- Use short coordinates (integers, at most one decimal) and keep every shape inside the viewBox.",
       "- Organize the drawing into a few <g> groups with short descriptive id attributes (for example id=\"leaf\", id=\"body\"), so it is easy to edit as a layered vector.",
@@ -156,6 +217,9 @@ const METADATA_STYLE: Record<StyleId, string> = {
   abstract_background: "an abstract geometric background",
   silhouette: "a solid black vector silhouette on a transparent background",
   line_art: "a black and white vector line art illustration on a transparent background",
+  line_icon: "a single outline vector icon with uniform stroke width on a transparent background",
+  glyph_icon: "a single solid glyph vector icon on a transparent background",
+  geometric_tile: "a square geometric vector tile with a symmetric motif",
 };
 
 export function metadataPrompt(input: MetadataInput): { system: string; user: string } {
@@ -173,7 +237,9 @@ export function metadataPrompt(input: MetadataInput): { system: string; user: st
       `- keywords: 25 to 35 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, colors, style words such as "flat vector", "vector illustration" or "clipart", and likely use cases. No brand, artist, character, or celebrity names.`,
       `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
       "- needs_release: true only if the picture shows a realistic person or a real private property, otherwise false.",
-      "Never use the words icon, icons, icon set, pictogram or glyph in the title or keywords, even if the theme above uses them: Adobe reserves them for interface symbols, and this picture is an illustration.",
+      isIconStyle(input.style)
+        ? 'This picture is an interface-style icon, so the words "icon" and "icon set" are right for the title and keywords. Do not use "pictogram".'
+        : "Never use the words icon, icons, icon set, pictogram or glyph in the title or keywords, even if the theme above uses them: Adobe reserves them for interface symbols, and this picture is an illustration.",
       "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters.",
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","needs_release":false}',

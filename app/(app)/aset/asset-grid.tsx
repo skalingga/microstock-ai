@@ -23,10 +23,26 @@ export type GridAsset = {
   exportable: boolean;
 };
 
-type Mode = "pilih" | "adobe" | "hapus";
+type Mode = "pilih" | "adobe" | "hapus" | "hapus-catatan";
+
+/** What bulk actions need to know about an asset, including those not on the current page. */
+export type PickableAsset = Pick<GridAsset, "id" | "exported" | "adobeStatus" | "exportable">;
 
 /** The gallery grid. Ticking assets opens a bar to export them, record Adobe's decision, or delete them together. */
-export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Gallery filter, carried into the detail page. */ detailQuery: string }) {
+export function AssetGrid({
+  assets,
+  detailQuery,
+  filterTotal,
+  filterFirst,
+}: {
+  assets: GridAsset[];
+  /** Gallery filter, carried into the detail page. */
+  detailQuery: string;
+  /** How many assets the whole filter holds, across pages. */
+  filterTotal: number;
+  /** The first assets of the whole filter (up to the bulk limit), so one tap can pick them across pages. */
+  filterFirst: PickableAsset[];
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<Mode>("pilih");
@@ -35,9 +51,12 @@ export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Ga
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Ids of assets no longer on this page (deleted, or another page) drop out of the selection.
-  const picked = assets.filter((a) => selected.has(a.id));
-  const allPicked = picked.length === assets.length && assets.length > 0;
+  // Picks made on other pages stay in the selection; ids that no longer exist (deleted) drop out.
+  const known = new Map<string, PickableAsset>([...filterFirst, ...assets].map((a) => [a.id, a]));
+  const picked = [...selected].flatMap((id) => known.get(id) ?? []);
+  const offPage = picked.filter((a) => !assets.some((p) => p.id === a.id)).length;
+  const firstCount = filterFirst.length;
+  const allPicked = assets.length > 0 && assets.every((a) => selected.has(a.id));
   const exportedCount = picked.filter((a) => a.exported || a.adobeStatus).length;
   const exportable = picked.filter((a) => a.exportable);
   const notExported = picked.filter((a) => !a.exported).length;
@@ -108,14 +127,32 @@ export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Ga
             size="sm"
             variant="ghost"
             onClick={() => {
-              setSelected(allPicked ? new Set() : new Set(assets.map((a) => a.id)));
+              setSelected(
+                allPicked ? new Set([...selected].filter((id) => !assets.some((a) => a.id === id))) : new Set([...selected, ...assets.map((a) => a.id)]),
+              );
               setMode("pilih");
               setMessage(null);
             }}
             disabled={pending}
           >
-            {allPicked ? "Batal pilih semua" : "Pilih semua di halaman ini"}
+            {allPicked ? "Batal pilih halaman ini" : "Pilih semua di halaman ini"}
           </Button>
+          {filterTotal > assets.length && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSelected(new Set([...selected, ...filterFirst.map((a) => a.id)]));
+                setMode("pilih");
+                setMessage(null);
+              }}
+              disabled={pending}
+            >
+              {filterTotal > firstCount ? `Pilih ${firstCount} pertama di filter ini (dari ${filterTotal})` : `Pilih semua ${filterTotal} di filter ini`}
+            </Button>
+          )}
+          {offPage > 0 && <span className="px-1 text-xs text-muted-foreground">{offPage} dari halaman lain</span>}
 
           {picked.length > 0 && mode === "pilih" && (
             <>
@@ -181,13 +218,27 @@ export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Ga
             {exportedCount > 0 && (
               <button
                 type="button"
-                onClick={() => saveAdobe("belum")}
+                onClick={() => setMode("hapus-catatan")}
                 disabled={pending}
                 className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
                 Hapus catatan Adobe dari aset terpilih
               </button>
             )}
+          </div>
+        )}
+
+        {picked.length > 0 && mode === "hapus-catatan" && (
+          <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+            <span>
+              Hapus catatan Adobe dari {picked.length} aset? Keputusan Diterima atau Ditolak (dan alasannya) hilang; tingkat penerimaan di Ekspor ikut berubah.
+            </span>
+            <Button type="button" size="sm" variant="destructive" onClick={() => saveAdobe("belum")} disabled={pending}>
+              {pending ? "Menghapus..." : "Ya, hapus catatan"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setMode("adobe")} disabled={pending}>
+              Batal
+            </Button>
           </div>
         )}
 

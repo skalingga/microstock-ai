@@ -117,15 +117,24 @@ export function summarize(cells: BenchCell[]): ModelSummary[] {
 }
 
 /**
- * Suggested primary and backup. The backup must have its own quota (another provider, or a paid model next to a free
- * one), because the backup's job is to take over when the primary hits its limit.
+ * Suggested primary and backup. The backup comes from the other provider: the provider chain in Settings needs two
+ * different providers, and a separate provider also has its own quota when the primary hits its limit.
  */
 export function suggest(rows: ModelSummary[]): { primary?: ModelSummary; backup?: ModelSummary } {
   const usable = rows.filter((r) => r.score > 0);
   const primary = usable[0];
   if (!primary) return {};
-  const backup = usable.find((r) => r !== primary && quotaGroup(r) !== quotaGroup(primary));
+  const backup = usable.find((r) => r.provider !== primary.provider);
   return { primary, backup };
+}
+
+/** Below this many attempts per model a score is mostly noise. */
+export const SMALL_SAMPLE = 10;
+
+/** How settled a run's numbers are: cells still waiting, and the fewest attempts any model has. */
+export function confidence(cells: BenchCell[], rows: ModelSummary[]): { waiting: number; total: number; minAttempts: number } {
+  const waiting = cells.filter((c) => c.status === "menunggu" || c.status === "berjalan").length;
+  return { waiting, total: cells.length, minAttempts: rows.length ? Math.min(...rows.map((r) => r.total)) : 0 };
 }
 
 export type RunBenchmarkParams = {

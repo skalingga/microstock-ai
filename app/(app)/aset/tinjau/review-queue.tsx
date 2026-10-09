@@ -28,6 +28,8 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
   const [history, setHistory] = useState<string[]>([]);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  /** True while the reason in the field is the one typed for an earlier asset, not for this one. */
+  const [carried, setCarried] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
   const reasonRef = useRef<HTMLInputElement>(null);
@@ -54,7 +56,8 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
         }
         setDecided((prev) => new Map(prev).set(id, decision));
         setHistory((prev) => [...prev, id]);
-        // The reason is kept: rejections in one batch often share it.
+        // The reason is kept, but shown as carried over: rejections in one batch often share it.
+        setCarried(decision === "ditolak" && reason.trim() !== "");
         goTo(index + 1);
       });
     },
@@ -82,7 +85,13 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
   }
 
   useEffect(() => {
-    if (rejecting) reasonRef.current?.focus();
+    if (rejecting) {
+      reasonRef.current?.focus();
+      // A carried-over reason is selected, so typing replaces it and Enter reuses it knowingly.
+      if (carried) reasonRef.current?.select();
+    }
+    // Only when the field opens: later edits clear `carried` without re-selecting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rejecting]);
 
   useEffect(() => {
@@ -201,13 +210,17 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
                     <Input
                       ref={reasonRef}
                       value={reason}
-                      onChange={(e) => setReason(e.target.value)}
+                      onChange={(e) => {
+                        setReason(e.target.value);
+                        setCarried(false);
+                      }}
                       maxLength={500}
                       placeholder="mis. Similar content, Quality"
                       onKeyDown={(e) => {
                         if (e.key === "Escape") setRejecting(false);
                       }}
                     />
+                    {carried && <span className="block text-xs text-warning-foreground">Alasan dari aset sebelumnya. Ketik untuk menggantinya.</span>}
                   </label>
                   <Button type="submit" disabled={pending}>
                     {pending ? "Menyimpan..." : "Simpan Ditolak"}

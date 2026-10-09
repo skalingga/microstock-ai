@@ -17,10 +17,12 @@ const monthFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "l
 
 export default async function HalamanPengaturan() {
   const supabase = await createClient();
-  const [{ data: settings, error }, { data: spent }, { data: benchmarks }, catalog, geminiModels] = await Promise.all([
+  const [{ data: settings, error }, { data: spent }, { data: benchmarks }, { data: svgCosts }, catalog, geminiModels] = await Promise.all([
     supabase.from("user_settings").select("*").maybeSingle(),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
     supabase.from("model_benchmarks").select("results").order("created_at", { ascending: false }).limit(5),
+    // What paid SVG calls really cost, per model (same source as the estimate in Generate).
+    supabase.from("provider_usage").select("model, cost_idr").eq("kind", "svg").eq("provider", "kenari").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(500),
     fetchModelCatalog().catch(() => []),
     fetchGeminiModels().catch(() => []),
   ]);
@@ -33,16 +35,22 @@ export default async function HalamanPengaturan() {
       `uji: ${r.lolos}/${r.total} lolos${r.medianMs !== null ? `, ${Math.round(r.medianMs / 1000)} dtk` : ""}`,
     ]),
   );
-  const option = (provider: "kenari" | "gemini", id: string, price: string): ModelOption => ({
+  const costRuns: Record<string, number[]> = {};
+  for (const row of svgCosts ?? []) (costRuns[row.model] ??= []).push(Number(row.cost_idr));
+  const svgCostIdr = Object.fromEntries(Object.entries(costRuns).map(([model, costs]) => [model, costs.reduce((a, b) => a + b, 0) / costs.length]));
+
+  const option = (provider: "kenari" | "gemini", id: string, price: string, paid = false): ModelOption => ({
     id,
     note: [tested.get(`${provider}|${id}`), price].filter(Boolean).join(" · "),
     tested: tested.has(`${provider}|${id}`),
+    paid,
+    testNote: tested.get(`${provider}|${id}`) ?? null,
   });
   // Tested models first, so the benchmark winners are at the top of each list.
   const byTested = (a: ModelOption, b: ModelOption) => Number(b.tested) - Number(a.tested);
   const kenariOptions = catalog
     .filter((m) => !NON_TEXT_MODEL.test(m.id))
-    .map((m) => option("kenari", m.id, m.free ? "gratis" : "berbayar"))
+    .map((m) => option("kenari", m.id, m.free ? "gratis" : "berbayar", !m.free))
     .sort(byTested);
   const geminiOptions = geminiModels.map((id) => option("gemini", id, "gratis")).sort(byTested);
 
@@ -68,6 +76,7 @@ export default async function HalamanPengaturan() {
             image: process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL,
           }}
           imagePrices={KENARI_IMAGE_PRICES_IDR}
+          svgCostIdr={svgCostIdr}
           options={{ kenari: kenariOptions, gemini: geminiOptions }}
         />
       )}

@@ -6,6 +6,7 @@ import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
 import { fetchActiveJob } from "@/lib/generate/active-job";
 import { parseCells, summarize } from "@/lib/generate/benchmark";
 import { createClient } from "@/lib/supabase/server";
+import { fetchSaturatedSubjects } from "@/lib/subjects/fetch";
 import { withPresetPalettes } from "@/lib/settings/palettes";
 import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
@@ -37,6 +38,7 @@ export default async function HalamanGenerate({
     activeJob,
     { data: benchmarks },
     { data: svgCosts },
+    saturated,
   ] = await Promise.all([
     supabase.from("user_settings").select("*").maybeSingle(),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
@@ -45,6 +47,7 @@ export default async function HalamanGenerate({
     supabase.from("model_benchmarks").select("results").order("created_at", { ascending: false }).limit(5),
     // What paid SVG calls really cost, per model: the estimate shown before a batch.
     supabase.from("provider_usage").select("model, cost_idr").eq("kind", "svg").eq("provider", "kenari").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(500),
+    fetchSaturatedSubjects(supabase),
   ]);
 
   const defaultStyle = (STYLES.find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
@@ -110,6 +113,7 @@ export default async function HalamanGenerate({
         providerOrder={providerOrder}
         tested={tested}
         svgCostIdr={svgCostIdr}
+        saturated={saturated}
         activeJob={activeJob ? <ActiveJobCard initial={activeJob} /> : null}
       />
     </div>

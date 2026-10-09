@@ -14,6 +14,7 @@ export async function runVisualQc(args: {
   sanitizeNotes: string[];
   pool: HashPoolEntry[];
   selfId?: string;
+  batchMaxHamming?: number;
 }): Promise<{ notes: QcNote[]; phash: string }> {
   const measured = await measureSvg(args.svg);
   return evaluateVisual({
@@ -25,6 +26,7 @@ export async function runVisualQc(args: {
     sanitizeNotes: args.sanitizeNotes,
     pool: args.pool,
     selfId: args.selfId,
+    batchMaxHamming: args.batchMaxHamming,
   });
 }
 

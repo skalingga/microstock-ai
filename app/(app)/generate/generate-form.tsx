@@ -16,11 +16,12 @@ import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
 import { formatIdr } from "@/lib/budget";
 import { KENARI_IMAGE_PRICES_IDR, imagePriceIdr } from "@/lib/providers/kenari-image-pricing";
 import { findBannedWords } from "@/lib/settings/banned";
+import { MAX_AVOID, matchSaturated, type SaturatedSubject } from "@/lib/subjects/saturation";
 import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import { STYLES, isImageStyle, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
-import { selectClass } from "@/lib/ui";
+import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 const REQUESTS_PER_MINUTE = 5; // observed on Kenari free models; the queue reads the real limit from headers
@@ -37,6 +38,11 @@ const STATUS_LABEL: Record<JobItem["status"], string> = {
   gagal: "Gagal",
 };
 
+const SET_MODES = [
+  { label: "Set beragam", variations: false },
+  { label: "Variasi satu subjek", variations: true },
+];
+
 /** A model from the latest /uji-model run, with its result. key = "provider|model". */
 export type TestedModel = { key: string; label: string; score: number };
 
@@ -52,6 +58,7 @@ export function GenerateForm({
   providerOrder,
   tested,
   svgCostIdr,
+  saturated,
   activeJob,
 }: {
   userId: string;
@@ -70,11 +77,15 @@ export function GenerateForm({
   tested: TestedModel[];
   /** Average real cost of one SVG call per paid Kenari model, from provider_usage. */
   svgCostIdr: Record<string, number>;
+  /** Subjects Adobe refused as similar content (from Aset): warned about and kept out of the concepts. */
+  saturated: SaturatedSubject[];
   /** Read-only card for a batch running elsewhere; hidden once this tab runs its own. */
   activeJob: React.ReactNode;
 }) {
   const [theme, setTheme] = useState(initialTheme);
   const [style, setStyle] = useState<StyleId>(defaultStyle);
+  // false = a set of different subjects for the theme; true = one subject drawn many ways.
+  const [variations, setVariations] = useState(false);
   const [paletteIndex, setPaletteIndex] = useState(palettes.length > 0 ? "0" : "");
   // Kept as typed text so editing never jumps; clamped when the field is left.
   const [countText, setCountText] = useState("10");
@@ -179,6 +190,7 @@ export function GenerateForm({
     : Math.max(1, Math.ceil((count + 1) / REQUESTS_PER_MINUTE));
 
   const bannedHits = findBannedWords(theme, bannedWords);
+  const saturatedHits = matchSaturated(theme, saturated);
   const blockReason =
     theme.trim().length < 2
       ? "Isi tema dulu, minimal 2 huruf."
@@ -216,6 +228,8 @@ export function GenerateForm({
       style,
       palette,
       count,
+      avoid: saturated.slice(0, MAX_AVOID).map((s) => s.subject),
+      variations,
       model: traced ? (imageModel ? { provider: "kenari", model: imageModel } : undefined) : parseModelChoice(model),
       bannedWords,
       signal: controller.signal,
@@ -354,7 +368,7 @@ export function GenerateForm({
                 disabled={running}
                 placeholder="mis. autumn harvest icons"
                 aria-invalid={bannedHits.length > 0 ? true : undefined}
-                aria-describedby={cn(bannedHits.length > 0 && "theme-error", "theme-hint")}
+                aria-describedby={cn(bannedHits.length > 0 && "theme-error", saturatedHits.length > 0 && "theme-saturated", "theme-hint")}
               />
               {bannedHits.length > 0 && (
                 <p id="theme-error" className="text-sm text-destructive">
@@ -364,6 +378,12 @@ export function GenerateForm({
               <p id="theme-hint" className="text-sm text-muted-foreground">
                 Bahasa Inggris. Tanpa merek, tokoh, atau karakter: Adobe menolaknya.
               </p>
+              {saturatedHits.length > 0 && (
+                <p id="theme-saturated" className="text-sm font-medium">
+                  Mirip subjek yang ditolak Adobe sebagai &quot;similar content&quot;:{" "}
+                  {saturatedHits.map((s) => `${s.subject.toLowerCase()} (${s.count} aset)`).join(", ")}. Pilih subjek yang lebih spesifik.
+                </p>
+              )}
               {uploadBy && theme === initialTheme && (
                 <p className="text-sm font-medium">
                   Dari Riset: upload sebelum{" "}
@@ -391,6 +411,36 @@ export function GenerateForm({
               </div>
               <StylePreview style={style} palette={palette} />
             </div>
+
+            <fieldset className="space-y-2" disabled={running}>
+              <legend className="text-sm font-medium">Isi set</legend>
+              <div className="flex flex-wrap gap-1">
+                {SET_MODES.map((mode) => (
+                  <label
+                    key={mode.label}
+                    className={cn(
+                      "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm",
+                      tapTarget,
+                      variations === mode.variations ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="set-mode"
+                      checked={variations === mode.variations}
+                      onChange={() => setVariations(mode.variations)}
+                      className="accent-foreground"
+                    />
+                    {mode.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {variations
+                  ? "Tulis satu subjek sebagai tema, mis. tropical fish. Tiap aset subjek yang sama dengan pose, detail, atau pola berbeda."
+                  : "Tiap aset subjek berbeda dari tema yang sama."}
+              </p>
+            </fieldset>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

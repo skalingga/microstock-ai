@@ -14,6 +14,12 @@ export type HistoryRow = {
   csvUrl: string | null;
   /** Ticks stored on the export row: the same on every device. */
   checklistDone: string[];
+  /** The themes in the export; empty for exports saved before this was recorded. */
+  label: string;
+  filenames: string[];
+  /** Assets that needed a release; undefined-safe for old rows (empty). */
+  releaseTitles: string[];
+  thumbUrls: string[];
 };
 
 function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
@@ -38,13 +44,27 @@ function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
           <ChevronDown aria-hidden className={cn("size-4 shrink-0 transition-transform duration-150", open && "rotate-180")} />
           <span className="min-w-0">
             <span className="block">
-              {row.dateLabel} · <strong className="tabular-nums">{row.count}</strong> aset
+              {row.label ? <strong>{row.label}</strong> : <span>Ekspor</span>}
+              <span className="text-muted-foreground">
+                {" "}
+                · {row.dateLabel} · <span className="tabular-nums">{row.count}</span> aset
+              </span>
             </span>
             <span className={cn("block text-xs", finished ? "text-success-foreground" : "text-muted-foreground")}>
               {finished ? "Semua langkah unggah selesai" : `Checklist unggah: ${done}/${CHECKLIST_STEPS} langkah`}
             </span>
           </span>
         </button>
+        {row.thumbUrls.length > 0 && (
+          <span aria-hidden className="flex gap-1 max-sm:hidden">
+            {row.thumbUrls.map((url) => (
+              <span key={url} className="bg-checker size-8 overflow-hidden rounded-sm border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="size-full object-contain" loading="lazy" />
+              </span>
+            ))}
+          </span>
+        )}
         <span className="flex gap-1">
           {!row.zipUrl && !row.csvUrl && <span className="text-muted-foreground">File tidak tersedia</span>}
           {row.zipUrl && (
@@ -68,7 +88,20 @@ function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
             zip={row.zipUrl ? { href: row.zipUrl } : undefined}
             csv={row.csvUrl ? { href: row.csvUrl } : undefined}
             onProgress={setDoneIds}
+            releaseTitles={row.label || row.releaseTitles.length > 0 ? row.releaseTitles : undefined}
           />
+          {row.filenames.length > 0 && (
+            <details className="mt-2 text-sm">
+              <summary className={cn("inline-flex cursor-pointer items-center font-semibold", tapTarget)}>Nama file ({row.filenames.length})</summary>
+              <ul className="mt-1 columns-1 gap-6 font-mono text-xs sm:columns-2">
+                {row.filenames.map((f) => (
+                  <li key={f} className="break-all">
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
     </li>

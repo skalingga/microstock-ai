@@ -11,6 +11,7 @@ export type QcCheckId =
   | "kosong"
   | "latar"
   | "pola"
+  | "kontur"
   | "kemiripan"
   | "metadata";
 
@@ -32,7 +33,12 @@ export type MetadataFields = {
   needsRelease: boolean;
 };
 
-export type HashPoolEntry = { id: string; phash: string | null };
+export type HashPoolEntry = {
+  id: string;
+  phash: string | null;
+  /** Made in the batch that is running now. In a one-subject variations batch these are compared more loosely. */
+  batch?: boolean;
+};
 
 const CHECK_IDS: QcCheckId[] = [
   "validitas",
@@ -43,6 +49,7 @@ const CHECK_IDS: QcCheckId[] = [
   "kosong",
   "latar",
   "pola",
+  "kontur",
   "kemiripan",
   "metadata",
 ];

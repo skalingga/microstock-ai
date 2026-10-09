@@ -20,6 +20,12 @@ const dateFormat = new Intl.DateTimeFormat("id-ID", {
 });
 
 
+const HISTORY_RECENT = 10;
+const HISTORY_ALL = 60;
+/** Thumbnails per history row. */
+const HISTORY_THUMBS = 4;
+
+const linkClass = cn("inline-flex items-center font-semibold underline underline-offset-4 hover:decoration-2", tapTarget);
 const statLink = cn("inline-flex items-center underline underline-offset-4 hover:decoration-2", tapTarget);
 
 function LoadError({ children }: { children: React.ReactNode }) {
@@ -30,9 +36,10 @@ function LoadError({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function HalamanEkspor({ searchParams }: { searchParams: Promise<{ pilih?: string }> }) {
+export default async function HalamanEkspor({ searchParams }: { searchParams: Promise<{ pilih?: string; riwayat?: string }> }) {
   // Assets picked in the gallery arrive as ?pilih=id,id,...
-  const { pilih } = await searchParams;
+  const { pilih, riwayat } = await searchParams;
+  const allHistory = riwayat === "semua";
   const preselect = (pilih ?? "")
     .split(",")
     .filter((id) => UUID_RE.test(id))
@@ -59,7 +66,11 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
       .in("qc_status", ["lolos", "perlu_cek"])
       .order("created_at", { ascending: false })
       .limit(500),
-    supabase.from("exports").select("id, asset_count, created_at, zip_path, csv_path, checklist_done").order("created_at", { ascending: false }).limit(10),
+    supabase
+      .from("exports")
+      .select("id, asset_count, created_at, zip_path, csv_path, checklist_done, label, asset_ids, filenames, release_titles")
+      .order("created_at", { ascending: false })
+      .limit(allHistory ? HISTORY_ALL : HISTORY_RECENT + 1),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "menunggu"),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "gagal"),
     supabase
@@ -102,9 +113,18 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
 
   const storage = supabase.storage.from("assets");
   const thumbPaths = (assets ?? []).flatMap((a) => (a.preview_path ? [a.preview_path] : []));
-  const historyPaths = (history ?? []).flatMap((h) => [h.zip_path, h.csv_path].filter((p): p is string => Boolean(p)));
+  // Thumbnails of exported assets that still exist (deleted ones simply drop out).
+  const hasMore = !allHistory && (history?.length ?? 0) > HISTORY_RECENT;
+  const shownHistory = hasMore ? (history ?? []).slice(0, HISTORY_RECENT) : (history ?? []);
+  const historyAssetIds = [...new Set(shownHistory.flatMap((h) => h.asset_ids.slice(0, HISTORY_THUMBS)))];
+  const { data: historyAssets } =
+    historyAssetIds.length > 0 ? await supabase.from("assets").select("id, preview_path").in("id", historyAssetIds) : { data: [] };
+  const historyPreviewById = new Map((historyAssets ?? []).flatMap((a) => (a.preview_path ? [[a.id, a.preview_path] as const] : [])));
+  const historyPaths = shownHistory.flatMap((h) => [h.zip_path, h.csv_path].filter((p): p is string => Boolean(p)));
   const [thumbs, files] = await Promise.all([
-    thumbPaths.length > 0 ? storage.createSignedUrls(thumbPaths, SIGNED_URL_TTL_SEC) : null,
+    thumbPaths.length > 0 || historyPreviewById.size > 0
+      ? storage.createSignedUrls([...new Set([...thumbPaths, ...historyPreviewById.values()])], SIGNED_URL_TTL_SEC)
+      : null,
     historyPaths.length > 0 ? storage.createSignedUrls(historyPaths, SIGNED_URL_TTL_SEC) : null,
   ]);
   const thumbByPath = new Map((thumbs?.data ?? []).map((s) => [s.path, s.signedUrl]));
@@ -168,17 +188,43 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
           <p role="alert" className="text-sm text-destructive">
             Riwayat ekspor tidak bisa dimuat. Muat ulang halaman.
           </p>
-        ) : history && history.length > 0 ? (
+        ) : shownHistory.length > 0 ? (
+          <>
           <ExportHistory
-            rows={history.map((h) => ({
+            rows={shownHistory.map((h) => ({
               id: h.id,
               dateLabel: dateFormat.format(new Date(h.created_at)),
               count: h.asset_count,
               zipUrl: (h.zip_path && fileByPath.get(h.zip_path)) || null,
               csvUrl: (h.csv_path && fileByPath.get(h.csv_path)) || null,
               checklistDone: h.checklist_done,
+              label: h.label,
+              filenames: h.filenames,
+              releaseTitles: h.release_titles,
+              thumbUrls: h.asset_ids
+                .slice(0, HISTORY_THUMBS)
+                .flatMap((id) => {
+                  const path = historyPreviewById.get(id);
+                  const url = path && thumbByPath.get(path);
+                  return url ? [url] : [];
+                }),
             }))}
+            openId={undefined}
           />
+          {(hasMore || allHistory) && (
+            <p className="text-sm">
+              {hasMore ? (
+                <Link href="/ekspor?riwayat=semua" className={linkClass}>
+                  Lihat ekspor yang lebih lama
+                </Link>
+              ) : (
+                <Link href="/ekspor" className={linkClass}>
+                  Tampilkan yang terbaru saja
+                </Link>
+              )}
+            </p>
+          )}
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">Belum ada ekspor. Setiap ekspor muncul di sini dengan file dan checklist unggahnya, jadi bisa dilanjutkan nanti di PC.</p>
         )}

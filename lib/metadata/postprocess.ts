@@ -1,7 +1,7 @@
 import { ADOBE, DEFAULT_CATEGORY, normalizeCategory } from "@/lib/adobe/rules";
 import type { AssetMetadata } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
-import type { StyleId } from "@/lib/settings/schema";
+import { isIconStyle, type StyleId } from "@/lib/settings/schema";
 
 // The AI is asked for clean metadata but does not always deliver it. This tidies what it can and
 // reports what it had to drop. Anything left over is caught by the QC metadata check.
@@ -22,8 +22,8 @@ export function cleanTitle(raw: string): string {
   return (lastSpace > ADOBE.titleMaxChars * 0.5 ? cut.slice(0, lastSpace) : cut).trim();
 }
 
-// Safety net for the prompt rule that forbids "icon" words. The app has no icon mode, and Adobe reserves the
-// icon label for interface symbols, so these words in the metadata would mislead buyers.
+// Safety net for the prompt rule that forbids "icon" words. Adobe reserves the icon label for interface symbols, so
+// on clipart and illustrations these words would mislead buyers. The icon styles (line_icon, glyph_icon) skip this.
 const UI_WORD = /\b(icons?|pictograms?|glyphs?)\b/i;
 const TRAILING_CONNECTOR = /\s+(a|an|the|with|and|for|of|in|on|to)$/i;
 
@@ -43,6 +43,7 @@ export function stripIconWords(title: string): string {
 export function cleanKeywords(
   raw: string[],
   bannedWords: string[],
+  allowIconWords = false,
 ): { keywords: string[]; dropped: { banned: number; invalid: number; overLimit: number; misleading: number } } {
   const seen = new Set<string>();
   const keywords: string[] = [];
@@ -66,7 +67,7 @@ export function cleanKeywords(
       dropped.banned += 1;
       continue;
     }
-    if (UI_WORD.test(keyword)) {
+    if (!allowIconWords && UI_WORD.test(keyword)) {
       dropped.misleading += 1;
       continue;
     }
@@ -80,7 +81,15 @@ export function cleanKeywords(
 }
 
 // Adobe files icons, patterns, backgrounds and badge/label sets under Graphic resources, whatever they depict.
-const GRAPHIC_STYLES: StyleId[] = ["icon_set", "seamless_pattern", "abstract_background", "badge_label"];
+const GRAPHIC_STYLES: StyleId[] = [
+  "icon_set",
+  "seamless_pattern",
+  "abstract_background",
+  "badge_label",
+  "line_icon",
+  "glyph_icon",
+  "geometric_tile",
+];
 
 export type CleanMetadata = {
   title: string;
@@ -96,12 +105,13 @@ export function normalizeMetadata(
 ): { metadata: CleanMetadata; notes: string[] } {
   const notes: string[] = [];
 
+  const iconWordsOk = style !== undefined && isIconStyle(style);
   const cleaned = cleanTitle(raw.title);
-  const title = cleanTitle(stripIconWords(cleaned));
+  const title = iconWordsOk ? cleaned : cleanTitle(stripIconWords(cleaned));
   if (title !== raw.title.trim()) notes.push("judul dirapikan");
   if (title !== cleaned) notes.push("kata icon dibuang dari judul");
 
-  const { keywords, dropped } = cleanKeywords(raw.keywords, bannedWords);
+  const { keywords, dropped } = cleanKeywords(raw.keywords, bannedWords, iconWordsOk);
   if (dropped.banned > 0) notes.push(`${dropped.banned} keyword terlarang dibuang`);
   if (dropped.invalid > 0) notes.push(`${dropped.invalid} keyword tidak valid dibuang`);
   if (dropped.overLimit > 0) notes.push(`${dropped.overLimit} keyword melebihi batas dibuang`);

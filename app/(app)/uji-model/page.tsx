@@ -11,15 +11,15 @@ import { toProviderOrder } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { BenchmarkRunner, BenchResults } from "./benchmark-client";
+import { BenchmarkRunner, BenchResults, type Current } from "./benchmark-client";
 
 export const metadata: Metadata = { title: "Uji model" };
 
 const STATUS_LABEL: Record<string, string> = {
   berjalan: "terputus",
   selesai: "selesai",
-  dihentikan: "dihentikan",
-  gagal: "berhenti",
+  dihentikan: "kamu hentikan",
+  gagal: "berhenti karena error",
 };
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" });
@@ -48,7 +48,16 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
 
   // The chain as it runs today, with empty model fields resolved to their defaults.
   const chain = withEnvDefaults(settings ? toProviderOrder(settings.provider_order) : []);
-  const current = { primary: chain[0] ? `${chain[0].provider}|${chain[0].model}` : "", backup: chain[1] ? `${chain[1].provider}|${chain[1].model}` : "" };
+  const current: Current = { primary: chain[0] ?? null, backup: chain[1] ?? null };
+
+  // Median time per SVG per model, newest run first: the estimate shown before the next run.
+  const msPerSvg: Record<string, number> = {};
+  for (const r of runs ?? []) {
+    for (const row of summarize(parseCells(r.results))) {
+      const k = `${row.provider}|${row.model}`;
+      if (row.medianMs !== null && msPerSvg[k] === undefined) msPerSvg[k] = row.medianMs;
+    }
+  }
 
   const selected = runs?.find((r) => r.id === (run && UUID_RE.test(run) ? run : undefined)) ?? runs?.[0];
   const cells = selected ? parseCells(selected.results) : [];
@@ -78,6 +87,7 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
         bannedWords={settings?.banned_words ?? []}
         hasRuns={hasRuns}
         costPerSvg={costPerSvg}
+        msPerSvg={msPerSvg}
         budgetLeftIdr={budgetLeftIdr}
       />
 

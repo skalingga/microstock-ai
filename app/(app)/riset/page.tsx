@@ -5,6 +5,7 @@ import { orderForKind } from "@/lib/providers";
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { toProviderOrder } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
+import { fetchSaturatedSubjects } from "@/lib/subjects/fetch";
 import { RisetForm, type RunInfo, type ThemeRow } from "./riset-form";
 
 export const metadata: Metadata = { title: "Riset" };
@@ -17,7 +18,7 @@ export default async function HalamanRiset() {
   if (!user) redirect("/login");
 
   // Show the most recent research run so a finished run is still there after a reload.
-  const [{ data: run, error: runError }, { data: settings }, { data: themeCosts }, { data: usedJobs }] = await Promise.all([
+  const [{ data: run, error: runError }, { data: settings }, { data: themeCosts }, { data: usedJobs }, saturated] = await Promise.all([
     supabase
       .from("research_runs")
       .select("id, region, period_start, period_end, created_at, trends_missing, provider, model, cost_idr")
@@ -29,6 +30,7 @@ export default async function HalamanRiset() {
     supabase.from("provider_usage").select("model, cost_idr").eq("kind", "themes").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(100),
     // Themes already sent to Generate, to mark them in the list.
     supabase.from("generation_jobs").select("themes(title)").order("created_at", { ascending: false }).limit(300),
+    fetchSaturatedSubjects(supabase),
   ]);
 
   const { data: themes, error: themesError } = run
@@ -89,6 +91,7 @@ export default async function HalamanRiset() {
         providerOrder={order}
         themeCostIdr={themeCostIdr}
         usedTitles={usedTitles}
+        saturated={saturated}
       />
     </div>
   );

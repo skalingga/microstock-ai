@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellsToRedo, estimateRemainingMs, parseCells, quotaGroup, suggest, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
+import { cellsToRedo, confidence, estimateRemainingMs, parseCells, quotaGroup, suggest, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
 
 const cell = (model: string, patch: Partial<BenchCell> = {}): BenchCell => ({
   theme: "autumn",
@@ -56,16 +56,23 @@ describe("summarize", () => {
 });
 
 describe("suggest", () => {
-  it("picks a backup with its own quota", () => {
+  it("picks the backup from the other provider", () => {
     const rows = summarize([
       cell("a:free", { durationMs: 1_000 }),
       cell("b:free", { durationMs: 2_000 }),
+      cell("paid-model", { durationMs: 3_000 }),
       cell("gemini-3.5-flash-lite", { qc: "perlu_cek" }),
     ]);
     const { primary, backup } = suggest(rows);
     expect(primary?.model).toBe("a:free");
-    // b:free is second best but shares the free quota with a:free.
+    // b:free and paid-model score higher but are Kenari too: Settings cannot chain two Kenari models.
     expect(backup?.model).toBe("gemini-3.5-flash-lite");
+  });
+
+  it("suggests no backup when only one provider made usable SVGs", () => {
+    const { primary, backup } = suggest(summarize([cell("a:free"), cell("paid-model")]));
+    expect(primary?.model).toBe("a:free");
+    expect(backup).toBeUndefined();
   });
 
   it("suggests nothing when no model made a usable SVG", () => {
@@ -112,5 +119,13 @@ describe("estimateRemainingMs", () => {
 
   it("has no estimate before the first cell is done", () => {
     expect(estimateRemainingMs([cell("a", { status: "menunggu", durationMs: undefined })])).toBeNull();
+  });
+});
+
+describe("confidence", () => {
+  it("counts the cells still waiting and the fewest attempts per model", () => {
+    const cells = [cell("a"), cell("a"), cell("b"), cell("b", { status: "menunggu" })];
+    const rows = summarize(cells);
+    expect(confidence(cells, rows)).toEqual({ waiting: 1, total: 4, minAttempts: 1 });
   });
 });

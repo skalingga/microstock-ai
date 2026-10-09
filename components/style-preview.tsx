@@ -16,6 +16,9 @@ const DESCRIPTIONS: Record<StyleId, string> = {
   abstract_background: "Geometris penuh 3:2, ada ruang untuk teks. Untuk slide dan banner.",
   silhouette: "Siluet hitam padat dari model gambar. Untuk bentuk lengkung seperti hewan.",
   line_art: "Garis hitam isi putih dari model gambar. Untuk kendaraan dan benda berdetail.",
+  line_icon: "Ikon dari garis dengan tebal seragam, satu warna. Untuk set ikon antarmuka.",
+  glyph_icon: "Ikon padat satu atau dua warna, tanpa garis tepi. Untuk set ikon antarmuka.",
+  geometric_tile: "Ubin persegi dengan motif geometris simetris. Untuk set ubin dan pola dekoratif.",
 };
 
 function lightness(hex: string): number {
@@ -38,7 +41,7 @@ function pickColors(palette: string[]): string[] {
 export function StylePreview({ style, palette }: { style: StyleId; palette: string[] }) {
   const patternId = useId();
   const [a, b, c, d, bg] = pickColors(palette);
-  const transparent = style === "icon_set" || style === "badge_label" || style === "silhouette" || style === "line_art";
+  const transparent = ["icon_set", "badge_label", "silhouette", "line_art", "line_icon", "glyph_icon"].includes(style);
 
   return (
     <div className="flex items-center gap-4">
@@ -112,6 +115,28 @@ export function StylePreview({ style, palette }: { style: StyleId; palette: stri
               <path d="M60 268 L470 268" fill="none" />
             </g>
           )}
+          {style === "line_icon" && (
+            <g fill="none" stroke={a} strokeWidth="24" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M110 400 C110 220 220 110 400 112 C400 290 300 400 110 400Z" />
+              <path d="M110 400 L300 210" />
+              <path d="M250 262 L250 200 M300 210 L360 210" />
+            </g>
+          )}
+          {style === "glyph_icon" && (
+            <>
+              <path d="M110 400 C110 220 220 110 400 112 C400 290 300 400 110 400Z" fill={a} />
+              <path d="M110 400 L300 210" fill="none" stroke={bg} strokeWidth="20" strokeLinecap="round" />
+              <circle cx="380" cy="380" r="36" fill={b} />
+            </>
+          )}
+          {style === "geometric_tile" && (
+            <>
+              <rect x="24" y="24" width="464" height="464" rx="48" fill={a} />
+              <circle cx="256" cy="256" r="150" fill="none" stroke={bg} strokeWidth="20" />
+              <path d="M256 106 L406 256 L256 406 L106 256Z" fill={b} />
+              <circle cx="256" cy="256" r="44" fill={bg} />
+            </>
+          )}
           {style === "abstract_background" && (
             <>
               <rect width="1500" height="1000" fill={bg} />
@@ -138,4 +163,7 @@ const VIEWBOX: Record<StyleId, string> = {
   abstract_background: "0 0 1500 1000",
   silhouette: "0 0 512 512",
   line_art: "0 0 512 512",
+  line_icon: "0 0 512 512",
+  glyph_icon: "0 0 512 512",
+  geometric_tile: "0 0 512 512",
 };
