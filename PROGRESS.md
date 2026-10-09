@@ -1,7 +1,7 @@
 # Progress
 
 ## Status terakhir
-Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 6 (uji ke Adobe) menunggu data pengguna. 8 Okt 2026: halaman Masuk, Generate, dan Riset diperbaiki dari kritik Impeccable; 9 Okt digabung ke `main` (PR #13) dan ter-deploy ke produksi.
+Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 6 (uji ke Adobe) menunggu data pengguna. 9 Okt 2026: `/ekspor`, `/aset` (+ mode tinjau Adobe), `/pengaturan`, `/uji-model` diperbaiki dari kritik Impeccable dan digabung ke `main` (PR #14, deploy produksi). Sesudah PR #14, branch `dev` berisi 1 commit yang belum di `main`: perbaikan sisa temuan `/uji-model` (`4200bac`). Skor kritik terakhir: `/pengaturan` 28, `/aset` 29, `/ekspor` 29, `/uji-model` 26 (sebelum `4200bac`).
 
 ## Sudah selesai
 - [2026-10-09] Sisa temuan kritik `/uji-model`: `suggest()` kini memilih cadangan dari provider lain (sesuai aturan rantai di Pengaturan; tes diperbarui), `confidence()` + `SMALL_SAMPLE` (10). Kesimpulan menandai "Belum lengkap" / "Sampel kecil", Lolos ditulis dulu (4/5 Lolos) lalu skor. Satu aksi "Pakai saran ini" (`pakaiSaran`) menggantikan tombol Jadikan per baris: menampilkan perubahan sebelum-sesudah ("Utama tetap ..."), lalu Urungkan (`kembalikanRantai`) + tautan Pengaturan; tanpa saran cadangan, cadangan lama dipertahankan bila beda provider; di bawah 3 percobaan per model tidak ditawarkan, di bawah 10 jadi "Tetap pakai saran ini". Tabel dipangkas (Lolos, Perlu cek/Gagal QC, Gagal dibuat, waktu, biaya). Grid menandai kolom saran dengan titik jangkar + handle seleksi, tanpa bingkai luar. Uji tersimpan yang belum lengkap: Lanjutkan tampil sebelum kesimpulan; tombolnya nonaktif dengan alasan saat ada uji berjalan (`useRunning`). Estimasi waktu dari median uji sebelumnya. Persetujuan bila perkiraan biaya melewati anggaran. Fokus pilihan 1/2/3 terlihat, "Uji baru" jadi heading, pengumuman live per fase, label status "kamu hentikan" / "berhenti karena error", format Rupiah seragam.
@@ -42,15 +42,22 @@ Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 6 (uji ke A
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-0. Mulai Tahap 10 (gaya baru) sesuai `docs/PLAN-tahap-10-13.md`. Keputusan pengguna sudah dicatat di sana (bundle 16 ikon, screenshot dibuang, mau buat API key Adobe/Shutterstock).
-1. Uji langsung hasil perbaikan 8 Okt yang belum bisa dicek tanpa data sungguhan: (a) keluar, buka `/aset`, masuk lagi: harus kembali ke `/aset`; (b) batch kecil 2 variasi model gratis, buka `/generate` di HP selama berjalan: kartu "Antrean sedang berjalan", judul tab "(x/2)", ringkasan selesai + biaya; (c) riset 3 tema: progress, Batalkan, model dan biaya tersimpan di keterangan riset. (sudah di produksi sejak PR #13; uji di sana).
-2. Sisa temuan kritik 9 Okt: `/pengaturan` (biaya model teks berbayar), `/aset` (skala galeri: cari, batch, lompat halaman), `/ekspor` (peringatan release sebelum ekspor, riwayat bernama). Kritik ulang login, `/generate`, `/riset`.
-3. Isi hasil review Adobe untuk 12 file yang sudah dikirim (data untuk Tahap 6).
-4. Tahap 6: unggah batch 50-100 aset (boleh termasuk Siluet/Line art dan aset uji model yang bagus setelah dibuatkan metadata), catat keputusan Adobe, lalu setel ambang QC (terutama pemeriksa kemiripan).
-5. Opsional: ulangi `/uji-model` sesekali, karena daftar dan kecepatan model gratis Kenari berubah.
-6. Bila ingin, ganti nilai yang dipilih Claude di `DESIGN.md` (warna aksen vermilion, font Bricolage Grotesque): cukup ubah token di `app/globals.css` dan font di `app/layout.tsx`.
+1. Sisa temuan kritik 9 Okt (detail di `.impeccable/critique/2026-10-08T23-46-12Z__*`):
+   - `/pengaturan`: biaya model teks berbayar tak terlihat (baris "berbayar · ~Rp/SVG · uji x/5" di bawah kolom model; hint anggaran menyebut teks + gambar).
+   - `/aset`: skala galeri (cari judul, pilih batch/tema, lompat halaman, "Pilih semua N di filter ini"); aset Gagal: Unduh SVG jangan jadi tombol utama + alasan Ekspor hilang; hapus catatan Adobe massal perlu konfirmasi; alasan tolak di mode tinjau jangan terbawa diam-diam; hapus aset kembali ke galeri dengan filter.
+   - `/ekspor`: peringatan aset "butuh release" sebelum ekspor (di bar), simpan judul release di ekspor untuk Riwayat; Riwayat bernama (tema + thumbnail + nama file, "lihat lebih lama"); petunjuk CSV di HP.
+   Lalu gabungkan `dev` ke `main` lewat PR.
+2. Uji di produksi (tidak bisa diuji tanpa data/aksi sungguhan): ekspor kecil (ZIP terunduh otomatis, kartu hasil, centang checklist di HP lalu buka Riwayat di PC: centang sama); "Pakai saran ini" + Urungkan di `/uji-model`; simpan keputusan Adobe di `/aset/tinjau`.
+3. Catat 68 keputusan Adobe lewat `/aset/tinjau` (data Tahap 6), lalu setel `lib/qc/config.ts` (terutama pemeriksa kemiripan).
+4. Kritik ulang login, `/generate`, `/riset` (skor awal 23, 25, 22) dan kritik ulang `/uji-model` setelah `4200bac`.
+5. Mulai Tahap 10 (gaya baru) sesuai `docs/PLAN-tahap-10-13.md`.
+6. Uji langsung perbaikan 8 Okt yang belum dicek: kembali ke halaman asal setelah sesi habis; kartu "Antrean sedang berjalan" di HP; riset 3 tema (progress, Batalkan).
+7. Opsional: ulangi `/uji-model` sesekali (model gratis Kenari berubah); ganti nilai `DESIGN.md` bila ingin.
 
 ## Catatan penting
+- Kritik Impeccable: dua agen terpisah (A tinjauan desain berbasis kode tanpa melihat skor lama, B detektor CLI) + overlay detektor di browser bawaan (sudah login sebagai pemilik, tidak perlu password). Overlay selalu menandai sidebar/indikator dev (alarm palsu). Saat verifikasi, jangan klik aksi yang menulis data sungguhan (ekspor, simpan keputusan Adobe, pakai saran, simpan pengaturan valid); ganti `window.confirm` sementara bila menguji dialog.
+- Pengaman editan belum disimpan: pakai `lib/use-unsaved-guard.ts` (`useUnsavedGuard(dirty)`, `confirmLeave()` untuk navigasi lewat keyboard).
+- Checklist unggah: sumber kebenaran `exports.checklist_done`; localStorage hanya cache dan untuk ekspor yang riwayatnya gagal disimpan.
 - Migrasi dibuat lewat MCP Supabase memakai versi waktu-terap (mis. `research_provenance`), jadi nama file lokal (`20261012000000_...`) tidak sama dengan versi di `supabase_migrations`; isinya sama.
 - Fokus tombol kini `outline` 2 px ber-offset (`components/ui/button.tsx`); kontrol khusus lain masih `ring-2 ring-ring`.
 - `AUTH_SIGNUP_ENABLED` kosong/false = form daftar tersembunyi dan action `daftar` menolak.
