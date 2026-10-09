@@ -4,14 +4,14 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { hapusAset } from "../actions";
 
-export function DeleteButton({ id, hasAdobeData }: { id: string; /** Exported or reviewed: deleting loses that record too. */ hasAdobeData: boolean }) {
+export function DeleteButton({ id, query, hasAdobeData }: { id: string; /** Gallery filter to return to. */ query: string; /** Exported or reviewed: deleting loses that record too. */ hasAdobeData: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function remove() {
     startTransition(async () => {
-      const result = await hapusAset(id); // redirects to /aset on success
+      const result = await hapusAset(id, query); // redirects to the gallery on success
       if (result && !result.ok) {
         setError(result.error);
         setConfirming(false);

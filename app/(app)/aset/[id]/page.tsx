@@ -106,6 +106,14 @@ export default async function HalamanDetailAset({
   ];
   const svgUrl = view?.data?.signedUrl;
   const exportable = Boolean(asset.title) && (asset.qc_status === "lolos" || asset.qc_status === "perlu_cek");
+  // Why there is no Export button, so its absence is not a mystery.
+  const exportBlockedReason = exportable
+    ? null
+    : asset.qc_status === "gagal"
+      ? "Tidak bisa diekspor: status Gagal. Perbaiki lewat hasil QC di bawah, atau buat ulang asetnya."
+      : !asset.title
+        ? "Belum bisa diekspor: aset belum punya metadata."
+        : "Belum bisa diekspor: QC belum Lolos atau Perlu cek.";
   const storedAsset = {
     id: asset.id,
     svg_path: asset.svg_path,
@@ -173,7 +181,7 @@ export default async function HalamanDetailAset({
                 </Link>
               )}
               {download?.data?.signedUrl && (
-                <a href={download.data.signedUrl} className={buttonVariants({ variant: exportable ? "outline" : "default" })}>
+                <a href={download.data.signedUrl} className={buttonVariants({ variant: "outline" })}>
                   <Download />
                   Unduh SVG
                 </a>
@@ -184,6 +192,7 @@ export default async function HalamanDetailAset({
                 </Link>
               )}
             </div>
+            {exportBlockedReason && <p className="text-sm text-muted-foreground">{exportBlockedReason}</p>}
           </div>
 
           <Section id="qc-heading" title="Hasil QC">
@@ -250,7 +259,7 @@ export default async function HalamanDetailAset({
                   </div>
                 ))}
               </dl>
-              <DeleteButton id={asset.id} hasAdobeData={Boolean(asset.exported_at || asset.adobe_status)} />
+              <DeleteButton id={asset.id} query={query} hasAdobeData={Boolean(asset.exported_at || asset.adobe_status)} />
             </div>
           </details>
         </div>

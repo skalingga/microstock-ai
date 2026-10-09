@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { normalizeCategory } from "@/lib/adobe/rules";
 import { MAX_BULK_DELETE, UUID_RE } from "@/lib/assets";
+import { galleryQuery, parseGalleryFilter, withQuery } from "./filters";
 import type { Json } from "@/lib/database.types";
 import { parseKeywordText } from "@/lib/metadata/keywords";
 import { combine } from "@/lib/qc/evaluate";
@@ -13,7 +14,11 @@ import { createClient } from "@/lib/supabase/server";
 
 export type DeleteResult = { ok: false; error: string };
 
-export async function hapusAset(id: string): Promise<DeleteResult> {
+/**
+ * Deletes one asset and returns to the gallery view it was opened from. `query` is the gallery filter's query string;
+ * it is parsed and rebuilt, so only known filters survive. The page number is dropped: the last page may be gone now.
+ */
+export async function hapusAset(id: string, query = ""): Promise<DeleteResult> {
   if (!UUID_RE.test(id)) return { ok: false, error: "ID aset tidak valid." };
 
   const supabase = await createClient();
@@ -31,7 +36,8 @@ export async function hapusAset(id: string): Promise<DeleteResult> {
   if (error) return { ok: false, error: "Gagal menghapus data aset. Coba lagi." };
 
   revalidatePath("/aset");
-  redirect("/aset");
+  const params = Object.fromEntries(new URLSearchParams(typeof query === "string" ? query.slice(0, 200) : ""));
+  redirect(withQuery("/aset", galleryQuery(parseGalleryFilter(params), { page: 1 })));
 }
 
 export type BulkDeleteResult = { ok: true; deleted: number; warning?: string } | { ok: false; error: string };

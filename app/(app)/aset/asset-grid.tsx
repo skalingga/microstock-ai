@@ -23,7 +23,7 @@ export type GridAsset = {
   exportable: boolean;
 };
 
-type Mode = "pilih" | "adobe" | "hapus";
+type Mode = "pilih" | "adobe" | "hapus" | "hapus-catatan";
 
 /** The gallery grid. Ticking assets opens a bar to export them, record Adobe's decision, or delete them together. */
 export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Gallery filter, carried into the detail page. */ detailQuery: string }) {
@@ -181,13 +181,27 @@ export function AssetGrid({ assets, detailQuery }: { assets: GridAsset[]; /** Ga
             {exportedCount > 0 && (
               <button
                 type="button"
-                onClick={() => saveAdobe("belum")}
+                onClick={() => setMode("hapus-catatan")}
                 disabled={pending}
                 className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
                 Hapus catatan Adobe dari aset terpilih
               </button>
             )}
+          </div>
+        )}
+
+        {picked.length > 0 && mode === "hapus-catatan" && (
+          <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+            <span>
+              Hapus catatan Adobe dari {picked.length} aset? Keputusan Diterima atau Ditolak (dan alasannya) hilang; tingkat penerimaan di Ekspor ikut berubah.
+            </span>
+            <Button type="button" size="sm" variant="destructive" onClick={() => saveAdobe("belum")} disabled={pending}>
+              {pending ? "Menghapus..." : "Ya, hapus catatan"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setMode("adobe")} disabled={pending}>
+              Batal
+            </Button>
           </div>
         )}
 
