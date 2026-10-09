@@ -1,9 +1,10 @@
-import { ChevronLeft, ChevronRight, Spline } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Spline } from "lucide-react";
 import Link from "next/link";
 import { InfoTip } from "@/components/info-tip";
 import { PageHeader } from "@/components/page-header";
 import { PenPath } from "@/components/pen-motif";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
@@ -11,13 +12,13 @@ import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
-import { applyGalleryFilter, FILTERS, galleryQuery, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
+import { applyGalleryFilter, FILTERS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
 
 const PAGE_SIZE = 24;
 
 export default async function HalamanAset({ searchParams }: { searchParams: Promise<GalleryParams> }) {
   const filter = parseGalleryFilter(await searchParams);
-  const { job, status, adobePending, page } = filter;
+  const { job, status, adobePending, q, page } = filter;
   const from = (page - 1) * PAGE_SIZE;
   const href = (over: Partial<typeof filter>) => withQuery("/aset", galleryQuery(filter, over));
 
@@ -66,6 +67,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
   const scope = [
     job && `batch "${jobInfo?.data?.themes?.title ?? "tanpa tema"}"`,
     adobePending && "sudah diekspor, keputusan Adobe belum dicatat",
+    q && `judul memuat "${q}"`,
   ].filter(Boolean);
 
   return (
@@ -125,6 +127,17 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
           Menunggu: belum punya QC atau metadata.
         </InfoTip>
       </div>
+
+      <form action="/aset" method="get" role="search" className="flex max-w-md gap-2">
+        {job && <input type="hidden" name="job" value={job} />}
+        {status !== "semua" && <input type="hidden" name="status" value={status} />}
+        {adobePending && <input type="hidden" name="adobe" value="belum" />}
+        <Input type="search" name="q" defaultValue={q} maxLength={MAX_SEARCH_LENGTH} placeholder="Cari judul aset" aria-label="Cari judul aset" />
+        <Button type="submit" variant="outline">
+          <Search />
+          Cari
+        </Button>
+      </form>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <Link
@@ -199,7 +212,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
       ) : (
         <div className="flex flex-col items-center gap-4 rounded-md border border-dashed bg-card/60 p-10 text-center text-sm text-muted-foreground">
           <PenPath className="max-w-56" />
-          {status === "semua" && !adobePending && !job ? (
+          {status === "semua" && !adobePending && !job && !q ? (
             <>
               Belum ada aset.{" "}
               <Link href="/generate" className="font-medium text-foreground underline underline-offset-4">
