@@ -95,8 +95,6 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 - [ ] 10. Gaya baru: ikon garis, ikon glyph, ubin geometris, mode satu subjek banyak variasi (rincian: `docs/PLAN-tahap-10-13.md`)
 - [ ] 11. Bundle: 16 aset Lolos jadi satu SVG grid 4x4 + metadata set
-- [ ] 12. Riset dari screenshot pasar (Adobe Insights, Shutterstock, dll.) lewat model visi; screenshot dibuang setelah dianalisis, tanpa scraping
-- [ ] 13. Adobe Stock API: data unduhan dan jumlah pesaing per keyword (Shutterstock menyusul)
 
 Centang tahap setelah selesai dan diverifikasi pengguna.
 

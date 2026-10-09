@@ -1,7 +1,9 @@
-# Rencana Tahap 10–13: gaya baru, bundle, riset multi-sumber
+# Rencana Tahap 10–11: gaya baru dan bundle
 
 Disusun 8 Okt 2026 dari diskusi dengan pengguna (contoh: screenshot portofolio
 kontributor lain dan halaman Adobe Insights "Recent top sellers", Vectors, 28 Sep–4 Okt).
+Tahap 12 (riset dari screenshot) dan 13 (Adobe Stock API) dihapus 9 Okt 2026: terlalu ribet, dan
+Adobe Stock API hanya untuk pelanggan Enterprise/Affiliate (bukan kasus kontributor).
 Kerjakan satu tahap per sesi, berurutan. Setiap tahap: rencana singkat → persetujuan
 pengguna bila ada pilihan desain → kode → `npm run lint`, `npx tsc --noEmit`,
 `npm run build` → commit + push → perbarui PROGRESS.md.
@@ -11,10 +13,7 @@ pengguna bila ada pilihan desain → kode → `npm run lint`, `npx tsc --noEmit`
 - Top seller vektor Adobe minggu itu didominasi **set ikon besar dalam satu file**
   (ikon garis, glyph biru, ikon UI), lalu siluet orang, avatar flat beragam, dan orang isometrik.
 - Halaman Insights tidak punya API dan perlu login. **Jangan scraping** (melanggar
-  ketentuan kontributor, akun bisa kena sanksi). Gantinya: pengguna unggah screenshot.
-- API resmi yang bisa dipakai: Adobe Stock Search API (`search_parameters[order]=nb_downloads`,
-  filter vektor, jumlah hasil per keyword) dan Shutterstock API (`sort=popular|newest`).
-  Keduanya perlu key dari pengguna; kuota gratis Shutterstock belum dicek.
+  ketentuan kontributor, akun bisa kena sanksi).
 - Data laris hanya dipakai untuk **tema, gaya, dan keyword**, tidak untuk meniru gambar.
 - Set ikon dengan label tulisan bertabrakan dengan aturan "tanpa elemen teks". Tetap tanpa teks.
 
@@ -53,42 +52,12 @@ Tujuan: ikon seperti contoh (eco line icons, awan/ikon 1 warna, ubin geometris h
 7. Ekspor seperti aset biasa. Di halaman ekspor beri peringatan: mengunggah bundle **dan** ikon satuan yang sama
    berisiko dianggap konten serupa. Uji dulu di Tahap 6 dengan satu tema.
 
-## Tahap 12 — Riset dari screenshot pasar
-
-1. `/riset`: pilihan sumber (tab/segmented): "Screenshot pasar" (baru, bawaan), "Kalender + Google Trends" (yang sekarang),
-   nanti "Adobe Stock API".
-2. Unggah 1–5 gambar (png/jpg/webp, kompres di browser, maks ~1 MB per gambar), isi nama sumber
-   (Adobe Insights / Shutterstock / Freepik / lain) dan periode.
-3. Route Handler baru `app/api/riset/screenshot/route.ts` (`maxDuration = 60`, tenggat 57 dtk): kirim gambar ke model visi lewat
-   adapter (tambah method mis. `analyzeMarketImage` di `lib/providers/types.ts`; cek apakah endpoint OpenAI-compatible Gemini
-   menerima `image_url` base64; Kenari model visi sebagai cadangan bila ada). Satu panggilan per gambar.
-4. Output terstruktur (Zod di `lib/research/schemas.ts`): jenis aset, gaya, topik, ukuran set, lalu daftar tema baru
-   (judul Inggris, gaya yang disarankan, seed keyword) yang **tidak menyebut merek/nama kontributor** (cek daftar kata terlarang).
-5. Simpan: `research_runs` dengan `source = 'screenshot'` (migrasi kolom `source`, `source_label`), tema ke `themes` seperti biasa.
-   Screenshot tidak disimpan permanen (atau Storage privat bila pengguna mau; tanyakan).
-6. Skor: tema dari screenshot diberi sinyal permintaan "dari data pasar" (sesuaikan `provenanceOf` di `lib/research/score.ts`).
-7. Tombol "Generate" per tema membawa gaya yang disarankan ke `/generate`.
-8. Catat panggilan di `provider_usage`.
-
-## Tahap 13 — Adobe Stock API (data unduhan + persaingan)
-
-1. Pengguna membuat API key di Adobe Developer Console (Adobe Stock API). Env baru `ADOBE_STOCK_API_KEY` (server saja),
-   tambahkan ke `.env.example` dan Vercel. Cek dokumentasi terbaru: header `x-api-key`, `x-product`, batas kuota.
-2. `lib/research/adobe-stock.ts`: cari per keyword dengan filter vektor; ambil `nb_results` (persaingan) dan
-   top N `order=nb_downloads` (judul + keyword, tanpa menyimpan gambar). Cache per keyword (tabel atau kolom JSON) agar hemat kuota.
-3. Dipakai dua cara: (a) validasi tema dari Tahap 12 dan riset kalender: skor persaingan jadi data asli;
-   (b) sumber riset sendiri: masukkan topik → keyword laris → tema.
-4. Shutterstock API menyusul dengan pola yang sama bila pengguna mau (env `SHUTTERSTOCK_API_TOKEN`).
-
 ## Opsional (belakangan)
 
 - Doodle hitam: varian prompt "hand-drawn doodle" untuk gaya Line art yang ada (gambar AI, Rp125).
 - Doodle berwarna dengan arsiran: perlu trace multi-warna (posterize → potrace per warna) di `lib/svg/trace.ts`. Mahal dan rumit.
 
-## Keputusan pengguna (8 Okt 2026)
+## Keputusan pengguna
 
-1. Urutan disetujui: 10 → 11 → 12 → 13.
-2. Satu bundle = **16 ikon** (grid 4×4, artboard persegi).
-3. Pengguna bersedia membuat API key Adobe Stock (dan Shutterstock). Minta saat mulai Tahap 13.
-4. Screenshot riset **dibuang** setelah dianalisis (tidak disimpan di Storage).
-5. Tahap 10–13 sudah ditambahkan ke Roadmap CLAUDE.md.
+1. 8 Okt 2026: urutan 10 → 11. Satu bundle = **16 ikon** (grid 4×4, artboard persegi).
+2. 9 Okt 2026: Tahap 12 (screenshot pasar) dan 13 (Adobe Stock API) dihapus dari rencana.
