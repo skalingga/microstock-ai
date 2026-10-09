@@ -3,16 +3,18 @@
 import { ChevronDown, Clock, FlaskConical, Loader2, Plus, RotateCcw, Shapes, Square, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { InfoTip } from "@/components/info-tip";
-import { Anchor, ProgressLine } from "@/components/pen-motif";
+import { Anchor, ProgressLine, SelectionHandles } from "@/components/pen-motif";
 import { QcBadge } from "@/components/qc-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QC_LABEL } from "@/lib/assets";
 import { formatIdr } from "@/lib/budget";
 import {
+  SMALL_SAMPLE,
   cellsToRedo,
+  confidence,
   continueBenchmark,
   estimateRemainingMs,
   runBenchmark,
@@ -25,11 +27,11 @@ import {
   type ModelSummary,
 } from "@/lib/generate/benchmark";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
-import { STYLES, isImageStyle, type StyleId } from "@/lib/settings/schema";
+import { STYLES, isImageStyle, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
 import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { pakaiModel } from "./actions";
+import { kembalikanRantai, pakaiSaran } from "./actions";
 
 const TEXT_STYLES = STYLES.filter((s) => !isImageStyle(s.value));
 const MAX_THEMES = 8;
@@ -54,7 +56,8 @@ const DEFAULT_MODELS: BenchModel[] = [
   { provider: "kenari", model: "agnes-3-0-flash:free" },
 ];
 
-const SECONDS_PER_SVG = 30; // before a run: free models took 4-70s per SVG in the check, plus quota waits
+/** Before a run, for a model never tested: free models took 4-70s per SVG in the first check, plus quota waits. */
+const FALLBACK_MS_PER_SVG = 30_000;
 
 const key = (m: { provider: string; model: string }) => `${m.provider}|${m.model}`;
 const isPaid = (m: BenchModel) => m.provider === "kenari" && !m.model.endsWith(":free");
@@ -69,6 +72,24 @@ function minutes(ms: number) {
   return m < 1 ? "<1 menit" : `±${m} menit`;
 }
 
+/** Whether a run is going on this page: the saved results disable their own run buttons meanwhile. */
+let runningNow = false;
+const runningListeners = new Set<() => void>();
+function setRunningNow(value: boolean) {
+  runningNow = value;
+  runningListeners.forEach((l) => l());
+}
+function useRunning() {
+  return useSyncExternalStore(
+    (l) => {
+      runningListeners.add(l);
+      return () => runningListeners.delete(l);
+    },
+    () => runningNow,
+    () => false,
+  );
+}
+
 /** Events from the saved results below to the runner, which owns every running queue on this page. */
 type RunnerEvent = { kind: "setup"; setup: BenchSetup } | { kind: "continue"; id: string; setup: BenchSetup; cells: BenchCell[]; retryFailed: boolean };
 const EVENT = "uji-model:runner";
@@ -79,6 +100,7 @@ export function BenchmarkRunner({
   bannedWords,
   hasRuns,
   costPerSvg,
+  msPerSvg,
   budgetLeftIdr,
 }: {
   userId: string;
@@ -86,6 +108,8 @@ export function BenchmarkRunner({
   hasRuns: boolean;
   /** Average real cost of one SVG per paid Kenari model, from past calls. */
   costPerSvg: Record<string, number>;
+  /** Median time per SVG per model ("provider|model") from past runs, for the time estimate. */
+  msPerSvg: Record<string, number>;
   budgetLeftIdr: number;
 }) {
   const router = useRouter();
@@ -149,6 +173,9 @@ export function BenchmarkRunner({
   const knownCost = paid.filter((m) => costPerSvg[m.model] !== undefined);
   const costEstimate = knownCost.reduce((sum, m) => sum + costPerSvg[m.model] * perModel, 0);
   const unknownPaid = paid.length - knownCost.length;
+  const timeEstimateMs = picked.reduce((sum, m) => sum + (msPerSvg[key(m)] ?? FALLBACK_MS_PER_SVG) * perModel, 0);
+  const overBudget = paid.length > 0 && costEstimate > budgetLeftIdr;
+  const [overBudgetOk, setOverBudgetOk] = useState(false);
 
   async function execute(run: (signal: AbortSignal, onState: (s: BenchState) => void) => Promise<void>) {
     urlsRef.current.forEach((u) => URL.revokeObjectURL(u));
@@ -156,6 +183,7 @@ export function BenchmarkRunner({
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
+    setRunningNow(true);
     setNotice(null);
     setStartedAt(clock());
     setNow(clock());
@@ -166,6 +194,7 @@ export function BenchmarkRunner({
       setState(next);
     });
     setRunning(false);
+    setRunningNow(false);
     setStartedAt(null);
     const final = last as BenchState | null;
     // The saved run below now shows everything; drop the live copy instead of showing the same run twice.
@@ -245,7 +274,7 @@ export function BenchmarkRunner({
         <div className="space-y-4 rounded-md border bg-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
-              <h2 id="uji-baru-heading" className="text-lg font-bold" aria-live="polite">
+              <h2 id="uji-baru-heading" className="text-lg font-bold">
                 {state.phase === "mulai" && "Menyiapkan uji..."}
                 {state.phase === "konsep" && "Menyusun konsep..."}
                 {state.phase === "antrean" && `Menggambar ${finished} dari ${total} SVG`}
@@ -271,6 +300,10 @@ export function BenchmarkRunner({
               </Button>
             )}
           </div>
+          {/* Announced once per phase, not on every drawn SVG. */}
+          <p className="sr-only" aria-live="polite">
+            {state.phase === "konsep" ? "Menyusun konsep" : state.phase === "antrean" ? "Menggambar SVG" : state.phase === "selesai" ? "Uji selesai" : ""}
+          </p>
           {total > 0 && <ProgressLine value={finished / total} label="Kemajuan uji" />}
           <BenchResults setup={state.setup} cells={state.cells} previews={{}} live />
         </div>
@@ -281,9 +314,9 @@ export function BenchmarkRunner({
           onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
         >
           <summary className={cn("flex cursor-pointer list-none items-center justify-between gap-2 px-5", tapTarget, "min-h-13")}>
-            <span id="uji-baru-heading" className="flex items-center gap-1 text-lg font-bold">
+            <h2 id="uji-baru-heading" className="text-lg font-bold">
               Uji baru
-            </span>
+            </h2>
             <ChevronDown aria-hidden className="size-4 transition-transform duration-150 group-open:rotate-180" />
           </summary>
 
@@ -428,6 +461,7 @@ export function BenchmarkRunner({
                     key={n}
                     className={cn(
                       "inline-flex min-h-9 min-w-11 cursor-pointer items-center justify-center rounded-md border px-3 text-sm",
+                      "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
                       tapTarget,
                       variations === n ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
                     )}
@@ -440,7 +474,7 @@ export function BenchmarkRunner({
             </fieldset>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" size="lg" disabled={running || cellCount === 0}>
+              <Button type="submit" size="lg" disabled={running || cellCount === 0 || (overBudget && !overBudgetOk)}>
                 {running ? <Loader2 className="animate-spin" /> : <FlaskConical />}
                 Mulai uji
               </Button>
@@ -450,7 +484,7 @@ export function BenchmarkRunner({
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 <Clock className="size-3.5" />
-                {minutes(cellCount * SECONDS_PER_SVG * 1000)}
+                {minutes(timeEstimateMs)}
               </span>
               {paid.length > 0 && (
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground">
@@ -462,10 +496,19 @@ export function BenchmarkRunner({
                 </span>
               )}
             </div>
-            {paid.length > 0 && costEstimate > budgetLeftIdr && (
-              <p className="text-sm text-warning-foreground">
-                Perkiraan biaya melebihi sisa anggaran Kenari bulan ini, jadi sebagian SVG berbayar akan ditolak.
-              </p>
+            {overBudget && (
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 shrink-0 accent-foreground"
+                  checked={overBudgetOk}
+                  onChange={(e) => setOverBudgetOk(e.target.checked)}
+                />
+                <span>
+                  Perkiraan biaya ({formatIdr(costEstimate)}) melebihi sisa anggaran Kenari bulan ini ({formatIdr(budgetLeftIdr)}). Tetap mulai: SVG
+                  berbayar yang lewat batas akan ditolak dan dihitung gagal.
+                </span>
+              </label>
             )}
           </form>
         </details>
@@ -500,78 +543,185 @@ const errorsText = (r: ModelSummary) =>
     .map(([code, n]) => `${n} ${ERROR_LABEL[code] ?? code}`)
     .join(", ") || "–";
 
-type Current = { primary: string; backup: string };
+const providerLabel = (p: string) => (p === "gemini" ? "Gemini" : "Kenari");
+const entryLabel = (e: ProviderEntry | null | undefined) => (e ? `${providerLabel(e.provider)} ${e.model || "(bawaan)"}` : "tidak ada");
+const sameEntry = (a: ProviderEntry | null | undefined, b: ProviderEntry | null | undefined) => (a ? key(a) : "") === (b ? key(b) : "");
 
-function CurrentTag({ row, current }: { row: ModelSummary; current?: Current }) {
-  if (!current) return null;
-  const k = key(row);
-  if (k === current.primary) return <span className="rounded-sm bg-secondary px-1.5 py-px font-sans text-xs font-semibold text-secondary-foreground">utama sekarang</span>;
-  if (k === current.backup) return <span className="rounded-sm bg-secondary px-1.5 py-px font-sans text-xs font-semibold text-secondary-foreground">cadangan sekarang</span>;
-  return null;
-}
-
-/** "Pakai sebagai utama / cadangan": writes the provider chain in Settings. */
-function ApplyButtons({ row, current, compact }: { row: ModelSummary; current?: Current; compact?: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
-  if (!current) return null;
-  const k = key(row);
-  const apply = (slot: "utama" | "cadangan") =>
-    startTransition(async () => {
-      const result = await pakaiModel({ slot, provider: row.provider, model: row.model });
-      setMessage(result.ok ? { text: result.message } : { text: result.error, error: true });
-    });
-  return (
-    <span className={cn("flex flex-wrap items-center gap-1", compact && "justify-end")}>
-      {k !== current.primary && (
-        <Button type="button" size="sm" variant={compact ? "ghost" : "default"} onClick={() => apply("utama")} disabled={pending}>
-          Jadikan utama
-        </Button>
-      )}
-      {k !== current.backup && k !== current.primary && (
-        <Button type="button" size="sm" variant={compact ? "ghost" : "outline"} onClick={() => apply("cadangan")} disabled={pending}>
-          Jadikan cadangan
-        </Button>
-      )}
-      {message && (
-        <span role={message.error ? "alert" : "status"} className={cn("w-full text-xs", message.error ? "text-destructive" : "text-muted-foreground")}>
-          {message.text}
-        </span>
-      )}
+/** "Utama: A → B", or "Utama tetap A" when nothing changes. */
+function Change({ label, from, to }: { label: string; from: ProviderEntry | null | undefined; to: ProviderEntry | null | undefined }) {
+  return sameEntry(from, to) ? (
+    <span>
+      {label} tetap {entryLabel(to)}
+    </span>
+  ) : (
+    <span>
+      {label}: {entryLabel(from)} → <strong className="text-foreground">{entryLabel(to)}</strong>
     </span>
   );
 }
 
-function Verdict({ rows, current }: { rows: ModelSummary[]; current?: Current }) {
+/** The provider chain in Settings today, with empty model fields resolved to their defaults. */
+export type Current = { primary: ProviderEntry | null; backup: ProviderEntry | null };
+
+function CurrentTag({ row, current }: { row: ModelSummary; current?: Current }) {
+  if (!current) return null;
+  const k = key(row);
+  const tag = current.primary && k === key(current.primary) ? "utama sekarang" : current.backup && k === key(current.backup) ? "cadangan sekarang" : null;
+  return tag ? <span className="rounded-sm bg-secondary px-1.5 py-px font-sans text-xs font-semibold text-secondary-foreground">{tag}</span> : null;
+}
+
+/** "Pakai saran ini": the suggested pair into Settings in one step, with the change spelled out and an undo. */
+/** Fewer attempts per model than this and the page will not offer to change Settings at all. */
+const MIN_ATTEMPTS_TO_APPLY = 3;
+
+function ApplySuggestion({
+  primary,
+  backup,
+  current,
+  minAttempts,
+}: {
+  primary: ModelSummary;
+  backup?: ModelSummary;
+  current: Current;
+  minAttempts: number;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [applied, setApplied] = useState<{ before: ProviderEntry[]; after: ProviderEntry[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const running = useRunning();
+
+  const nextPrimary: ProviderEntry = { provider: primary.provider, model: primary.model };
+  // Without a suggested backup, the current one stays when it is on the other provider.
+  const nextBackup: ProviderEntry | null = backup
+    ? { provider: backup.provider, model: backup.model }
+    : current.backup && current.backup.provider !== primary.provider
+      ? current.backup
+      : current.primary && current.primary.provider !== primary.provider
+        ? current.primary
+        : null;
+  const same = sameEntry(current.primary, nextPrimary) && sameEntry(current.backup, nextBackup);
+
+  if (same && !applied) {
+    return <p className="py-3 text-sm text-muted-foreground">Rantai di Pengaturan sudah sama dengan saran ini.</p>;
+  }
+  if (minAttempts < MIN_ATTEMPTS_TO_APPLY && !applied) {
+    return (
+      <p className="py-3 text-sm text-muted-foreground">
+        Terlalu sedikit percobaan ({minAttempts} per model) untuk dijadikan pengaturan. Ulangi uji dengan lebih banyak tema atau konsep.
+      </p>
+    );
+  }
+  const small = minAttempts < SMALL_SAMPLE;
+
+  function apply() {
+    setError(null);
+    startTransition(async () => {
+      const result = await pakaiSaran({ primary: nextPrimary, backup: nextBackup ?? undefined });
+      if (result.ok) setApplied({ before: result.before, after: result.after });
+      else setError(result.error);
+    });
+  }
+
+  function undo() {
+    if (!applied) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await kembalikanRantai(applied.before);
+      if (result.ok) setApplied(null);
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <div className="space-y-2 py-3">
+      {applied ? (
+        <div role="status" className="space-y-2 text-sm">
+          <p>
+            Dipakai di Pengaturan. <Change label="Utama" from={applied.before[0]} to={applied.after[0]} /> ·{" "}
+            <Change label="Cadangan" from={applied.before[1]} to={applied.after[1]} />. Berlaku untuk antrean berikutnya.
+          </p>
+          <p className="flex flex-wrap items-center gap-3">
+            <Button type="button" size="sm" variant="outline" onClick={undo} disabled={pending}>
+              <RotateCcw />
+              {pending ? "Mengembalikan..." : "Urungkan"}
+            </Button>
+            <Link href="/pengaturan" className="font-semibold underline underline-offset-4 hover:decoration-2">
+              Lihat di Pengaturan
+            </Link>
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Akan mengubah Pengaturan. <Change label="Utama" from={current.primary} to={nextPrimary} /> ·{" "}
+            <Change label="Cadangan" from={current.backup} to={nextBackup} />
+          </p>
+          <Button type="button" variant={small ? "outline" : "default"} onClick={apply} disabled={pending || running}>
+            {pending ? "Menyimpan..." : small ? "Tetap pakai saran ini" : "Pakai saran ini"}
+          </Button>
+          {running && <p className="text-xs text-muted-foreground">Tunggu uji yang sedang berjalan selesai.</p>}
+        </>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Verdict({ rows, cells, current }: { rows: ModelSummary[]; cells: BenchCell[]; current?: Current }) {
   const { primary, backup } = suggest(rows);
+  const { waiting, total, minAttempts } = confidence(cells, rows);
   if (!primary) return <p className="text-sm text-muted-foreground">Belum ada model yang menghasilkan SVG yang bisa dipakai di uji ini.</p>;
-  const line = (label: string, r: ModelSummary) => (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        <Anchor filled={label === "Utama"} />
-        <span className="min-w-0">
-          <span className="block text-xs text-muted-foreground">Saran {label.toLowerCase()}</span>
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-sm font-semibold break-all">{r.model}</span>
-            <CurrentTag row={r} current={current} />
-          </span>
-          <span className="block text-xs text-muted-foreground tabular-nums">
-            {Math.round(r.score * 100)}% · {r.lolos}/{r.total} Lolos · {seconds(r.medianMs)} · {r.costIdr > 0 ? formatIdr(r.costIdr) : "Rp0"}
+
+  const line = (label: "utama" | "cadangan", r: ModelSummary) => (
+    <div className="flex items-start gap-2 py-3">
+      <Anchor filled={label === "utama"} className="mt-1.5" />
+      <span className="min-w-0">
+        <span className="block text-xs text-muted-foreground">Saran {label}</span>
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-sm font-semibold [overflow-wrap:anywhere]">{r.model}</span>
+          <span className="text-xs text-muted-foreground">{providerLabel(r.provider)}</span>
+          <CurrentTag row={r} current={current} />
+        </span>
+        <span className="block text-sm tabular-nums">
+          <strong>
+            {r.lolos}/{r.total} Lolos
+          </strong>
+          <span className="text-muted-foreground">
+            {r.perluCek > 0 && `, ${r.perluCek} Perlu cek`} · {seconds(r.medianMs)} · {formatIdr(r.costIdr)} · skor {Math.round(r.score * 100)}%
           </span>
         </span>
       </span>
-      <ApplyButtons row={r} current={current} />
     </div>
   );
+
   return (
     <div className="divide-y rounded-md border bg-card px-4">
-      {line("Utama", primary)}
-      {backup && line("Cadangan", backup)}
+      {(waiting > 0 || minAttempts < SMALL_SAMPLE) && (
+        <p className="py-3 text-sm text-warning-foreground">
+          {waiting > 0
+            ? `Belum lengkap: ${total - waiting} dari ${total} SVG. Saran ini bisa berubah setelah uji dilanjutkan.`
+            : `Sampel kecil: tiap model baru dicoba ${minAttempts} kali. Ulangi uji atau tambah konsep per tema sebelum mengganti model utama.`}
+        </p>
+      )}
+      {line("utama", primary)}
+      {backup ? (
+        line("cadangan", backup)
+      ) : (
+        <p className="py-3 text-sm text-muted-foreground">
+          Tidak ada saran cadangan: belum ada model dari provider {primary.provider === "gemini" ? "Kenari" : "Gemini"} yang menghasilkan SVG
+          yang bisa dipakai.
+        </p>
+      )}
+      {current && waiting === 0 && <ApplySuggestion primary={primary} backup={backup} current={current} minAttempts={minAttempts} />}
       <p className="flex items-start gap-1 py-2 text-xs text-muted-foreground">
         Skor = (Lolos + ½ Perlu cek) ÷ percobaan. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya di bawah.
         <InfoTip align="end">
-          Dari QC visual saja; seri diurutkan dari yang tercepat. Cadangan dipilih dari kuota yang terpisah dari model utama, karena
-          tugasnya mengambil alih saat utama kena limit. Rantai provider di Pengaturan harus memakai dua provider berbeda.
+          Dari QC visual saja; seri diurutkan dari yang tercepat. Cadangan diambil dari provider lain, karena Pengaturan memakai dua provider
+          berbeda dan provider lain punya kuota sendiri saat utama kena limit.
         </InfoTip>
       </p>
     </div>
@@ -587,15 +737,16 @@ function SummaryTable({ rows, current }: { rows: ModelSummary[]; current?: Curre
         {rows.map((r) => (
           <li key={key(r)} className="space-y-1 rounded-md border bg-card p-3 text-sm">
             <p className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs font-semibold break-all">{r.model}</span>
+              <span className="font-mono text-xs font-semibold [overflow-wrap:anywhere]">{r.model}</span>
               <CurrentTag row={r} current={current} />
             </p>
             <p className="text-xs text-muted-foreground tabular-nums">
-              <strong className="text-foreground">{Math.round(r.score * 100)}%</strong> · {r.lolos} Lolos, {r.perluCek} Perlu cek, {r.gagalQc} Gagal QC dari{" "}
-              {r.total} · {seconds(r.medianMs)} · {r.costIdr > 0 ? formatIdr(r.costIdr) : "Rp0"}
+              <strong className="text-foreground">
+                {r.lolos}/{r.total} Lolos
+              </strong>
+              , {r.perluCek} Perlu cek, {r.gagalQc} Gagal QC · {seconds(r.medianMs)} · {formatIdr(r.costIdr)}
             </p>
             {r.made < r.total && <p className="text-xs text-muted-foreground">Gagal dibuat: {errorsText(r)}</p>}
-            <ApplyButtons row={r} current={current} compact />
           </li>
         ))}
       </ul>
@@ -609,13 +760,10 @@ function SummaryTable({ rows, current }: { rows: ModelSummary[]; current?: Curre
                 Model
               </th>
               <th scope="col" className="py-2 pr-3 font-semibold">
-                Skor
+                Lolos
               </th>
               <th scope="col" className="py-2 pr-3 font-semibold">
-                SVG jadi
-              </th>
-              <th scope="col" className="py-2 pr-3 font-semibold">
-                Lolos / Perlu cek / Gagal QC
+                Perlu cek / Gagal QC
               </th>
               <th scope="col" className="py-2 pr-3 font-semibold">
                 Gagal dibuat
@@ -623,14 +771,8 @@ function SummaryTable({ rows, current }: { rows: ModelSummary[]; current?: Curre
               <th scope="col" className="py-2 pr-3 font-semibold">
                 Median waktu
               </th>
-              <th scope="col" className="py-2 pr-3 font-semibold">
-                Rata-rata path
-              </th>
-              <th scope="col" className="py-2 pr-3 font-semibold">
-                Biaya
-              </th>
               <th scope="col" className="py-2 font-semibold">
-                <span className="sr-only">Aksi</span>
+                Biaya
               </th>
             </tr>
           </thead>
@@ -640,56 +782,65 @@ function SummaryTable({ rows, current }: { rows: ModelSummary[]; current?: Curre
                 <th scope="row" className="min-w-44 py-2 pr-3 text-left font-normal">
                   <span className="block font-mono text-xs [overflow-wrap:anywhere]">{r.model}</span>
                   <span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                    {r.provider === "gemini" ? "Gemini" : "Kenari"}
+                    {providerLabel(r.provider)}
                     <CurrentTag row={r} current={current} />
                   </span>
                 </th>
-                <td className="py-2 pr-3 font-semibold">{Math.round(r.score * 100)}%</td>
                 <td className="py-2 pr-3">
-                  {r.made}/{r.total}
+                  <strong>
+                    {r.lolos}/{r.total}
+                  </strong>{" "}
+                  <span className="text-xs text-muted-foreground">({Math.round(r.score * 100)}%)</span>
                 </td>
                 <td className="py-2 pr-3">
-                  {r.lolos} / {r.perluCek} / {r.gagalQc}
+                  {r.perluCek} / {r.gagalQc}
                 </td>
                 <td className="py-2 pr-3 text-xs">{errorsText(r)}</td>
                 <td className="py-2 pr-3">{seconds(r.medianMs)}</td>
-                <td className="py-2 pr-3">{r.avgShapes ?? "–"}</td>
-                <td className="py-2 pr-3">{r.costIdr > 0 ? formatIdr(r.costIdr) : "Rp0"}</td>
-                <td className="py-2">
-                  <ApplyButtons row={r} current={current} compact />
-                </td>
+                <td className="py-2">{formatIdr(r.costIdr)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">Total biaya uji ini: {totalCost > 0 ? formatIdr(totalCost) : "Rp0"}.</p>
+      <p className="text-xs text-muted-foreground">Total biaya uji ini: {formatIdr(totalCost)}.</p>
     </div>
   );
 }
 
 /** Actions on a saved run: continue it, redraw the failed cells, or refill the form with its setup. */
 function SavedRunActions({ id, status, setup, cells }: { id: string; status: string; setup: BenchSetup; cells: BenchCell[] }) {
+  const running = useRunning();
   const waiting = cellsToRedo(cells, false).length;
   const failed = cells.filter((c) => c.status === "gagal").length;
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {waiting > 0 && (
-        <Button type="button" onClick={() => sendToRunner({ kind: "continue", id, setup, cells, retryFailed: false })}>
-          Lanjutkan {waiting} SVG yang belum
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        {waiting > 0 && (
+          <Button type="button" onClick={() => sendToRunner({ kind: "continue", id, setup, cells, retryFailed: false })} disabled={running}>
+            Lanjutkan {waiting} SVG yang belum
+          </Button>
+        )}
+        {failed > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => sendToRunner({ kind: "continue", id, setup, cells, retryFailed: true })}
+            disabled={running}
+          >
+            <RotateCcw />
+            Ulangi {failed} yang gagal{waiting > 0 ? " + yang belum" : ""}
+          </Button>
+        )}
+        <Button type="button" variant="ghost" onClick={() => sendToRunner({ kind: "setup", setup })} disabled={running}>
+          Uji baru dengan setup ini
         </Button>
-      )}
-      {failed > 0 && (
-        <Button type="button" variant="outline" onClick={() => sendToRunner({ kind: "continue", id, setup, cells, retryFailed: true })}>
-          <RotateCcw />
-          Ulangi {failed} yang gagal{waiting > 0 ? " + yang belum" : ""}
-        </Button>
-      )}
-      <Button type="button" variant="ghost" onClick={() => sendToRunner({ kind: "setup", setup })}>
-        Uji baru dengan setup ini
-      </Button>
-      {status === "berjalan" && waiting > 0 && (
-        <span className="text-xs text-muted-foreground">Uji ini terputus (tab tertutup atau layar terkunci).</span>
+      </div>
+      {running ? (
+        <p className="text-xs text-muted-foreground">Ada uji yang sedang berjalan di atas. Tombol ini aktif lagi setelah uji itu selesai.</p>
+      ) : (
+        status === "berjalan" &&
+        waiting > 0 && <p className="text-xs text-muted-foreground">Uji ini terputus (tab tertutup atau layar terkunci).</p>
       )}
     </div>
   );
@@ -715,31 +866,45 @@ export function BenchResults({
   if (cells.length === 0) return null;
   const rows = summarize(cells);
   const models = setup.models;
+  const { primary, backup } = suggest(rows);
+  const unfinished = cellsToRedo(cells, false).length > 0;
   // One row per concept, in the order they were drawn.
   const concepts: { theme: string; concept: string }[] = [];
   for (const c of cells) {
     if (!concepts.some((x) => x.theme === c.theme && x.concept === c.concept)) concepts.push({ theme: c.theme, concept: c.concept });
   }
+  const pick = (m: BenchModel) => (!live && primary && key(m) === key(primary) ? "utama" : !live && backup && key(m) === key(backup) ? "cadangan" : null);
 
   return (
     <div className="space-y-6">
-      {!live && rows.length > 0 && <Verdict rows={rows} current={current} />}
-      {saved && <SavedRunActions id={saved.id} status={saved.status} setup={setup} cells={cells} />}
+      {/* An unfinished run: finishing it comes before trusting its verdict. */}
+      {saved && unfinished && <SavedRunActions id={saved.id} status={saved.status} setup={setup} cells={cells} />}
+      {!live && rows.length > 0 && <Verdict rows={rows} cells={cells} current={current} />}
+      {saved && !unfinished && <SavedRunActions id={saved.id} status={saved.status} setup={setup} cells={cells} />}
       {rows.length > 0 && <SummaryTable rows={rows} current={live ? undefined : current} />}
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto pb-2">
         <table className="text-xs">
           <caption className="sr-only">Gambar tiap model per konsep</caption>
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 z-[1] w-36 bg-card p-2 text-left font-semibold text-muted-foreground">
+              <th scope="col" className="sticky left-0 z-[1] w-36 bg-background py-2 pr-3 text-left font-semibold text-muted-foreground">
                 Konsep
               </th>
-              {models.map((m) => (
-                <th key={key(m)} scope="col" className="w-28 p-2 text-left font-mono font-normal break-all text-muted-foreground">
-                  {m.model}
-                </th>
-              ))}
+              {models.map((m) => {
+                const chosen = pick(m);
+                return (
+                  <th key={key(m)} scope="col" className="w-28 p-2 text-left align-bottom font-normal">
+                    {chosen && (
+                      <span className="mb-1 flex items-center gap-1 font-sans text-xs font-semibold text-foreground">
+                        <Anchor filled={chosen === "utama"} />
+                        Saran {chosen}
+                      </span>
+                    )}
+                    <span className={cn("block font-mono [overflow-wrap:anywhere]", chosen ? "text-foreground" : "text-muted-foreground")}>{m.model}</span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -747,7 +912,7 @@ export function BenchResults({
               const job = setup.themes.find((t) => t.theme === row.theme)?.jobId;
               return (
                 <tr key={`${row.theme}|${row.concept}`} className="border-t align-top">
-                  <th scope="row" className="sticky left-0 z-[1] w-36 bg-card p-2 text-left font-normal">
+                  <th scope="row" className="sticky left-0 z-[1] w-36 bg-background py-2 pr-3 text-left font-normal">
                     <p className="font-semibold">{row.theme}</p>
                     <p className="line-clamp-3 text-muted-foreground">{row.concept}</p>
                     {job && (
@@ -762,7 +927,9 @@ export function BenchResults({
                     );
                     return (
                       <td key={key(m)} className="p-2">
-                        {cell ? <CellView cell={cell} preview={cell.previewUrl ?? (cell.assetId ? previews[cell.assetId] : undefined)} /> : null}
+                        {cell ? (
+                          <CellView cell={cell} chosen={Boolean(pick(m))} preview={cell.previewUrl ?? (cell.assetId ? previews[cell.assetId] : undefined)} />
+                        ) : null}
                       </td>
                     );
                   })}
@@ -776,10 +943,10 @@ export function BenchResults({
   );
 }
 
-function CellView({ cell, preview }: { cell: BenchCell; preview?: string }) {
+function CellView({ cell, preview, chosen }: { cell: BenchCell; preview?: string; chosen?: boolean }) {
   const alt = `${cell.model}: ${cell.concept}${cell.qc ? ` (${QC_LABEL[cell.qc] ?? cell.qc})` : ""}`;
   const thumb = (
-    <div className="bg-checker flex aspect-square w-28 items-center justify-center overflow-hidden rounded-sm border">
+    <div className="bg-checker relative flex aspect-square w-28 items-center justify-center overflow-hidden rounded-sm">
       {preview ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={preview} alt={alt} className="size-full object-contain" />
@@ -798,17 +965,17 @@ function CellView({ cell, preview }: { cell: BenchCell; preview?: string }) {
   );
   return (
     <div className="space-y-1">
-      {/* A finished cell without a preview means the asset was deleted from the gallery: no dead link. */}
-      {cell.assetId && preview ? <Link href={`/aset/${cell.assetId}`}>{thumb}</Link> : thumb}
+      {/* The suggested models' drawings carry the selection handles, so the verdict points at its evidence. */}
+      <div className="relative w-28">
+        {chosen && <SelectionHandles />}
+        {/* A finished cell without a preview means the asset was deleted from the gallery: no dead link. */}
+        {cell.assetId && preview ? <Link href={`/aset/${cell.assetId}`}>{thumb}</Link> : thumb}
+      </div>
       <div className="flex flex-wrap items-center gap-1">
         {cell.qc && <QcBadge status={cell.qc} />}
         {cell.durationMs !== undefined && cell.status !== "berjalan" && <span className="text-muted-foreground">{seconds(cell.durationMs)}</span>}
       </div>
-      {cell.status === "gagal" && cell.error && (
-        <p className="line-clamp-3 text-destructive" title={cell.error}>
-          {cell.error}
-        </p>
-      )}
+      {cell.status === "gagal" && cell.error && <p className="line-clamp-3 break-words text-muted-foreground">{cell.error}</p>}
     </div>
   );
 }
