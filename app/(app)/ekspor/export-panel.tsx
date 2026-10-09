@@ -99,6 +99,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
   const chosen = visible.filter((c) => selected.has(c.id));
   const hiddenPicked = selected.size - chosen.length;
   const cekChosen = chosen.filter((c) => c.status === "perlu_cek");
+  const releaseChosen = chosen.filter((c) => c.needsRelease);
   // The statement covers exactly these assets: adding or removing one asks again.
   const cekKey = cekChosen.map((c) => c.id).sort().join(",");
   const cekConfirmed = cekKey !== "" && confirmedCek === cekKey;
@@ -467,6 +468,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                                 <span className="mt-0.5 flex items-center gap-2">
                                   <QcBadge status={c.status} />
                                   {c.exportedAt && <span className="text-xs text-muted-foreground">Sudah diekspor</span>}
+                                  {c.needsRelease && <span className="text-xs font-semibold text-warning-foreground">Perlu Release</span>}
                                 </span>
                               </span>
                             </label>
@@ -500,6 +502,16 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                 {cekChosen.length > CEK_NAMES_SHOWN && `; dan ${cekChosen.length - CEK_NAMES_SHOWN} lainnya`}.
               </span>
             </label>
+          )}
+          {releaseChosen.length > 0 && !building && (
+            <p className="text-sm text-warning-foreground" role="status">
+              <strong>{releaseChosen.length} aset Perlu Release</strong> (orang atau properti nyata): siapkan file release sebelum mengunggah ke Adobe.{" "}
+              {releaseChosen
+                .slice(0, CEK_NAMES_SHOWN)
+                .map((c) => c.title)
+                .join("; ")}
+              {releaseChosen.length > CEK_NAMES_SHOWN && `; dan ${releaseChosen.length - CEK_NAMES_SHOWN} lainnya`}.
+            </p>
           )}
           {building ? (
             <div className="space-y-2">
