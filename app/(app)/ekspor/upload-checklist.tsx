@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Anchor } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AI_LABEL_REMINDER } from "@/lib/adobe/rules";
+import { createClient } from "@/lib/supabase/client";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ export type FileAction = { onClick: () => void } | { href: string };
 
 const storageKey = (id: string) => `ekspor-checklist:${id}`;
 
-/** Steps ticked for one export in this browser. */
+/** Steps ticked for one export in this browser (a cache; the export row holds the shared copy). */
 export function readChecklistDone(id: string): Set<string> {
   try {
     const raw = localStorage.getItem(storageKey(id));
@@ -31,14 +32,19 @@ export function readChecklistDone(id: string): Set<string> {
 }
 
 type Props = {
-  /** Export id; ticks are remembered per export in this browser. Without one the list is read-only guidance. */
+  /** Export id (or a stamp before the export is saved). Without one the list is read-only guidance. */
   storageId?: string;
+  /** Save ticks on the export row, so they follow the user to another device. Needs a real export id. */
+  persist?: boolean;
+  /** Ticks already stored on the export row. */
+  initialDone?: string[];
   zip?: FileAction;
   csv?: FileAction;
   zipLabel?: string;
   /** Titles in this export that show real people or property. */
   releaseTitles?: string[];
-  onProgress?: (done: number) => void;
+  /** The ticked step ids after each change. */
+  onProgress?: (done: string[]) => void;
 };
 
 function FileButton({ action, label, primary }: { action: FileAction; label: string; primary?: boolean }) {
@@ -63,27 +69,35 @@ function FileButton({ action, label, primary }: { action: FileAction; label: str
 }
 
 /** The manual steps on Adobe's side, next to the files they need. */
-export function UploadChecklist({ storageId, zip, csv, zipLabel = "Unduh ZIP (SVG)", releaseTitles, onProgress }: Props) {
-  const [done, setDone] = useState<Set<string>>(new Set());
+export function UploadChecklist({ storageId, persist, initialDone, zip, csv, zipLabel = "Unduh ZIP (SVG)", releaseTitles, onProgress }: Props) {
+  const [done, setDone] = useState<Set<string>>(() => new Set(initialDone ?? []));
+  const [syncError, setSyncError] = useState(false);
   const interactive = Boolean(storageId);
 
   useEffect(() => {
-    // Ticks live in localStorage, which only exists in the browser.
+    // The stored row wins; without it, fall back to this browser's copy (localStorage only exists in the browser).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (storageId) setDone(readChecklistDone(storageId));
-  }, [storageId]);
+    if (storageId && !initialDone) setDone(readChecklistDone(storageId));
+  }, [storageId, initialDone]);
 
-  function toggle(id: string) {
+  async function toggle(id: string) {
     if (!storageId) return;
     const next = new Set(done);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setDone(next);
-    onProgress?.(next.size);
+    onProgress?.([...next]);
     try {
       localStorage.setItem(storageKey(storageId), JSON.stringify([...next]));
     } catch {
-      // Private mode: ticks just are not remembered.
+      // Private mode: the row below still keeps them.
+    }
+    if (persist) {
+      const { error } = await createClient()
+        .from("exports")
+        .update({ checklist_done: [...next] })
+        .eq("id", storageId);
+      setSyncError(Boolean(error));
     }
   }
 
@@ -141,6 +155,12 @@ export function UploadChecklist({ storageId, zip, csv, zipLabel = "Unduh ZIP (SV
       {interactive && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {done.size} dari {steps.length} langkah selesai
+          {!persist && " · hanya tersimpan di browser ini"}
+        </p>
+      )}
+      {syncError && (
+        <p role="alert" className="text-sm text-destructive">
+          Centang terakhir belum tersimpan ke Riwayat, jadi belum terlihat di perangkat lain. Periksa koneksi lalu centang lagi.
         </p>
       )}
       <ol className="space-y-1">

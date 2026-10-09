@@ -1,10 +1,10 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { CHECKLIST_STEPS, readChecklistDone, UploadChecklist } from "./upload-checklist";
+import { CHECKLIST_STEPS, UploadChecklist } from "./upload-checklist";
 
 export type HistoryRow = {
   id: string;
@@ -12,17 +12,15 @@ export type HistoryRow = {
   count: number;
   zipUrl: string | null;
   csvUrl: string | null;
+  /** Ticks stored on the export row: the same on every device. */
+  checklistDone: string[];
 };
 
 function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
   const [open, setOpen] = useState(startOpen);
-  const [done, setDone] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Progress lives in localStorage, which only exists in the browser.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDone(readChecklistDone(row.id).size);
-  }, [row.id]);
+  // Kept here, so closing and reopening the row shows this session's ticks too.
+  const [doneIds, setDoneIds] = useState(row.checklistDone);
+  const done = doneIds.length;
 
   const fileLink = cn("inline-flex items-center px-2 underline underline-offset-4 hover:decoration-2", tapTarget);
   const finished = done === CHECKLIST_STEPS;
@@ -43,7 +41,7 @@ function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
               {row.dateLabel} · <strong className="tabular-nums">{row.count}</strong> aset
             </span>
             <span className={cn("block text-xs", finished ? "text-success-foreground" : "text-muted-foreground")}>
-              {done === null ? "Checklist unggah" : finished ? "Semua langkah unggah selesai" : `Checklist unggah: ${done}/${CHECKLIST_STEPS} langkah`}
+              {finished ? "Semua langkah unggah selesai" : `Checklist unggah: ${done}/${CHECKLIST_STEPS} langkah`}
             </span>
           </span>
         </button>
@@ -65,9 +63,11 @@ function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
         <div id={`riwayat-${row.id}`} className="pt-2 pb-3 sm:pl-6">
           <UploadChecklist
             storageId={row.id}
+            persist
+            initialDone={doneIds}
             zip={row.zipUrl ? { href: row.zipUrl } : undefined}
             csv={row.csvUrl ? { href: row.csvUrl } : undefined}
-            onProgress={setDone}
+            onProgress={setDoneIds}
           />
         </div>
       )}

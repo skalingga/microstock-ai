@@ -95,8 +95,20 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Keeps the files for the export history and marks the assets as exported. Returns the export id, or null on failure. */
-export async function saveExport(supabase: Client, userId: string, result: ExportResult): Promise<string | null> {
+export type SavedExport = {
+  exportId: string;
+  /** False when the history was saved but the assets could not be marked exported (retry with markExported). */
+  marked: boolean;
+};
+
+/** Marks assets as exported. Returns false when the update failed, so the caller can say so and offer a retry. */
+export async function markExported(supabase: Client, assetIds: string[]): Promise<boolean> {
+  const { error } = await supabase.from("assets").update({ exported_at: new Date().toISOString() }).in("id", assetIds);
+  return !error;
+}
+
+/** Keeps the files for the export history and marks the assets as exported. Returns null when the history could not be saved. */
+export async function saveExport(supabase: Client, userId: string, result: ExportResult): Promise<SavedExport | null> {
   const exportId = crypto.randomUUID();
   const zipPath = `${userId}/exports/${exportId}.zip`;
   const csvPath = `${userId}/exports/${exportId}.csv`;
@@ -118,9 +130,10 @@ export async function saveExport(supabase: Client, userId: string, result: Expor
     return null;
   }
 
-  await supabase
-    .from("assets")
-    .update({ exported_at: new Date().toISOString() })
-    .in("id", result.included.map((i) => i.id));
-  return exportId;
+  // Checked, not assumed: an unmarked asset shows up again as "not exported" and could be uploaded twice.
+  const marked = await markExported(
+    supabase,
+    result.included.map((i) => i.id),
+  );
+  return { exportId, marked };
 }

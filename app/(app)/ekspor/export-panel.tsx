@@ -9,7 +9,7 @@ import { PenPath, ProgressLine, SelectionHandles } from "@/components/pen-motif"
 import { QcBadge } from "@/components/qc-badge";
 import { Button } from "@/components/ui/button";
 import { ADOBE } from "@/lib/adobe/rules";
-import { buildExport, downloadBlob, exportStamp, saveExport, type ExportResult } from "@/lib/export/build";
+import { buildExport, downloadBlob, exportStamp, markExported, saveExport, type ExportResult } from "@/lib/export/build";
 import { createClient } from "@/lib/supabase/client";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,8 @@ type Result = {
   stamp: string;
   /** undefined while saving, null when saving failed, else the stored export's id. */
   exportId: string | null | undefined;
+  /** Whether the assets were marked exported; false offers a retry. */
+  marked?: boolean;
 };
 
 const MAX_PER_EXPORT = 500;
@@ -77,6 +79,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
   const [building, setBuilding] = useState<{ phase: "build" | "save"; done: number; total: number } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [marking, setMarking] = useState(false);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const abort = useRef<AbortController | null>(null);
 
@@ -173,9 +176,9 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       downloadZip(next);
       setResult(next);
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
-      const exportId = await saveExport(supabase, userId, data);
-      setResult({ ...next, exportId });
-      if (exportId) {
+      const saved = await saveExport(supabase, userId, data);
+      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked });
+      if (saved?.marked) {
         setSelected(new Set());
         setConfirmedCek("");
       }
@@ -191,6 +194,22 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         resultHeading.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         resultHeading.current?.focus({ preventScroll: true });
       });
+    }
+  }
+
+  async function retryMark() {
+    if (!result) return;
+    setMarking(true);
+    const ok = await markExported(
+      createClient(),
+      result.data.included.map((i) => i.id),
+    );
+    setMarking(false);
+    if (ok) {
+      setResult({ ...result, marked: true });
+      setSelected(new Set());
+      setConfirmedCek("");
+      router.refresh();
     }
   }
 
@@ -219,11 +238,22 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
               Menyimpan ke Riwayat...
             </p>
           )}
-          {typeof result.exportId === "string" && (
+          {typeof result.exportId === "string" && result.marked && (
             <p className="text-sm" role="status">
               {included.length} aset ditandai sudah diekspor, jadi tidak muncul lagi di daftar &ldquo;belum diekspor&rdquo;. File dan
               checklist ini tersimpan di Riwayat ekspor.
             </p>
+          )}
+          {typeof result.exportId === "string" && result.marked === false && (
+            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
+              <span className="min-w-0 flex-1">
+                File tersimpan di Riwayat, tapi {included.length} aset gagal ditandai diekspor. Tanpa tanda itu mereka muncul lagi di
+                daftar &ldquo;belum diekspor&rdquo; dan bisa terunggah dua kali.
+              </span>
+              <Button type="button" size="sm" onClick={retryMark} disabled={marking}>
+                {marking ? "Menandai..." : "Tandai lagi"}
+              </Button>
+            </div>
           )}
           {result.exportId === null && included.length > 0 && (
             <p role="alert" className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
@@ -257,11 +287,14 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
               <h3 className="flex items-center gap-1 font-bold">
                 Unggah ke Adobe Stock
                 <InfoTip align="start" label="Tentang unggah">
-                  Ekstrak ZIP dan unggah ke portal paling mudah dari PC. Checklist ini bisa dibuka lagi dari Riwayat ekspor.
+                  {typeof result.exportId === "string"
+                    ? "Ekstrak ZIP dan unggah ke portal paling mudah dari PC. Centangmu tersimpan di Riwayat ekspor, jadi bisa dilanjutkan di perangkat lain."
+                    : "Ekstrak ZIP dan unggah ke portal paling mudah dari PC. Riwayat gagal disimpan, jadi centang ini hanya ada di browser ini."}
                 </InfoTip>
               </h3>
               <UploadChecklist
                 storageId={result.exportId ?? result.stamp}
+                persist={typeof result.exportId === "string"}
                 zip={{ onClick: () => downloadZip(result) }}
                 zipLabel="Unduh ZIP lagi"
                 csv={{ onClick: () => downloadCsv(result) }}

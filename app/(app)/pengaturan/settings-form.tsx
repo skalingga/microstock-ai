@@ -12,6 +12,7 @@ import { formatIdr } from "@/lib/budget";
 import type { Tables } from "@/lib/database.types";
 import { isImageStyle, AUTO_PROVIDERS, STYLES, formatBannedWords, formatPalettes, parseBannedWords, parsePalettes, toPalettes, toProviderOrder } from "@/lib/settings/schema";
 import { selectClass, tapTarget } from "@/lib/ui";
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { cn } from "@/lib/utils";
 import { simpanPengaturan, type SettingsField } from "./actions";
 
@@ -90,6 +91,8 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
   const initial = {
     primaryProvider: primary.provider as Provider,
     backupProvider: (backup?.provider ?? "") as Provider | "",
+    primaryModel: primary.model,
+    backupModel: backup?.model ?? "",
     budget: String(settings.kenari_monthly_budget_idr),
     imageModel: settings.kenari_image_model,
     style: settings.default_style,
@@ -101,6 +104,10 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
   const [pending, startTransition] = useTransition();
   const [primaryProvider, setPrimaryProvider] = useState(initial.primaryProvider);
   const [backupProvider, setBackupProvider] = useState(initial.backupProvider);
+  const [primaryModel, setPrimaryModel] = useState(initial.primaryModel);
+  const [backupModel, setBackupModel] = useState(initial.backupModel);
+  /** Why a model field just changed by itself, shown under it until the next edit there. */
+  const [modelNote, setModelNote] = useState<{ primary?: string; backup?: string }>({});
   const [budget, setBudget] = useState(initial.budget);
   const [imageModel, setImageModel] = useState(initial.imageModel);
   const [style, setStyle] = useState(initial.style);
@@ -111,13 +118,31 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
   const [summary, setSummary] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
-  // Leaving with unsaved edits asks first.
-  useEffect(() => {
-    if (!dirty) return;
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  // Leaving with unsaved edits asks first: closing the tab and in-app links (the sidebar, "Lihat hasil uji model").
+  useUnsavedGuard(dirty);
+
+  // A model id belongs to one provider: switching provider never keeps the other provider's id.
+  function changePrimaryProvider(next: Provider) {
+    if (next === primaryProvider) return;
+    if (next === backupProvider) {
+      // Picking the backup's provider swaps the two, models included.
+      setBackupProvider(primaryProvider);
+      setBackupModel(primaryModel);
+      setPrimaryModel(backupModel);
+      setModelNote({ primary: "Ditukar dengan cadangan.", backup: "Ditukar dengan utama." });
+    } else {
+      setPrimaryModel("");
+      setModelNote((n) => ({ ...n, primary: primaryModel ? `Dikosongkan (tadinya ${primaryModel}): model itu milik provider lain.` : undefined }));
+    }
+    setPrimaryProvider(next);
+  }
+
+  function changeBackupProvider(next: Provider | "") {
+    if (next === backupProvider) return;
+    setBackupModel("");
+    setModelNote((n) => ({ ...n, backup: backupModel && next ? `Dikosongkan (tadinya ${backupModel}): model itu milik provider lain.` : undefined }));
+    setBackupProvider(next);
+  }
 
   // After a failed save, take the user to the first field that needs fixing.
   useEffect(() => {
@@ -129,6 +154,9 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     formRef.current?.reset();
     setPrimaryProvider(initial.primaryProvider);
     setBackupProvider(initial.backupProvider);
+    setPrimaryModel(initial.primaryModel);
+    setBackupModel(initial.backupModel);
+    setModelNote({});
     setBudget(initial.budget);
     setImageModel(initial.imageModel);
     setStyle(initial.style);
@@ -304,7 +332,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                 id="primary_provider"
                 name="primary_provider"
                 value={primaryProvider}
-                onChange={(e) => setPrimaryProvider(e.target.value as Provider)}
+                onChange={(e) => changePrimaryProvider(e.target.value as Provider)}
                 className={selectClass}
               >
                 {AUTO_PROVIDERS.map((p) => (
@@ -314,12 +342,16 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                 ))}
               </select>
             </Field>
-            <Field name="primary_model" label="Model utama" hint="Kosong: model bawaan." error={errors.primary_model}>
+            <Field name="primary_model" label="Model utama" hint={modelNote.primary ?? "Kosong: model bawaan."} error={errors.primary_model}>
               <Input
                 id="primary_model"
                 name="primary_model"
                 list={`models-${primaryProvider}`}
-                defaultValue={primary.model}
+                value={primaryModel}
+                onChange={(e) => {
+                  setPrimaryModel(e.target.value);
+                  setModelNote((n) => ({ ...n, primary: undefined }));
+                }}
                 placeholder={modelPlaceholder(primaryProvider)}
                 className="font-mono text-sm"
                 autoComplete="off"
@@ -334,7 +366,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                 id="backup_provider"
                 name="backup_provider"
                 value={backupProvider}
-                onChange={(e) => setBackupProvider(e.target.value as Provider | "")}
+                onChange={(e) => changeBackupProvider(e.target.value as Provider | "")}
                 className={selectClass}
                 {...describe("backup_provider", errors.backup_provider)}
               >
@@ -348,12 +380,16 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
               </select>
             </Field>
             {backupProvider && (
-              <Field name="backup_model" label="Model cadangan" hint="Kosong: model bawaan." error={errors.backup_model}>
+              <Field name="backup_model" label="Model cadangan" hint={modelNote.backup ?? "Kosong: model bawaan."} error={errors.backup_model}>
                 <Input
                   id="backup_model"
                   name="backup_model"
                   list={`models-${backupProvider}`}
-                  defaultValue={backup?.model ?? ""}
+                  value={backupModel}
+                  onChange={(e) => {
+                    setBackupModel(e.target.value);
+                    setModelNote((n) => ({ ...n, backup: undefined }));
+                  }}
                   placeholder={modelPlaceholder(backupProvider)}
                   className="font-mono text-sm"
                   autoComplete="off"

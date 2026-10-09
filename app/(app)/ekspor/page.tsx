@@ -59,7 +59,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
       .in("qc_status", ["lolos", "perlu_cek"])
       .order("created_at", { ascending: false })
       .limit(500),
-    supabase.from("exports").select("id, asset_count, created_at, zip_path, csv_path").order("created_at", { ascending: false }).limit(10),
+    supabase.from("exports").select("id, asset_count, created_at, zip_path, csv_path, checklist_done").order("created_at", { ascending: false }).limit(10),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "menunggu"),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "gagal"),
     supabase
@@ -176,6 +176,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
               count: h.asset_count,
               zipUrl: (h.zip_path && fileByPath.get(h.zip_path)) || null,
               csvUrl: (h.csv_path && fileByPath.get(h.csv_path)) || null,
+              checklistDone: h.checklist_done,
             }))}
           />
         ) : (
