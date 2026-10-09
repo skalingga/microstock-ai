@@ -5,16 +5,18 @@ import { PageHeader } from "@/components/page-header";
 import { PenPath } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
+import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
-import { tapTarget } from "@/lib/ui";
+import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
 import { applyGalleryFilter, FILTERS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
 
 const PAGE_SIZE = 24;
+const BATCH_CHOICES = 50;
+const dayFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
 
 export default async function HalamanAset({ searchParams }: { searchParams: Promise<GalleryParams> }) {
   const filter = parseGalleryFilter(await searchParams);
@@ -36,7 +38,17 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
   const countOf = (qc?: FilterValue) =>
     applyGalleryFilter(supabase.from("assets").select("id", { count: "exact", head: true }), { ...filter, status: qc ?? "semua" });
 
-  const [{ data: assets, count, error }, all, menunggu, lolos, perluCek, gagal, pending, adobeCount, settings, jobInfo] = await Promise.all([
+  // The first assets of the whole filter, so "select all in this filter" works across pages.
+  const firstQuery = applyGalleryFilter(
+    supabase
+      .from("assets")
+      .select("id, title, qc_status, exported_at, adobe_status")
+      .order("created_at", { ascending: false })
+      .range(0, MAX_BULK_DELETE - 1),
+    filter,
+  );
+
+  const [{ data: assets, count, error }, all, menunggu, lolos, perluCek, gagal, pending, adobeCount, settings, jobInfo, { data: first }] = await Promise.all([
     query,
     countOf(),
     countOf("menunggu"),
@@ -47,7 +59,17 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
     applyGalleryFilter(supabase.from("assets").select("id", { count: "exact", head: true }), { ...filter, status: "semua", adobePending: true }),
     supabase.from("user_settings").select("banned_words").maybeSingle(),
     job ? supabase.from("generation_jobs").select("themes(title)").eq("id", job).maybeSingle() : null,
+    firstQuery,
   ]);
+
+  // Batches to pick from: the newest ones, plus the current one even when it is older.
+  const { data: jobRows } = await supabase
+    .from("generation_jobs")
+    .select("id, created_at, themes(title)")
+    .order("created_at", { ascending: false })
+    .limit(BATCH_CHOICES);
+  const batches = (jobRows ?? []).map((j) => ({ id: j.id, label: `${j.themes?.title ?? "Tanpa tema"} · ${dayFormat.format(new Date(j.created_at))}` }));
+  if (job && !batches.some((b) => b.id === job)) batches.push({ id: job, label: `${jobInfo?.data?.themes?.title ?? "Tanpa tema"} (batch ini)` });
   const counts: Record<FilterValue, number> = {
     semua: all.count ?? 0,
     menunggu: menunggu.count ?? 0,
@@ -128,14 +150,24 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
         </InfoTip>
       </div>
 
-      <form action="/aset" method="get" role="search" className="flex max-w-md gap-2">
-        {job && <input type="hidden" name="job" value={job} />}
+      <form action="/aset" method="get" role="search" className="flex flex-wrap gap-2">
+        {batches.length > 1 && (
+          <select name="job" defaultValue={job ?? ""} aria-label="Batch" className={cn(selectClass, "w-auto max-w-56")}>
+            <option value="">Semua batch</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {batches.length <= 1 && job && <input type="hidden" name="job" value={job} />}
         {status !== "semua" && <input type="hidden" name="status" value={status} />}
         {adobePending && <input type="hidden" name="adobe" value="belum" />}
-        <Input type="search" name="q" defaultValue={q} maxLength={MAX_SEARCH_LENGTH} placeholder="Cari judul aset" aria-label="Cari judul aset" />
+        <Input type="search" name="q" defaultValue={q} maxLength={MAX_SEARCH_LENGTH} placeholder="Cari judul aset" aria-label="Cari judul aset" className="w-auto min-w-48 max-w-xs flex-1" />
         <Button type="submit" variant="outline">
           <Search />
-          Cari
+          Terapkan
         </Button>
       </form>
 
@@ -168,6 +200,13 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
         <>
           <AssetGrid
             detailQuery={galleryQuery(filter)}
+            filterTotal={total}
+            filterFirst={(first ?? []).map((a) => ({
+              id: a.id,
+              exported: Boolean(a.exported_at),
+              adobeStatus: a.adobe_status,
+              exportable: Boolean(a.title) && (a.qc_status === "lolos" || a.qc_status === "perlu_cek"),
+            }))}
             assets={assets.map((asset) => ({
               id: asset.id,
               previewUrl: (asset.preview_path && urlByPath.get(asset.preview_path)) || undefined,
@@ -195,6 +234,16 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
               <span className="px-2 text-muted-foreground tabular-nums">
                 Halaman <span className="font-semibold text-foreground">{page}</span> dari {lastPage}
               </span>
+              <form action="/aset" method="get" className="flex items-center gap-1">
+                {job && <input type="hidden" name="job" value={job} />}
+                {status !== "semua" && <input type="hidden" name="status" value={status} />}
+                {adobePending && <input type="hidden" name="adobe" value="belum" />}
+                {q && <input type="hidden" name="q" value={q} />}
+                <Input type="number" name="page" min={1} max={lastPage} defaultValue={page} aria-label="Lompat ke halaman" className="w-16 tabular-nums" />
+                <Button type="submit" variant="ghost" size="sm">
+                  Buka
+                </Button>
+              </form>
               {page < lastPage ? (
                 <Link href={href({ page: page + 1 })} className={buttonVariants({ variant: "outline" })}>
                   Berikutnya

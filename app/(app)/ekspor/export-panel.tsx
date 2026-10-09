@@ -9,6 +9,7 @@ import { PenPath, ProgressLine, SelectionHandles } from "@/components/pen-motif"
 import { QcBadge } from "@/components/qc-badge";
 import { Button } from "@/components/ui/button";
 import { ADOBE } from "@/lib/adobe/rules";
+import { exportLabel } from "@/lib/export/label";
 import { buildExport, downloadBlob, exportStamp, markExported, saveExport, type ExportResult } from "@/lib/export/build";
 import { createClient } from "@/lib/supabase/client";
 import { tapTarget } from "@/lib/ui";
@@ -177,7 +178,12 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       downloadZip(next);
       setResult(next);
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
-      const saved = await saveExport(supabase, userId, data);
+      const includedIds = new Set(data.included.map((i) => i.id));
+      const exported = candidates.filter((c) => includedIds.has(c.id));
+      const saved = await saveExport(supabase, userId, data, {
+        label: exportLabel(exported.map((c) => c.groupLabel)),
+        releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
+      });
       setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked });
       if (saved?.marked) {
         setSelected(new Set());
@@ -541,7 +547,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                     {blockedReason}
                   </span>
                 ) : (
-                  <span className="max-sm:hidden">ZIP langsung terunduh; CSV ada di langkah unggah</span>
+                  <span>ZIP langsung terunduh; CSV ada di langkah unggah</span>
                 )}
                 <InfoTip align="start" label="Ukuran artboard">
                   Setiap SVG diberi ukuran artboard {ADOBE.artboard.maxSidePx} px (syarat Adobe: minimal {ADOBE.artboard.minMegapixels} MP).

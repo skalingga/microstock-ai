@@ -107,8 +107,16 @@ export async function markExported(supabase: Client, assetIds: string[]): Promis
   return !error;
 }
 
+/** What the history row records besides the files: how to name the export, and which assets need a release. */
+export type ExportSummary = { label: string; releaseTitles: string[] };
+
 /** Keeps the files for the export history and marks the assets as exported. Returns null when the history could not be saved. */
-export async function saveExport(supabase: Client, userId: string, result: ExportResult): Promise<SavedExport | null> {
+export async function saveExport(
+  supabase: Client,
+  userId: string,
+  result: ExportResult,
+  summary: ExportSummary = { label: "", releaseTitles: [] },
+): Promise<SavedExport | null> {
   const exportId = crypto.randomUUID();
   const zipPath = `${userId}/exports/${exportId}.zip`;
   const csvPath = `${userId}/exports/${exportId}.csv`;
@@ -124,7 +132,16 @@ export async function saveExport(supabase: Client, userId: string, result: Expor
 
   const insert = await supabase
     .from("exports")
-    .insert({ id: exportId, zip_path: zipPath, csv_path: csvPath, asset_count: result.included.length });
+    .insert({
+      id: exportId,
+      zip_path: zipPath,
+      csv_path: csvPath,
+      asset_count: result.included.length,
+      asset_ids: result.included.map((i) => i.id),
+      filenames: result.included.map((i) => i.filename),
+      label: summary.label,
+      release_titles: summary.releaseTitles,
+    });
   if (insert.error) {
     await storage.remove([zipPath, csvPath]);
     return null;

@@ -97,28 +97,40 @@ export type Database = {
       exports: {
         Row: {
           asset_count: number
+          asset_ids: string[]
           checklist_done: string[]
           created_at: string
           csv_path: string | null
+          filenames: string[]
           id: string
+          label: string
+          release_titles: string[]
           user_id: string
           zip_path: string | null
         }
         Insert: {
           asset_count?: number
+          asset_ids?: string[]
           checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
+          filenames?: string[]
           id?: string
+          label?: string
+          release_titles?: string[]
           user_id?: string
           zip_path?: string | null
         }
         Update: {
           asset_count?: number
+          asset_ids?: string[]
           checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
+          filenames?: string[]
           id?: string
+          label?: string
+          release_titles?: string[]
           user_id?: string
           zip_path?: string | null
         }
