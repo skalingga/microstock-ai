@@ -16,7 +16,7 @@ import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { cn } from "@/lib/utils";
 import { simpanPengaturan, type SettingsField } from "./actions";
 
-export type ModelOption = { id: string; note: string; tested: boolean };
+export type ModelOption = { id: string; note: string; tested: boolean; paid: boolean; testNote: string | null };
 
 type Provider = "kenari" | "gemini";
 
@@ -27,6 +27,8 @@ type Props = {
   /** What an empty model field falls back to on the server. */
   defaults: { kenari: string; gemini: string; image: string };
   imagePrices: Record<string, number>;
+  /** Average real cost of one SVG call per paid Kenari model, from provider_usage. */
+  svgCostIdr: Record<string, number>;
   options: Record<Provider, ModelOption[]>;
 };
 
@@ -81,12 +83,14 @@ function Field({
   );
 }
 
+const joinHint = (...parts: string[]) => parts.filter(Boolean).join(" ");
+
 const describe = (name: string, error?: string, hint?: unknown) => ({
   "aria-invalid": error ? true : undefined,
   "aria-describedby": error || hint ? `${name}-msg` : undefined,
 });
 
-export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePrices, options }: Props) {
+export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePrices, svgCostIdr, options }: Props) {
   const [primary, backup] = toProviderOrder(settings.provider_order);
   const initial = {
     primaryProvider: primary.provider as Provider,
@@ -94,6 +98,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     primaryModel: primary.model,
     backupModel: backup?.model ?? "",
     budget: String(settings.kenari_monthly_budget_idr),
+    textModel: settings.kenari_text_model,
     imageModel: settings.kenari_image_model,
     style: settings.default_style,
     palettes: formatPalettes(toPalettes(settings.palettes)),
@@ -109,6 +114,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
   /** Why a model field just changed by itself, shown under it until the next edit there. */
   const [modelNote, setModelNote] = useState<{ primary?: string; backup?: string }>({});
   const [budget, setBudget] = useState(initial.budget);
+  const [textModel, setTextModel] = useState(initial.textModel);
   const [imageModel, setImageModel] = useState(initial.imageModel);
   const [style, setStyle] = useState(initial.style);
   const [palettes, setPalettes] = useState(initial.palettes);
@@ -158,6 +164,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     setBackupModel(initial.backupModel);
     setModelNote({});
     setBudget(initial.budget);
+    setTextModel(initial.textModel);
     setImageModel(initial.imageModel);
     setStyle(initial.style);
     setPalettes(initial.palettes);
@@ -197,8 +204,8 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
       : budgetNumber === 0
         ? "0: semua model berbayar mati, termasuk Siluet dan Line art. Model gratis tetap jalan."
         : imagePrice && budgetNumber > spentIdr
-          ? `Sisa bulan ini ${formatIdr(budgetNumber - spentIdr)}: cukup untuk sekitar ${Math.floor((budgetNumber - spentIdr) / imagePrice)} gambar ${effectiveImageModel}. Model gratis tidak dihitung.`
-          : "Model gratis tidak dihitung.";
+          ? `Sisa bulan ini ${formatIdr(budgetNumber - spentIdr)}: cukup untuk sekitar ${Math.floor((budgetNumber - spentIdr) / imagePrice)} gambar ${effectiveImageModel}. Model teks berbayar memakai batas yang sama; model gratis tidak dihitung.`
+          : "Berlaku untuk model teks dan gambar berbayar. Model gratis tidak dihitung.";
   const budgetWarning =
     budgetNumber !== null && budgetNumber > 0 && budgetNumber < spentIdr
       ? `Lebih kecil dari pemakaian bulan ini (${formatIdr(spentIdr)}): model berbayar langsung berhenti sampai ${resetLabel}.`
@@ -208,6 +215,20 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
 
   const modelPlaceholder = (provider: Provider | "") =>
     provider === "gemini" ? `Bawaan: ${defaults.gemini}` : provider === "kenari" ? (defaults.kenari ? `Bawaan: ${defaults.kenari}` : "Bawaan server") : "";
+
+  // The line under a model field: free or paid, what an SVG costs, how it did in the model test.
+  const modelCost = (provider: Provider | "", model: string): string => {
+    if (!provider) return "";
+    const id = model.trim() || (provider === "gemini" ? defaults.gemini : defaults.kenari);
+    if (!id) return "";
+    if (provider === "gemini") return "Gemini free tier: gratis.";
+    const option = options.kenari.find((o) => o.id === id);
+    if (!option) return "";
+    if (!option.paid) return "Model gratis, tidak dihitung ke batas biaya.";
+    const avg = svgCostIdr[id];
+    const parts = ["Berbayar", avg !== undefined ? `±${formatIdr(avg)} per SVG` : "belum ada data biaya", option.testNote].filter(Boolean);
+    return `${parts.join(" · ")}.`;
+  };
 
   const bannedCount = parseBannedWords(banned).length;
   const paletteRows = parsePalettes(palettes);
@@ -342,7 +363,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                 ))}
               </select>
             </Field>
-            <Field name="primary_model" label="Model utama" hint={modelNote.primary ?? "Kosong: model bawaan."} error={errors.primary_model}>
+            <Field name="primary_model" label="Model utama" hint={modelNote.primary ?? joinHint("Kosong: model bawaan.", modelCost(primaryProvider, primaryModel))} error={errors.primary_model}>
               <Input
                 id="primary_model"
                 name="primary_model"
@@ -380,7 +401,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
               </select>
             </Field>
             {backupProvider && (
-              <Field name="backup_model" label="Model cadangan" hint={modelNote.backup ?? "Kosong: model bawaan."} error={errors.backup_model}>
+              <Field name="backup_model" label="Model cadangan" hint={modelNote.backup ?? joinHint("Kosong: model bawaan.", modelCost(backupProvider, backupModel))} error={errors.backup_model}>
                 <Input
                   id="backup_model"
                   name="backup_model"
@@ -402,7 +423,10 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
           <Field
             name="kenari_text_model"
             label="Model teks Kenari (konsep dan metadata)"
-            hint="Dipakai saat konsep dan metadata jalan di Kenari. Bisa model yang lebih murah, karena hanya teks. Kosong: sama dengan model Kenari di atas."
+            hint={joinHint(
+              "Dipakai saat konsep dan metadata jalan di Kenari. Bisa model yang lebih murah. Kosong: sama dengan model Kenari di atas.",
+              modelCost("kenari", textModel),
+            )}
             error={errors.kenari_text_model}
             className="sm:col-span-2"
           >
@@ -410,7 +434,8 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
               id="kenari_text_model"
               name="kenari_text_model"
               list="models-kenari"
-              defaultValue={settings.kenari_text_model}
+              value={textModel}
+              onChange={(e) => setTextModel(e.target.value)}
               placeholder="Sama dengan model Kenari di atas"
               className="font-mono text-sm"
               autoComplete="off"
