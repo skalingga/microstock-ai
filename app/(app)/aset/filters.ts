@@ -1,0 +1,61 @@
+import { UUID_RE } from "@/lib/assets";
+
+export const FILTERS = [
+  { value: "semua", label: "Semua" },
+  { value: "menunggu", label: "Menunggu" },
+  { value: "lolos", label: "Lolos" },
+  { value: "perlu_cek", label: "Perlu cek" },
+  { value: "gagal", label: "Gagal" },
+] as const;
+
+export type FilterValue = (typeof FILTERS)[number]["value"];
+
+/** What the gallery is showing. Carried into the detail page so "back" and prev/next stay in the same view. */
+export type GalleryFilter = {
+  job?: string;
+  status: FilterValue;
+  /** Exported assets still waiting for Adobe's decision. */
+  adobePending: boolean;
+  page: number;
+};
+
+export type GalleryParams = { job?: string; status?: string; page?: string; adobe?: string };
+
+export function parseGalleryFilter(params: GalleryParams): GalleryFilter {
+  return {
+    job: params.job && UUID_RE.test(params.job) ? params.job : undefined,
+    status: (FILTERS.find((f) => f.value === params.status)?.value ?? "semua") as FilterValue,
+    adobePending: params.adobe === "belum",
+    page: Math.max(1, Math.floor(Number(params.page)) || 1),
+  };
+}
+
+/** Query string (without "?") for a filter; empty for the plain gallery. */
+export function galleryQuery(filter: GalleryFilter, over: Partial<GalleryFilter> = {}): string {
+  const f = { ...filter, ...over };
+  const qs = new URLSearchParams();
+  if (f.job) qs.set("job", f.job);
+  if (f.adobePending) qs.set("adobe", "belum");
+  if (f.status !== "semua") qs.set("status", f.status);
+  if (f.page > 1) qs.set("page", String(f.page));
+  return qs.toString();
+}
+
+export function withQuery(path: string, query: string): string {
+  return query ? `${path}?${query}` : path;
+}
+
+type Filterable<Q> = {
+  eq(column: string, value: string): Q;
+  not(column: string, operator: string, value: null): Q;
+  is(column: string, value: null): Q;
+};
+
+/** Applies the gallery filter to an assets query. */
+export function applyGalleryFilter<Q extends Filterable<Q>>(query: Q, filter: GalleryFilter, opts: { status?: boolean } = {}): Q {
+  let q = query;
+  if (filter.job) q = q.eq("job_id", filter.job);
+  if (filter.adobePending) q = q.not("exported_at", "is", null).is("adobe_status", null);
+  if (opts.status !== false && filter.status !== "semua") q = q.eq("qc_status", filter.status);
+  return q;
+}

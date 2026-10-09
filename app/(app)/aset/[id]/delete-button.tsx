@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { hapusAset } from "../actions";
 
-export function DeleteButton({ id }: { id: string }) {
+export function DeleteButton({ id, hasAdobeData }: { id: string; /** Exported or reviewed: deleting loses that record too. */ hasAdobeData: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -23,7 +23,9 @@ export function DeleteButton({ id }: { id: string }) {
     <div className="space-y-2">
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm">Hapus aset ini secara permanen?</span>
+          <span className="text-sm">
+            Hapus aset ini secara permanen?{hasAdobeData && " Aset ini sudah diekspor atau punya keputusan Adobe; datanya ikut hilang."}
+          </span>
           <Button type="button" variant="destructive" size="sm" onClick={remove} disabled={pending}>
             {pending ? "Menghapus..." : "Ya, hapus"}
           </Button>
@@ -32,7 +34,7 @@ export function DeleteButton({ id }: { id: string }) {
           </Button>
         </div>
       ) : (
-        <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(true)}>
+        <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setConfirming(true)}>
           Hapus aset
         </Button>
       )}

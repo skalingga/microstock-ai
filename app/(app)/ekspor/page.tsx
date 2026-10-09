@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { StatCard } from "@/components/stat-card";
 import { redirect } from "next/navigation";
-import { AI_LABEL_REMINDER } from "@/lib/adobe/rules";
-import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
+import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { createClient } from "@/lib/supabase/server";
 import type { ReviewedAsset } from "@/lib/adobe/stats";
+import { STYLES } from "@/lib/settings/schema";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AcceptanceReport } from "./acceptance-report";
+import { ExportHistory } from "./export-history";
 import { ExportPanel, type Candidate } from "./export-panel";
+
+const dayFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "medium",
@@ -17,14 +19,8 @@ const dateFormat = new Intl.DateTimeFormat("id-ID", {
   timeZone: "Asia/Jakarta",
 });
 
-const CHECKLIST = [
-  "Ekstrak ZIP, lalu unggah file SVG-nya (Adobe tidak menerima ZIP untuk vektor).",
-  "Di Contributor Portal: Upload, pilih semua file SVG.",
-  `Centang "${AI_LABEL_REMINDER}" di setiap aset.`,
-  "Upload CSV agar judul, keyword, dan kategori terisi. Jangan ubah baris header.",
-  "Cek kategori dan peringatan ukuran artboard sebelum submit.",
-  "Aset dengan orang atau properti nyata butuh release.",
-];
+
+const statLink = cn("inline-flex items-center underline underline-offset-4 hover:decoration-2", tapTarget);
 
 function LoadError({ children }: { children: React.ReactNode }) {
   return (
@@ -34,7 +30,14 @@ function LoadError({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function HalamanEkspor() {
+export default async function HalamanEkspor({ searchParams }: { searchParams: Promise<{ pilih?: string }> }) {
+  // Assets picked in the gallery arrive as ?pilih=id,id,...
+  const { pilih } = await searchParams;
+  const preselect = (pilih ?? "")
+    .split(",")
+    .filter((id) => UUID_RE.test(id))
+    .slice(0, MAX_BULK_DELETE);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -51,12 +54,12 @@ export default async function HalamanEkspor() {
   ] = await Promise.all([
     supabase
       .from("assets")
-      .select("id, title, qc_status, exported_at, preview_path")
+      .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release")
       .not("title", "is", null)
       .in("qc_status", ["lolos", "perlu_cek"])
       .order("created_at", { ascending: false })
       .limit(500),
-    supabase.from("exports").select("id, asset_count, created_at, zip_path, csv_path").order("created_at", { ascending: false }).limit(10),
+    supabase.from("exports").select("id, asset_count, created_at, zip_path, csv_path, checklist_done").order("created_at", { ascending: false }).limit(10),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "menunggu"),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "gagal"),
     supabase
@@ -71,10 +74,16 @@ export default async function HalamanEkspor() {
       .is("adobe_status", null),
   ]);
 
-  // Style lives on the job, not the asset.
-  const jobIds = [...new Set((reviewed ?? []).map((r) => r.job_id))];
-  const { data: jobs } = jobIds.length > 0 ? await supabase.from("generation_jobs").select("id, style").in("id", jobIds) : { data: [] };
+  // Style and theme live on the job (batch), not the asset.
+  const jobIds = [...new Set([...(reviewed ?? []), ...(assets ?? [])].map((r) => r.job_id))];
+  const { data: jobs } =
+    jobIds.length > 0
+      ? await supabase.from("generation_jobs").select("id, style, created_at, themes(title)").in("id", jobIds)
+      : { data: [] };
+  const jobById = new Map((jobs ?? []).map((j) => [j.id, j]));
   const styleByJob = new Map((jobs ?? []).map((j) => [j.id, j.style]));
+  // Short form for the group line: "Line art", not "Line art (gambar AI, berbayar)".
+  const styleLabel = (v: string) => (STYLES.find((st) => st.value === v)?.label ?? v).replace(/\s*\(.*\)$/, "");
   const reviewedRows: ReviewedAsset[] = (reviewed ?? []).flatMap((r) =>
     r.adobe_status === "diterima" || r.adobe_status === "ditolak"
       ? [
@@ -101,6 +110,16 @@ export default async function HalamanEkspor() {
   const thumbByPath = new Map((thumbs?.data ?? []).map((s) => [s.path, s.signedUrl]));
   const fileByPath = new Map((files?.data ?? []).map((s) => [s.path, s.signedUrl]));
 
+  function groupOf(jobId: string) {
+    const job = jobById.get(jobId);
+    if (!job) return { groupId: jobId, groupLabel: "Batch tanpa keterangan", groupDetail: "" };
+    return {
+      groupId: jobId,
+      groupLabel: job.themes?.title ?? "Tanpa tema",
+      groupDetail: `${styleLabel(job.style)} · ${dayFormat.format(new Date(job.created_at))}`,
+    };
+  }
+
   const candidates: Candidate[] = (assets ?? []).flatMap((a) =>
     a.title && (a.qc_status === "lolos" || a.qc_status === "perlu_cek")
       ? [
@@ -109,7 +128,9 @@ export default async function HalamanEkspor() {
             title: a.title,
             status: a.qc_status,
             exportedAt: a.exported_at,
+            needsRelease: a.needs_release,
             thumbUrl: a.preview_path ? (thumbByPath.get(a.preview_path) ?? null) : null,
+            ...groupOf(a.job_id),
           },
         ]
       : [],
@@ -119,57 +140,27 @@ export default async function HalamanEkspor() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Ekspor"
-        description="ZIP berisi SVG dan CSV metadata untuk Adobe Stock."
-      >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
-          <StatCard label="Siap diekspor" value={assetsError ? "–" : readyCount} />
-          <StatCard
-            label="Menunggu QC"
-            value={waiting.error ? "–" : (waiting.count ?? 0)}
-            detail={
-              <Link
-                href="/aset?status=menunggu"
-                className={cn("inline-flex items-center font-semibold text-foreground underline underline-offset-4 hover:decoration-2", tapTarget)}
-              >
-                Proses di Aset
-              </Link>
-            }
-          />
-          <StatCard label="Gagal QC" value={failed.error ? "–" : (failed.count ?? 0)} />
-        </div>
+      <PageHeader title="Ekspor" description="ZIP berisi SVG dan CSV metadata untuk Adobe Stock.">
+        <p className="flex flex-wrap items-center gap-x-4 text-sm text-muted-foreground">
+          <span>
+            <strong className="text-foreground tabular-nums">{assetsError ? "–" : readyCount}</strong> Lolos belum diekspor
+          </span>
+          <Link href="/aset?status=menunggu" className={cn(statLink, "text-muted-foreground")}>
+            <strong className="text-foreground tabular-nums">{waiting.error ? "–" : (waiting.count ?? 0)}</strong>&nbsp;menunggu QC
+          </Link>
+          <Link href="/aset?status=gagal" className={cn(statLink, "text-muted-foreground")}>
+            <strong className="text-foreground tabular-nums">{failed.error ? "–" : (failed.count ?? 0)}</strong>&nbsp;gagal QC
+          </Link>
+        </p>
       </PageHeader>
 
       {assetsError ? (
         <LoadError>Daftar aset untuk ekspor tidak bisa dimuat. Muat ulang halaman.</LoadError>
       ) : (
-        <ExportPanel userId={user.id} candidates={candidates} />
+        <ExportPanel userId={user.id} candidates={candidates} preselect={preselect.length > 0 ? preselect : undefined} />
       )}
 
-      {reviewedError || awaiting.error ? (
-        <LoadError>Data penerimaan Adobe tidak bisa dimuat. Muat ulang halaman.</LoadError>
-      ) : (
-        <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
-      )}
-
-      <section className="space-y-4 rounded-2xl border bg-card p-5" aria-labelledby="checklist-heading">
-        <h2 id="checklist-heading" className="text-lg font-bold">
-          Checklist upload ke Adobe Stock
-        </h2>
-        <ol className="space-y-2.5 text-sm">
-          {CHECKLIST.map((step, i) => (
-            <li key={step} className="flex gap-3">
-              <span aria-hidden className="w-5 shrink-0 pt-0.5 text-right font-extrabold tabular-nums">
-                {i + 1}
-              </span>
-              <span className="pt-0.5 leading-relaxed">{step}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="space-y-3 rounded-2xl border bg-card p-5" aria-labelledby="riwayat-heading">
+      <section className="space-y-3" aria-labelledby="riwayat-heading">
         <h2 id="riwayat-heading" className="text-lg font-bold">
           Riwayat ekspor
         </h2>
@@ -178,35 +169,26 @@ export default async function HalamanEkspor() {
             Riwayat ekspor tidak bisa dimuat. Muat ulang halaman.
           </p>
         ) : history && history.length > 0 ? (
-          <ul className="divide-y text-sm">
-            {history.map((h) => {
-              const zip = h.zip_path ? fileByPath.get(h.zip_path) : undefined;
-              const csv = h.csv_path ? fileByPath.get(h.csv_path) : undefined;
-              return (
-                <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span>
-                    {dateFormat.format(new Date(h.created_at))} · {h.asset_count} aset
-                  </span>
-                  <span className="flex gap-1">
-                    {zip && (
-                      <a href={zip} className={cn("inline-flex items-center px-2 underline underline-offset-4", tapTarget)}>
-                        ZIP
-                      </a>
-                    )}
-                    {csv && (
-                      <a href={csv} className={cn("inline-flex items-center px-2 underline underline-offset-4", tapTarget)}>
-                        CSV
-                      </a>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <ExportHistory
+            rows={history.map((h) => ({
+              id: h.id,
+              dateLabel: dateFormat.format(new Date(h.created_at)),
+              count: h.asset_count,
+              zipUrl: (h.zip_path && fileByPath.get(h.zip_path)) || null,
+              csvUrl: (h.csv_path && fileByPath.get(h.csv_path)) || null,
+              checklistDone: h.checklist_done,
+            }))}
+          />
         ) : (
-          <p className="text-sm text-muted-foreground">Belum ada ekspor. File ZIP dan CSV yang kamu buat di atas akan muncul di sini.</p>
+          <p className="text-sm text-muted-foreground">Belum ada ekspor. Setiap ekspor muncul di sini dengan file dan checklist unggahnya, jadi bisa dilanjutkan nanti di PC.</p>
         )}
       </section>
+
+      {reviewedError || awaiting.error ? (
+        <LoadError>Data penerimaan Adobe tidak bisa dimuat. Muat ulang halaman.</LoadError>
+      ) : (
+        <AcceptanceReport rows={reviewedRows} awaiting={awaiting.count ?? 0} />
+      )}
     </div>
   );
 }

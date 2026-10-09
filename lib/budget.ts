@@ -7,6 +7,13 @@ export function startOfMonthWib(now: Date = new Date()): string {
   return new Date(monthStart - WIB_OFFSET_MS).toISOString();
 }
 
+/** ISO timestamp of the first moment of next month in WIB: when the current monthly budget ends. */
+export function startOfNextMonthWib(now: Date = new Date()): string {
+  const shifted = new Date(now.getTime() + WIB_OFFSET_MS);
+  const monthStart = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, 1);
+  return new Date(monthStart - WIB_OFFSET_MS).toISOString();
+}
+
 /** ISO timestamp of the start of the current day in WIB. */
 export function startOfDayWib(now: Date = new Date()): string {
   const shifted = new Date(now.getTime() + WIB_OFFSET_MS);

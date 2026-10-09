@@ -32,6 +32,8 @@ export async function buildExport(
   supabase: Client,
   assets: ExportAsset[],
   onProgress?: (done: number, total: number) => void,
+  /** Aborting stops between files; nothing is saved or marked. */
+  signal?: AbortSignal,
 ): Promise<ExportResult> {
   const zip = new JSZip();
   const used = new Set<string>();
@@ -40,6 +42,7 @@ export async function buildExport(
   const skipped: ExportResult["skipped"] = [];
 
   for (const [i, asset] of assets.entries()) {
+    signal?.throwIfAborted();
     onProgress?.(i, assets.length);
 
     const file = await supabase.storage.from("assets").download(asset.svg_path);
@@ -92,19 +95,31 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Keeps the files for the export history and marks the assets as exported. */
-export async function saveExport(supabase: Client, userId: string, result: ExportResult): Promise<boolean> {
+export type SavedExport = {
+  exportId: string;
+  /** False when the history was saved but the assets could not be marked exported (retry with markExported). */
+  marked: boolean;
+};
+
+/** Marks assets as exported. Returns false when the update failed, so the caller can say so and offer a retry. */
+export async function markExported(supabase: Client, assetIds: string[]): Promise<boolean> {
+  const { error } = await supabase.from("assets").update({ exported_at: new Date().toISOString() }).in("id", assetIds);
+  return !error;
+}
+
+/** Keeps the files for the export history and marks the assets as exported. Returns null when the history could not be saved. */
+export async function saveExport(supabase: Client, userId: string, result: ExportResult): Promise<SavedExport | null> {
   const exportId = crypto.randomUUID();
   const zipPath = `${userId}/exports/${exportId}.zip`;
   const csvPath = `${userId}/exports/${exportId}.csv`;
   const storage = supabase.storage.from("assets");
 
   const zipUpload = await storage.upload(zipPath, result.zip, { contentType: "application/zip" });
-  if (zipUpload.error) return false;
+  if (zipUpload.error) return null;
   const csvUpload = await storage.upload(csvPath, new Blob([result.csv], { type: "text/csv" }), { contentType: "text/csv" });
   if (csvUpload.error) {
     await storage.remove([zipPath]);
-    return false;
+    return null;
   }
 
   const insert = await supabase
@@ -112,12 +127,13 @@ export async function saveExport(supabase: Client, userId: string, result: Expor
     .insert({ id: exportId, zip_path: zipPath, csv_path: csvPath, asset_count: result.included.length });
   if (insert.error) {
     await storage.remove([zipPath, csvPath]);
-    return false;
+    return null;
   }
 
-  await supabase
-    .from("assets")
-    .update({ exported_at: new Date().toISOString() })
-    .in("id", result.included.map((i) => i.id));
-  return true;
+  // Checked, not assumed: an unmarked asset shows up again as "not exported" and could be uploaded twice.
+  const marked = await markExported(
+    supabase,
+    result.included.map((i) => i.id),
+  );
+  return { exportId, marked };
 }

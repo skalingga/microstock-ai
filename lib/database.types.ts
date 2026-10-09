@@ -97,6 +97,7 @@ export type Database = {
       exports: {
         Row: {
           asset_count: number
+          checklist_done: string[]
           created_at: string
           csv_path: string | null
           id: string
@@ -105,6 +106,7 @@ export type Database = {
         }
         Insert: {
           asset_count?: number
+          checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
           id?: string
@@ -113,6 +115,7 @@ export type Database = {
         }
         Update: {
           asset_count?: number
+          checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
           id?: string

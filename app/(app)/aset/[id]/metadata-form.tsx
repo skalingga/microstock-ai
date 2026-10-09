@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ADOBE, ADOBE_CATEGORIES, normalizeCategory } from "@/lib/adobe/rules";
+import { QC_LABEL } from "@/lib/assets";
 import { formatKeywordText, parseKeywordText } from "@/lib/metadata/keywords";
 import { selectClass } from "@/lib/ui";
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { cn } from "@/lib/utils";
 import { simpanMetadata } from "../actions";
 
@@ -28,12 +29,30 @@ function Counter({ value, max }: { value: number; max: number }) {
   );
 }
 
+/**
+ * The last save per asset. A save that changes the title remounts this form (its key follows the stored values), so
+ * the "Status QC sekarang" line is kept here for a moment instead of in component state.
+ */
+const lastSave = new Map<string, { status: string; at: number }>();
+const SAVED_NOTE_MS = 20_000;
+
 export function MetadataForm(props: Props) {
   const [title, setTitle] = useState(props.title ?? "");
   const [keywordText, setKeywordText] = useState(formatKeywordText(props.keywords));
   const [category, setCategory] = useState(normalizeCategory(props.category) ?? props.category ?? "");
   const [needsRelease, setNeedsRelease] = useState(props.needsRelease);
   const [error, setError] = useState<string | null>(null);
+  const [savedStatus, setSavedStatus] = useState<string | null>(() => {
+    const saved = lastSave.get(props.id);
+    return saved && performance.now() - saved.at < SAVED_NOTE_MS ? saved.status : null;
+  });
+
+  const initialKeywords = formatKeywordText(props.keywords);
+  const initialCategory = normalizeCategory(props.category) ?? props.category ?? "";
+  const dirty =
+    title !== (props.title ?? "") || keywordText !== initialKeywords || category !== initialCategory || needsRelease !== props.needsRelease;
+  // Leaving with typed but unsaved metadata (another asset, J/K, the gallery) asks first.
+  useUnsavedGuard(dirty, "Metadata aset ini belum disimpan. Pindah halaman dan buang perubahannya?");
   const [pending, startTransition] = useTransition();
 
   const keywordCount = parseKeywordText(keywordText).length;
@@ -44,8 +63,11 @@ export function MetadataForm(props: Props) {
       const result = await simpanMetadata(props.id, { title, keywords: keywordText, category, needsRelease });
       if (result.ok) {
         setError(null);
-        toast.success("Metadata disimpan.");
+        // Saving re-runs the metadata checks, so the QC status can change: say so where the user is looking.
+        setSavedStatus(result.status);
+        lastSave.set(props.id, { status: result.status, at: performance.now() });
       } else {
+        setSavedStatus(null);
         setError(result.error);
       }
     });
@@ -58,8 +80,17 @@ export function MetadataForm(props: Props) {
           <Label htmlFor="title">Judul</Label>
           <Counter value={title.trim().length} max={ADOBE.titleMaxChars} />
         </div>
-        <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short descriptive title" />
-        <p className="text-xs text-muted-foreground">Bahasa Inggris, tanpa koma atau karakter khusus.</p>
+        <Input
+          id="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Short descriptive title"
+          aria-invalid={title.includes(",") || undefined}
+          aria-describedby="title-hint"
+        />
+        <p id="title-hint" className={cn("text-xs", title.includes(",") ? "text-destructive" : "text-muted-foreground")}>
+          {title.includes(",") ? "Hapus koma dari judul: Adobe tidak menerimanya." : "Bahasa Inggris, tanpa koma atau karakter khusus."}
+        </p>
       </div>
 
       <div className="space-y-1.5">
@@ -90,7 +121,7 @@ export function MetadataForm(props: Props) {
       </div>
 
       <label className="flex items-center gap-2 text-sm max-sm:min-h-11 pointer-coarse:min-h-11">
-        <input type="checkbox" checked={needsRelease} onChange={(e) => setNeedsRelease(e.target.checked)} />
+        <input type="checkbox" className="size-4 accent-foreground" checked={needsRelease} onChange={(e) => setNeedsRelease(e.target.checked)} />
         Perlu Release (menggambarkan orang atau properti nyata)
       </label>
 
@@ -100,9 +131,16 @@ export function MetadataForm(props: Props) {
         </p>
       )}
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Menyimpan..." : "Simpan metadata"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Menyimpan..." : "Simpan metadata"}
+        </Button>
+        {savedStatus && !pending && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Tersimpan. Status QC sekarang: <strong className="text-foreground">{QC_LABEL[savedStatus] ?? savedStatus}</strong>.
+          </p>
+        )}
+      </div>
     </form>
   );
 }
