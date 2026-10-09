@@ -8,8 +8,8 @@ Tidak butuh API, key, atau screenshot.
 ## Yang dibangun
 
 ### A. Subjek yang pernah ditolak "similar" dipakai kembali
-1. **Kolom `assets.subject`** (migrasi baru, nullable). Diisi saat aset dibuat (`run-job.ts`, dari `concept.subject`).
-   Aset lama diisi dari `concept` (teks sebelum ". " pertama; format `describeConcept`).
+1. ~~Kolom `assets.subject`~~ Dibatalkan saat pengerjaan: subjek cukup diambil dari `assets.concept` (teks sebelum ". " pertama,
+   `subjectOf`), jadi tanpa migrasi dan aset lama langsung ikut.
 2. **Chip alasan cepat** di `app/(app)/aset/adobe-decision.tsx`: "Similar content", "Kualitas", "Lainnya" mengisi kolom
    alasan (masih bisa diedit). Penolakan "similar" dikenali dari alasan yang memuat kata `similar`/`serupa`.
 3. **`lib/subjects/saturation.ts`** (baru, murni, dengan tes): `normalizeSubject` (huruf kecil, buang kata gaya seperti

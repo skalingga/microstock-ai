@@ -17,6 +17,7 @@ import { competitionFromCount, daysUntil, deadlineStatus, provenanceOf, scoreThe
 import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import type { ProviderEntry } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
+import { matchSaturated, type SaturatedSubject } from "@/lib/subjects/saturation";
 import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
@@ -107,6 +108,7 @@ export function RisetForm({
   providerOrder,
   themeCostIdr,
   usedTitles,
+  saturated,
 }: {
   initialRows: ThemeRow[];
   initialRun: RunInfo | null;
@@ -116,6 +118,8 @@ export function RisetForm({
   themeCostIdr: Record<string, number>;
   /** Lowercased titles of themes already sent to Generate. */
   usedTitles: string[];
+  /** Subjects Adobe refused as similar content: themes that run into one get a note. */
+  saturated: SaturatedSubject[];
 }) {
   const [region, setRegion] = useState(initialRun?.region ?? "global");
   const [periodStart, setPeriodStart] = useState(() => initialPeriod(initialRun)[0]);
@@ -451,6 +455,7 @@ export function RisetForm({
                   row={row}
                   rowKey={key}
                   used={used.has(row.title.trim().toLowerCase())}
+                  saturated={matchSaturated(row.title, saturated)}
                   saved={savedKey === key}
                   onSave={(raw) => saveAdobeCount(key, raw)}
                 />
@@ -474,12 +479,14 @@ function ThemeItem({
   row,
   rowKey,
   used,
+  saturated,
   saved,
   onSave,
 }: {
   row: ThemeRow;
   rowKey: string;
   used: boolean;
+  saturated: SaturatedSubject[];
   saved: boolean;
   onSave: (raw: string) => void;
 }) {
@@ -514,6 +521,11 @@ function ThemeItem({
             {row.title}
             {used && <span className="ml-2 align-middle text-xs font-semibold text-muted-foreground normal-case">· sudah di-generate</span>}
           </p>
+          {saturated.length > 0 && (
+            <p className="text-sm font-medium text-warning-foreground">
+              Mirip subjek yang ditolak Adobe sebagai similar content: {saturated.map((s) => s.subject.toLowerCase()).join(", ")}. Pilih sudut yang lebih spesifik.
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             {row.event || "Tema sepanjang tahun"}
             {row.uploadBy &&

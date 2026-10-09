@@ -21,6 +21,8 @@ export type ConceptInput = {
   style: StyleId;
   palette: string[];
   count: number;
+  /** Subjects Adobe refused as similar content: the model must not propose them or close variants. */
+  avoid?: string[];
 };
 
 export type SvgInput = {

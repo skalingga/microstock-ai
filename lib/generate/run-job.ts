@@ -61,6 +61,8 @@ export type RunJobParams = {
   style: StyleId;
   palette: string[];
   count: number;
+  /** Subjects Adobe refused as similar content, kept out of the concepts. */
+  avoid?: string[];
   /** Model picked on the Generate page for the SVG calls; empty = the order from Settings. */
   model?: { provider: "kenari" | "gemini"; model: string };
   /** From the user's settings: used to judge the generated metadata. */
@@ -103,7 +105,7 @@ export async function runJob(p: RunJobParams): Promise<void> {
       (ctx) =>
         postJson<ConceptsResponse>(
           "/api/generate/concepts",
-          { theme: p.theme, style: p.style, palette: p.palette, count: p.count, ...skip(ctx) },
+          { theme: p.theme, style: p.style, palette: p.palette, count: p.count, avoid: p.avoid ?? [], ...skip(ctx) },
           p.signal,
         ).then((r) => {
           gate.update(r.rateLimit);

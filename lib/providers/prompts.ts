@@ -77,11 +77,16 @@ export function conceptsPrompt(input: ConceptInput): { system: string; user: str
       `Available palette: ${palette}`,
       "",
       `Propose exactly ${input.count} clearly different concepts for this theme. Vary subject, composition, and color combination so no two assets look alike.`,
+      // Adobe refuses "similar content": the plain version of a common object is already in its collection many times over.
+      "Every subject must be specific and distinctive, never the plain, most common version of an everyday object. Give each one a concrete differentiator: a particular variety, breed, or era, an unusual pairing of objects, or a distinctive pose or composition. No two concepts may share the same main object.",
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
       traced
         ? "Each concept must read clearly in black and white alone: a recognizable outline, no fine texture."
         : "Each concept must be easy to draw with a handful of flat vector shapes.",
       traced
-        ? "The concepts form ONE cohesive set sold together: the same visual language and level of detail. Vary the subject and composition, never the style. Prefer generic subjects; never a specific real product model."
+        ? "The concepts form ONE cohesive set sold together: the same visual language and level of detail. Vary the subject and composition, never the style. Subjects must be recognizable but specific; never a specific real product model."
         : "The concepts form ONE cohesive set sold together: the same visual language, the same level of detail, and colors only from the available palette. Vary the subject and composition, never the style.",
       ...SAFETY_RULES,
       "",

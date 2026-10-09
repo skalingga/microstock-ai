@@ -90,6 +90,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 4. Uji banding model gratis Kenari (5 tema x 6 model kandidat), pilih model utama dan cadangan
 - [x] 5. Gemini direct sebagai cadangan otomatis
 - [ ] 6. Uji ke Adobe: batch pertama 50-100 aset, catat tingkat penerimaan per provider
+- [ ] 6b. Anti-kejenuhan subjek (sisipan, `docs/PLAN-kejenuhan-subjek.md`): subjek yang ditolak Adobe "similar" jadi peringatan + daftar hindari, subjek konsep wajib spesifik
 - [x] 7. Gambar Kenari + konversi SVG: gaya Siluet dan Line art, adapter `gpt-image-2`, konversi di server, harga per gambar (Recraft jadi opsional)
 - [x] 8. Riset tema: kalender event, Google Trends, skor peluang
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro

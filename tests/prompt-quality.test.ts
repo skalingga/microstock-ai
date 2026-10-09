@@ -92,3 +92,21 @@ describe("withPresetPalettes", () => {
     for (const p of PRESET_PALETTES) for (const c of p.colors) expect(c).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 });
+
+describe("conceptsPrompt: similar content", () => {
+  const base = { theme: "ice cream", style: "line_art" as const, palette: [], count: 4 };
+
+  it("asks for specific subjects with one differentiator and no repeated main object", () => {
+    const prompt = conceptsPrompt(base).user;
+    expect(prompt).toContain("specific and distinctive");
+    expect(prompt).toContain("No two concepts may share the same main object");
+    expect(prompt).not.toContain("Prefer generic subjects");
+  });
+
+  it("lists the subjects Adobe refused only when there are some", () => {
+    expect(conceptsPrompt(base).user).not.toContain("already refused");
+    const prompt = conceptsPrompt({ ...base, avoid: ["Ice cream cone", "Galloping wild horse"] }).user;
+    expect(prompt).toContain("already refused");
+    expect(prompt).toContain("Ice cream cone; Galloping wild horse");
+  });
+});

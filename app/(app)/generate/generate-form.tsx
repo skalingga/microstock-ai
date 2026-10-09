@@ -16,6 +16,7 @@ import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
 import { formatIdr } from "@/lib/budget";
 import { KENARI_IMAGE_PRICES_IDR, imagePriceIdr } from "@/lib/providers/kenari-image-pricing";
 import { findBannedWords } from "@/lib/settings/banned";
+import { MAX_AVOID, matchSaturated, type SaturatedSubject } from "@/lib/subjects/saturation";
 import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import { STYLES, isImageStyle, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
@@ -52,6 +53,7 @@ export function GenerateForm({
   providerOrder,
   tested,
   svgCostIdr,
+  saturated,
   activeJob,
 }: {
   userId: string;
@@ -70,6 +72,8 @@ export function GenerateForm({
   tested: TestedModel[];
   /** Average real cost of one SVG call per paid Kenari model, from provider_usage. */
   svgCostIdr: Record<string, number>;
+  /** Subjects Adobe refused as similar content (from Aset): warned about and kept out of the concepts. */
+  saturated: SaturatedSubject[];
   /** Read-only card for a batch running elsewhere; hidden once this tab runs its own. */
   activeJob: React.ReactNode;
 }) {
@@ -179,6 +183,7 @@ export function GenerateForm({
     : Math.max(1, Math.ceil((count + 1) / REQUESTS_PER_MINUTE));
 
   const bannedHits = findBannedWords(theme, bannedWords);
+  const saturatedHits = matchSaturated(theme, saturated);
   const blockReason =
     theme.trim().length < 2
       ? "Isi tema dulu, minimal 2 huruf."
@@ -216,6 +221,7 @@ export function GenerateForm({
       style,
       palette,
       count,
+      avoid: saturated.slice(0, MAX_AVOID).map((s) => s.subject),
       model: traced ? (imageModel ? { provider: "kenari", model: imageModel } : undefined) : parseModelChoice(model),
       bannedWords,
       signal: controller.signal,
@@ -354,7 +360,7 @@ export function GenerateForm({
                 disabled={running}
                 placeholder="mis. autumn harvest icons"
                 aria-invalid={bannedHits.length > 0 ? true : undefined}
-                aria-describedby={cn(bannedHits.length > 0 && "theme-error", "theme-hint")}
+                aria-describedby={cn(bannedHits.length > 0 && "theme-error", saturatedHits.length > 0 && "theme-saturated", "theme-hint")}
               />
               {bannedHits.length > 0 && (
                 <p id="theme-error" className="text-sm text-destructive">
@@ -364,6 +370,12 @@ export function GenerateForm({
               <p id="theme-hint" className="text-sm text-muted-foreground">
                 Bahasa Inggris. Tanpa merek, tokoh, atau karakter: Adobe menolaknya.
               </p>
+              {saturatedHits.length > 0 && (
+                <p id="theme-saturated" className="text-sm font-medium">
+                  Mirip subjek yang ditolak Adobe sebagai &quot;similar content&quot;:{" "}
+                  {saturatedHits.map((s) => `${s.subject.toLowerCase()} (${s.count} aset)`).join(", ")}. Pilih subjek yang lebih spesifik.
+                </p>
+              )}
               {uploadBy && theme === initialTheme && (
                 <p className="text-sm font-medium">
                   Dari Riset: upload sebelum{" "}

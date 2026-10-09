@@ -14,6 +14,7 @@ export const conceptsRequestSchema = z.object({
   style,
   palette: z.array(hex).max(12).default([]),
   count: z.number().int().min(1, "Jumlah variasi minimal 1.").max(MAX_VARIATIONS, `Jumlah variasi maksimal ${MAX_VARIATIONS}.`),
+  avoid: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
 });
 
 // Model ids look like "deepseek-v4-flash", "vendor/model:free" (Kenari) or "gemini-3.5-flash".
