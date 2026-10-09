@@ -94,7 +94,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 7. Gambar Kenari + konversi SVG: gaya Siluet dan Line art, adapter `gpt-image-2`, konversi di server, harga per gambar (Recraft jadi opsional)
 - [x] 8. Riset tema: kalender event, Google Trends, skor peluang
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
-- [ ] 10. Gaya baru: ikon garis, ikon glyph, ubin geometris, mode satu subjek banyak variasi (rincian: `docs/PLAN-tahap-10-13.md`)
+- [ ] 10. Gaya baru: ikon garis, ikon glyph, ubin geometris, mode satu subjek banyak variasi (rincian: `docs/PLAN-tahap-10-13.md`). Kode selesai 9 Okt 2026, menunggu uji batch penuh pengguna
 - [ ] 11. Bundle: 16 aset Lolos jadi satu SVG grid 4x4 + metadata set
 
 Centang tahap setelah selesai dan diverifikasi pengguna.

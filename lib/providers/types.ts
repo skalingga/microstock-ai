@@ -23,6 +23,8 @@ export type ConceptInput = {
   count: number;
   /** Subjects Adobe refused as similar content: the model must not propose them or close variants. */
   avoid?: string[];
+  /** One subject drawn many ways instead of a set of different subjects. */
+  variations?: boolean;
 };
 
 export type SvgInput = {

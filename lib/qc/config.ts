@@ -27,6 +27,12 @@ export const QC = {
   similarity: {
     /** Perceptual hash (64 bit): at most this many differing bits counts as "looks the same". */
     maxHamming: 8,
+    /** Same, between assets of one "one subject, many variations" batch: they are alike on purpose, so only near copies count. */
+    maxHammingVariations: 3,
+  },
+  outline: {
+    /** Share of shapes that may carry a fill on an outline icon (an eye or a dot) before it needs a look. */
+    maxFilledShare: 0.25,
   },
   tile: {
     /** Seam mismatch relative to the strongest edge inside the tile; above this the tile does not join. */
@@ -39,7 +45,7 @@ export const QC = {
 } as const;
 
 /** Which checks apply to which style. */
-export const STYLE_RULES: Record<StyleId, { transparentBackground: boolean; seamless: boolean; boundsCheck: boolean }> = {
+export const STYLE_RULES: Record<StyleId, { transparentBackground: boolean; seamless: boolean; boundsCheck: boolean; outline?: boolean }> = {
   icon_set: { transparentBackground: true, seamless: false, boundsCheck: true },
   seamless_pattern: { transparentBackground: false, seamless: true, boundsCheck: false },
   flat_illustration: { transparentBackground: false, seamless: false, boundsCheck: true },
@@ -47,6 +53,10 @@ export const STYLE_RULES: Record<StyleId, { transparentBackground: boolean; seam
   abstract_background: { transparentBackground: false, seamless: false, boundsCheck: false },
   silhouette: { transparentBackground: true, seamless: false, boundsCheck: true },
   line_art: { transparentBackground: true, seamless: false, boundsCheck: true },
+  // Stage 10. The tile is a full-canvas square, so it has a background of its own.
+  line_icon: { transparentBackground: true, seamless: false, boundsCheck: true, outline: true },
+  glyph_icon: { transparentBackground: true, seamless: false, boundsCheck: true },
+  geometric_tile: { transparentBackground: false, seamless: false, boundsCheck: true },
 };
 
 export type ComplexityLimits = { minShapes: number; warnShapes: number; failShapes: number; warnPoints: number };
@@ -56,6 +66,9 @@ export type ComplexityLimits = { minShapes: number; warnShapes: number; failShap
 const COMPLEXITY_OVERRIDES: Partial<Record<StyleId, Partial<ComplexityLimits>>> = {
   silhouette: { minShapes: 1 },
   line_art: { warnShapes: 150, failShapes: 300, warnPoints: 4000 },
+  // An icon is one symbol: a handful of shapes. Starting guesses, to be tuned on Adobe's decisions (stage 6).
+  line_icon: { minShapes: 1, warnShapes: 40, failShapes: 100, warnPoints: 1200 },
+  glyph_icon: { minShapes: 1, warnShapes: 40, failShapes: 100, warnPoints: 1200 },
 };
 
 export function complexityFor(style: StyleId): ComplexityLimits {

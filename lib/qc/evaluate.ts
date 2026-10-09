@@ -4,6 +4,7 @@ import {
   checkBounds,
   checkComplexity,
   checkEmpty,
+  checkOutline,
   checkSeamless,
   checkSimilarity,
   checkText,
@@ -25,6 +26,8 @@ export type VisualInput = {
   /** Hashes of the user's other assets (this batch and history). */
   pool: HashPoolEntry[];
   selfId?: string;
+  /** Looser limit between assets of this batch (one-subject variations); see checkSimilarity. */
+  batchMaxHamming?: number;
 };
 
 /** The checks that need the SVG itself. Everything here is pure; measuring happens in lib/qc/measure.ts. */
@@ -42,7 +45,8 @@ export function evaluateVisual(input: VisualInput): { notes: QcNote[]; phash: st
   if (rules.boundsCheck) notes.push(checkBounds(input.bbox, input.viewBox));
   if (rules.transparentBackground) notes.push(checkTransparentBackground(input.pixels));
   if (rules.seamless) notes.push(checkSeamless(input.pixels));
-  notes.push(checkSimilarity(phash, input.pool, input.selfId));
+  if (rules.outline) notes.push(checkOutline(input.stats));
+  notes.push(checkSimilarity(phash, input.pool, input.selfId, input.batchMaxHamming));
 
   return { notes, phash };
 }

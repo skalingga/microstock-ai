@@ -21,7 +21,7 @@ import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import { STYLES, isImageStyle, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
-import { selectClass } from "@/lib/ui";
+import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 const REQUESTS_PER_MINUTE = 5; // observed on Kenari free models; the queue reads the real limit from headers
@@ -37,6 +37,11 @@ const STATUS_LABEL: Record<JobItem["status"], string> = {
   selesai: "Selesai",
   gagal: "Gagal",
 };
+
+const SET_MODES = [
+  { label: "Set beragam", variations: false },
+  { label: "Variasi satu subjek", variations: true },
+];
 
 /** A model from the latest /uji-model run, with its result. key = "provider|model". */
 export type TestedModel = { key: string; label: string; score: number };
@@ -79,6 +84,8 @@ export function GenerateForm({
 }) {
   const [theme, setTheme] = useState(initialTheme);
   const [style, setStyle] = useState<StyleId>(defaultStyle);
+  // false = a set of different subjects for the theme; true = one subject drawn many ways.
+  const [variations, setVariations] = useState(false);
   const [paletteIndex, setPaletteIndex] = useState(palettes.length > 0 ? "0" : "");
   // Kept as typed text so editing never jumps; clamped when the field is left.
   const [countText, setCountText] = useState("10");
@@ -222,6 +229,7 @@ export function GenerateForm({
       palette,
       count,
       avoid: saturated.slice(0, MAX_AVOID).map((s) => s.subject),
+      variations,
       model: traced ? (imageModel ? { provider: "kenari", model: imageModel } : undefined) : parseModelChoice(model),
       bannedWords,
       signal: controller.signal,
@@ -403,6 +411,36 @@ export function GenerateForm({
               </div>
               <StylePreview style={style} palette={palette} />
             </div>
+
+            <fieldset className="space-y-2" disabled={running}>
+              <legend className="text-sm font-medium">Isi set</legend>
+              <div className="flex flex-wrap gap-1">
+                {SET_MODES.map((mode) => (
+                  <label
+                    key={mode.label}
+                    className={cn(
+                      "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm",
+                      tapTarget,
+                      variations === mode.variations ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="set-mode"
+                      checked={variations === mode.variations}
+                      onChange={() => setVariations(mode.variations)}
+                      className="accent-foreground"
+                    />
+                    {mode.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {variations
+                  ? "Tulis satu subjek sebagai tema, mis. tropical fish. Tiap aset subjek yang sama dengan pose, detail, atau pola berbeda."
+                  : "Tiap aset subjek berbeda dari tema yang sama."}
+              </p>
+            </fieldset>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

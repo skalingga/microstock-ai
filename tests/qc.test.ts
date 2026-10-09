@@ -192,7 +192,7 @@ describe("metadata checks", () => {
 
 describe("evaluateVisual and combine", () => {
   const icon = make(64, 64, (x, y) => ((x - 32) ** 2 + (y - 32) ** 2 < 300 ? RED : CLEAR));
-  const stats = { pathCount: 5, shapeCount: 8, pointCount: 40, hasText: false };
+  const stats = { pathCount: 5, shapeCount: 8, pointCount: 40, hasText: false, filledShapes: 8 };
   const viewBox = { x: 0, y: 0, width: 512, height: 512 };
   const inside = { x: 100, y: 100, width: 300, height: 300 };
   const base = { stats, viewBox, bbox: inside, pixels: icon, sanitizeNotes: [] as string[], pool: [] };

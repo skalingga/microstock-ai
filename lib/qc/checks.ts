@@ -116,14 +116,36 @@ export function checkSeamless(p: Pixels): QcNote {
   return { check: "pola", status: "ok", message: "Uji tile 2x2: tepi menyambung." };
 }
 
-export function checkSimilarity(phash: string, pool: HashPoolEntry[], selfId?: string): QcNote {
+/**
+ * Outline icons must be drawn with strokes: a few filled shapes (an eye, a dot) are fine, a mostly filled drawing is a
+ * glyph in the wrong style.
+ */
+export function checkOutline(stats: { shapeCount: number; filledShapes: number }): QcNote {
+  const share = stats.shapeCount === 0 ? 0 : stats.filledShapes / stats.shapeCount;
+  if (stats.filledShapes > 1 && share > QC.outline.maxFilledShare) {
+    return {
+      check: "kontur",
+      status: "cek",
+      message: `${stats.filledShapes} dari ${stats.shapeCount} bentuk berisi warna, padahal ikon garis seharusnya hanya berupa garis.`,
+    };
+  }
+  return { check: "kontur", status: "ok", message: "Ikon digambar dengan garis." };
+}
+
+/**
+ * Nearest look-alike in the pool. Entries made in the batch that is running count only when they are closer than
+ * `batchMaxHamming` (variations batches); everything else uses the normal limit.
+ */
+export function checkSimilarity(phash: string, pool: HashPoolEntry[], selfId?: string, batchMaxHamming?: number): QcNote {
   let nearest: { id: string; distance: number } | null = null;
   for (const entry of pool) {
     if (!entry.phash || entry.id === selfId) continue;
     const distance = hammingHex(phash, entry.phash);
+    const limit = entry.batch && batchMaxHamming !== undefined ? batchMaxHamming : QC.similarity.maxHamming;
+    if (distance > limit) continue;
     if (!nearest || distance < nearest.distance) nearest = { id: entry.id, distance };
   }
-  if (nearest && nearest.distance <= QC.similarity.maxHamming) {
+  if (nearest) {
     return {
       check: "kemiripan",
       status: "cek",

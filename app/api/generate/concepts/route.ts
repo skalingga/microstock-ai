@@ -3,6 +3,7 @@ import { ProviderError } from "@/lib/providers/errors";
 import type { StyleId } from "@/lib/settings/schema";
 import { findBannedWords } from "@/lib/settings/banned";
 import { unifyPalettes } from "@/lib/generate/concept";
+import { colorRangeFor } from "@/lib/settings/schema";
 import { conceptsRequestSchema } from "@/lib/generate/schemas";
 
 // Stay under Vercel's 60s Hobby limit (CLAUDE.md rule 3); the provider call itself times out at 55s.
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
       if (concepts.length === 0) {
         throw new ProviderError("bad_output", "Semua konsep yang dihasilkan mengandung kata terlarang. Coba lagi.");
       }
-      return { ...result, concepts: unifyPalettes(concepts, input.palette) };
+      return { ...result, concepts: unifyPalettes(concepts, input.palette, colorRangeFor(input.style)) };
     },
   });
 }
