@@ -177,8 +177,9 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         return;
       }
 
-      // Files in hand first, then the server marks the assets exported.
-      downloadZip(next);
+      // Save to the history first, then download. A phone (iOS Safari) can suspend the page while a file downloads,
+      // which used to cut the save short: the files were never kept and the assets were never marked. The files
+      // are in memory either way, and a stored export can be downloaded again from the history.
       setResult(next);
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
       const includedIds = new Set(data.included.map((i) => i.id));
@@ -189,6 +190,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         fictionalFiles: fictionalFilesOf(data.included, candidates),
       });
       setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked });
+      downloadZip(next);
       if (saved?.marked) {
         setSelected(new Set());
         setConfirmedCek("");
@@ -550,8 +552,8 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold" aria-live="polite">
                   {building.phase === "build"
-                    ? `Menyiapkan ${building.done} dari ${building.total} SVG...`
-                    : "ZIP terunduh. Menyimpan ke Riwayat..."}
+                    ? `Menyiapkan ${building.done} dari ${building.total} berkas...`
+                    : "Menyimpan ke Riwayat. ZIP terunduh setelah ini..."}
                 </p>
                 {building.phase === "build" && (
                   <Button type="button" variant="outline" size="sm" onClick={() => abort.current?.abort()}>
@@ -573,7 +575,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                     {blockedReason}
                   </span>
                 ) : (
-                  <span>ZIP langsung terunduh; CSV ada di langkah unggah</span>
+                  <span>ZIP terunduh otomatis; CSV diunduh terpisah dari kartu hasil</span>
                 )}
                 <InfoTip align="start" label="Ukuran artboard">
                   Setiap SVG diberi ukuran artboard {ADOBE.artboard.maxSidePx} px (syarat Adobe: minimal {ADOBE.artboard.minMegapixels} MP).
