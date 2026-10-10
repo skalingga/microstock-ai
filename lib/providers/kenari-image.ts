@@ -125,6 +125,12 @@ export class KenariImageProvider implements SvgProvider {
   generateThemes(): never {
     throw new ProviderError("not_implemented", "Model gambar tidak membuat tema.");
   }
+  generatePhotoPrompts(): never {
+    throw new ProviderError("not_implemented", "Model gambar tidak menulis prompt foto.");
+  }
+  generatePhotoMetadata(): never {
+    throw new ProviderError("not_implemented", "Model gambar tidak membuat metadata foto.");
+  }
 }
 
 function networkError(err: unknown): ProviderError {

@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { formatIdr, startOfMonthWib } from "@/lib/budget";
 import { ProviderError, httpStatusFor } from "@/lib/providers/errors";
 import { isFreeModel } from "@/lib/providers/kenari-pricing";
-import { imageOrder, orderForKind, runWithFallback, withoutPrimary, type UsageKind } from "@/lib/providers";
+import { imageOrder, orderForKind, runWithFallback, visionOrder, withoutPrimary, type UsageKind } from "@/lib/providers";
 import type { SvgProvider } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
 import { toProviderOrder, type ProviderEntry } from "@/lib/settings/schema";
@@ -22,6 +22,8 @@ type Options<S extends z.ZodTypeAny, R extends { model: string; costUsd?: number
   modelOverride?: (input: z.infer<S>) => ProviderEntry | undefined;
   /** True when this request is drawn by a Kenari image model and traced (SVG calls of the traced styles). */
   usesImageModel?: (input: z.infer<S>) => boolean;
+  /** True when the call sends an image (photo metadata): only providers that read images are tried. */
+  vision?: boolean;
   /** Time budget for this request when it differs from the default (the route's maxDuration must allow it). */
   budgetMs?: (input: z.infer<S>) => number | undefined;
 };
@@ -76,7 +78,9 @@ export async function handleGenerate<
   const savedOrder = toProviderOrder(settings.provider_order);
   const order = opts.usesImageModel?.(input)
     ? imageOrder(settings.kenari_image_model, override)
-    : orderForKind(skipPrimary && !override ? withoutPrimary(savedOrder) : savedOrder, opts.kind, settings.kenari_text_model, override);
+    : opts.vision
+      ? visionOrder(savedOrder)
+      : orderForKind(skipPrimary && !override ? withoutPrimary(savedOrder) : savedOrder, opts.kind, settings.kenari_text_model, override);
 
   try {
     const result = await runWithFallback(
