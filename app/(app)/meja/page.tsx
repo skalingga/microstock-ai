@@ -10,8 +10,9 @@ import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
 import { acceptanceRate, fetchDeskSummary, type Deadline } from "@/lib/dashboard/summary";
 import { fetchActiveJob } from "@/lib/generate/active-job";
 import { createClient } from "@/lib/supabase/server";
+import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { ActiveJobCard } from "../generate/active-job-card";
+import { ActiveJobCard, JOB_PREVIEWS } from "../generate/active-job-card";
 
 export const metadata: Metadata = { title: "Meja" };
 
@@ -29,7 +30,7 @@ export default async function HalamanMeja() {
   const [summary, activeJob, { data: settings }, { data: spent, error: spentError }, { count: lolosToday, error: lolosError }, recent] =
     await Promise.all([
       fetchDeskSummary(supabase),
-      fetchActiveJob(supabase),
+      fetchActiveJob(supabase, { previews: JOB_PREVIEWS }),
       supabase.from("user_settings").select("kenari_monthly_budget_idr").maybeSingle(),
       supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
       supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "lolos").gte("created_at", startOfDayWib()),
@@ -50,6 +51,20 @@ export default async function HalamanMeja() {
       hint: "Sudah diekspor, belum dicatat",
       href: "/aset/tinjau",
     },
+    // Only listed while something is open: the Adobe AI label is the step that must never be skipped.
+    ...(summary.unfinishedUploads > 0
+      ? [
+          {
+            count: summary.unfinishedUploads,
+            label: "Selesaikan unggahan",
+            hint:
+              summary.missingAiLabel > 0
+                ? `${summary.missingAiLabel} ekspor belum dicentang label AI Adobe`
+                : "Checklist unggah belum selesai",
+            href: "/ekspor#riwayat-heading",
+          },
+        ]
+      : []),
     { count: summary.readyToExport, label: "Siap diekspor", hint: "Lolos dengan metadata, belum diekspor", href: "/ekspor" },
     { count: summary.needsCheck, label: "Cek manual", hint: "Perlu cek sebelum diekspor", href: "/aset?status=perlu_cek" },
   ];
@@ -116,7 +131,7 @@ export default async function HalamanMeja() {
                 <WaitingRow
                   count={`${rate}%`}
                   label="Diterima Adobe"
-                  hint={`${summary.accepted} dari ${summary.accepted + summary.rejected} keputusan yang dicatat`}
+                  hint={`${summary.accepted} dari ${summary.accepted + summary.rejected} keputusan · laporan di Ekspor`}
                   href="/ekspor"
                   muted={false}
                 />
@@ -152,7 +167,7 @@ export default async function HalamanMeja() {
             <h2 id="recent-title" className="text-lg font-extrabold">
               Aset terbaru
             </h2>
-            <Link href="/aset" className="text-sm font-semibold underline underline-offset-4">
+            <Link href="/aset" className={cn("inline-flex items-center text-sm font-semibold underline underline-offset-4", tapTarget)}>
               Lihat semua di Aset
             </Link>
           </div>

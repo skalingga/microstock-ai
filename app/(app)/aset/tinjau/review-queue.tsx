@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { PenPath, ProgressLine } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { tapTarget } from "@/lib/ui";
+import { pinnedBar, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { simpanHasilAdobe } from "../actions";
 import { REASON_CHIPS } from "../adobe-decision";
@@ -88,7 +88,8 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
   }
 
   useEffect(() => {
-    if (rejecting) {
+    // On touch screens the keyboard would cover the reason chips, which are usually all that is needed.
+    if (rejecting && !window.matchMedia("(pointer: coarse)").matches) {
       reasonRef.current?.focus();
       // A carried-over reason is selected, so typing replaces it and Enter reuses it knowingly.
       if (carried) reasonRef.current?.select();
@@ -169,8 +170,8 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
       ) : (
         item && (
           // One grid, so the pinned decision bar can grow upward over the picture on phones (a sticky element stays inside its parent).
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6">
-            <div className="bg-checker flex aspect-square max-h-[60vh] items-center justify-center overflow-hidden rounded-md border max-sm:aspect-auto max-sm:h-[38dvh] lg:row-span-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6 lg:gap-y-5">
+            <div className="bg-checker flex aspect-square max-h-[60vh] items-center justify-center overflow-hidden rounded-md border max-lg:aspect-auto max-lg:h-[32dvh] max-lg:max-h-none lg:row-span-3">
               {item.svgUrl ? (
                 // Shown through <img>, never inline, so scripts in an SVG can never run.
                 // eslint-disable-next-line @next/next/no-img-element
@@ -180,19 +181,25 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
               )}
             </div>
 
-            <div className="space-y-1 lg:col-start-2">
-              <p className="text-sm text-muted-foreground tabular-nums">
-                Aset {index + 1} dari {items.length} · diekspor {item.exportedLabel}
-                {decided.has(item.id) && ` · sudah dicatat ${decided.get(item.id) === "diterima" ? "Diterima" : "Ditolak"}`}
-              </p>
-              <h2 className="text-2xl leading-tight font-extrabold tracking-tight">{item.title}</h2>
-              <Link href={`/aset/${item.id}`} className={cn("inline-flex items-center text-sm underline underline-offset-4", tapTarget)} target="_blank">
+            {/* Phones: the title comes first, so it is never under the decision bar; it is how assets are matched to Adobe's email. */}
+            <div className="space-y-1 max-lg:order-first lg:col-start-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-3">
+                <p className="text-sm text-muted-foreground tabular-nums">
+                  Aset {index + 1} dari {items.length} · diekspor {item.exportedLabel}
+                  {decided.has(item.id) && ` · sudah dicatat ${decided.get(item.id) === "diterima" ? "Diterima" : "Ditolak"}`}
+                </p>
+                <Link href={`/aset/${item.id}`} className={cn("inline-flex items-center text-sm underline underline-offset-4 lg:hidden", tapTarget)}>
+                  Detail
+                </Link>
+              </div>
+              <h2 className="text-2xl leading-tight font-extrabold tracking-tight max-lg:line-clamp-2 max-lg:text-lg">{item.title}</h2>
+              <Link href={`/aset/${item.id}`} className={cn("inline-flex items-center text-sm underline underline-offset-4 max-lg:hidden", tapTarget)} target="_blank">
                 Buka detail (tab baru)
               </Link>
             </div>
 
             {/* Phones: the decision bar is pinned above the tab bar, so every asset is one tap without scrolling. */}
-            <div className="z-20 space-y-3 lg:col-start-2 max-lg:sticky max-lg:bottom-[var(--tabbar-h)] max-lg:-mx-4 max-lg:border-t max-lg:bg-card max-lg:px-4 max-lg:py-3 sm:max-lg:mx-0 sm:max-lg:rounded-md sm:max-lg:border">
+            <div className={cn("space-y-3 lg:col-start-2", pinnedBar)}>
               {rejecting && (
                 <form
                   className="flex flex-wrap items-end gap-2"
@@ -253,14 +260,8 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
                 </p>
               )}
 
-              {/* Ditolak on the left, Diterima under the right thumb on phones; Diterima first on larger screens. */}
+              {/* Same order everywhere, in the DOM too: Ditolak left, Diterima under the right thumb. */}
               <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
-                <Button size="lg" className="w-full max-lg:order-2 lg:w-auto" onClick={() => save("diterima")} disabled={pending} aria-keyshortcuts="D">
-                  Diterima{" "}
-                  <kbd aria-hidden className={cn(kbd, "border-primary-foreground/30 bg-transparent text-primary-foreground/80")}>
-                    D
-                  </kbd>
-                </Button>
                 <Button
                   size="lg"
                   variant="outline"
@@ -273,6 +274,12 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
                   Ditolak{" "}
                   <kbd aria-hidden className={kbd}>
                     T
+                  </kbd>
+                </Button>
+                <Button size="lg" className="w-full lg:w-auto" onClick={() => save("diterima")} disabled={pending} aria-keyshortcuts="D">
+                  Diterima{" "}
+                  <kbd aria-hidden className={cn(kbd, "border-primary-foreground/30 bg-transparent text-primary-foreground/80")}>
+                    D
                   </kbd>
                 </Button>
               </div>

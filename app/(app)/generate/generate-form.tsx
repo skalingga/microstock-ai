@@ -21,7 +21,7 @@ import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import { STYLES, isImageStyle, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
-import { selectClass, tapTarget } from "@/lib/ui";
+import { pinnedBar, selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { ChoiceField, Swatches, type Choice } from "./choice-field";
 
@@ -396,7 +396,7 @@ export function GenerateForm({
           </CardHeader>
           <CardContent className="space-y-5">
             {lastJob && !running && !sameAsLast && (
-              <div className="flex items-center gap-3 rounded-md border border-dashed px-3 py-2">
+              <div className="flex items-center gap-3 rounded-md bg-muted px-3 py-2">
                 <RotateCcw className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 <p className="min-w-0 flex-1 text-sm">
                   <span className="block font-semibold">Ulangi batch terakhir</span>
@@ -542,10 +542,10 @@ export function GenerateForm({
               </p>
             </div>
 
-          <details className="group rounded-lg border" open={model !== "" || imageModel !== "" ? true : undefined}>
+          <details className="group border-y" open={model !== "" || imageModel !== "" ? true : undefined}>
             <summary
               className={cn(
-                "flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden",
+                "flex cursor-pointer list-none items-center gap-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden",
                 "min-h-11",
               )}
             >
@@ -555,7 +555,7 @@ export function GenerateForm({
                 {traced ? "Model gambar" : "Model SVG"}: {cost.modelLabel}
               </span>
             </summary>
-            <div className="space-y-2 border-t p-3">
+            <div className="space-y-2 border-t py-3">
               {traced ? (
                 <>
                   <div className="flex items-center gap-1">
@@ -624,8 +624,8 @@ export function GenerateForm({
         <aside
           aria-label="Ringkasan batch"
           className={cn(
-            "z-20 space-y-3",
-            "max-lg:sticky max-lg:bottom-[var(--tabbar-h)] max-lg:-mx-4 max-lg:mt-4 max-lg:border-t max-lg:bg-card max-lg:px-4 max-lg:py-3 sm:max-lg:mx-0 sm:max-lg:rounded-md sm:max-lg:border",
+            "z-20 space-y-3 max-lg:mt-4",
+            pinnedBar,
             "lg:sticky lg:top-6 lg:rounded-lg lg:border lg:bg-card lg:p-5",
           )}
         >

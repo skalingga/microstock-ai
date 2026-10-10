@@ -139,9 +139,9 @@ export function AssetGrid({
         className={cn(
           "space-y-2 rounded-md border p-2 text-sm transition-colors duration-150",
           // Only pinned while something is picked, so it does not take phone screen space the rest of the time.
-          // Phones: pinned to the bottom, within thumb reach and above the iPhone home indicator. Larger screens: pinned under the header.
+          // Phones: the shared full-width band above the tab bar (fixed, so it stays while the grid scrolls). Larger screens: pinned under the header.
           pinned
-            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(var(--tabbar-h)+0.5rem)] sm:sticky sm:top-16 lg:top-3"
+            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[var(--tabbar-h)] max-sm:mb-0 max-sm:rounded-none max-sm:border-0 max-sm:border-t max-sm:px-4 max-sm:py-3 max-sm:shadow-none sm:sticky sm:top-16 lg:top-3"
             : "bg-card/70",
         )}
       >
@@ -207,7 +207,7 @@ export function AssetGrid({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="sm:hidden"
+                className="min-w-11 sm:hidden"
                 onClick={() => setMore(!more)}
                 aria-expanded={more}
                 aria-label={more ? "Sembunyikan aksi lain" : "Aksi lain: pilih semua, batal, hapus"}

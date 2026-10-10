@@ -50,7 +50,7 @@ export function Sheet({
       // A click on the dialog box itself (not its content) is a click on the backdrop.
       onClick={(e) => e.target === ref.current && onClose()}
       className={cn(
-        "m-0 mt-auto max-h-[85dvh] w-full max-w-none flex-col overflow-hidden rounded-t-xl border bg-card p-0 text-foreground shadow-xl open:flex backdrop:bg-foreground/35",
+        "m-0 mt-auto max-h-[85dvh] w-full max-w-none flex-col overflow-hidden rounded-t-xl border bg-card p-0 text-foreground shadow-xl open:flex backdrop:bg-[oklch(0.15_0.01_60/0.45)]",
         "sm:m-auto sm:max-w-lg sm:rounded-lg",
         className,
       )}

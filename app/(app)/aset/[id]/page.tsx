@@ -226,8 +226,9 @@ export default async function HalamanDetailAset({
             ) : (
               <>
                 {problems.length > 0 && <ul className="space-y-2 text-sm">{problems.map(noteItem)}</ul>}
+                {/* Folded even when everything passes: the summary line says so, and Metadata moves up the page. */}
                 {passed.length > 0 && (
-                  <details className="group text-sm" open={problems.length === 0}>
+                  <details className="group text-sm">
                     <summary className={cn("inline-flex cursor-pointer list-none items-center gap-1 text-muted-foreground hover:text-foreground", tapTarget)}>
                       {passed.length} pemeriksaan lolos
                       <ChevronDown aria-hidden className="size-4 transition-transform duration-150 group-open:rotate-180" />

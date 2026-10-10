@@ -5,16 +5,16 @@ import { useEffect, useState } from "react";
 import { Anchor } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AI_LABEL_REMINDER, FICTIONAL_LABEL } from "@/lib/adobe/rules";
+import { CHECKLIST_STEPS, type ChecklistStepId } from "@/lib/export/checklist";
 import { createClient } from "@/lib/supabase/client";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 const PORTAL_URL = "https://contributor.stock.adobe.com/";
 
-type StepId = "zip" | "upload" | "ai" | "csv" | "check" | "release";
+type StepId = ChecklistStepId;
 
-const STEP_IDS: StepId[] = ["zip", "upload", "ai", "csv", "check", "release"];
-export const CHECKLIST_STEPS = STEP_IDS.length;
+export { CHECKLIST_STEPS };
 
 /** A file action: a click handler for a file still in memory, or a link to the stored copy. */
 export type FileAction = { onClick: () => void } | { href: string };

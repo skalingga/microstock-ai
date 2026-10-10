@@ -108,12 +108,18 @@
   --sidebar-ring: oklch(0.21 0.014 60);
 }
 
-/* Height of the phone tab bar (components/app-nav.tsx), for bars pinned above it. The sidebar replaces it from lg. */
+/* Height of the phone tab bar (components/app-nav.tsx: 1px rule + 4px top padding + 48px tabs + bottom padding), for bars
+   pinned above it. The sidebar replaces it from lg. */
 :root {
-  --tabbar-h: calc(3.5rem + max(0.25rem, env(safe-area-inset-bottom)));
+  --tabbar-h: calc(53px + max(0.25rem, env(safe-area-inset-bottom)));
+}
+/* Focus mode (Tinjau on phones): no tab bar, only the home indicator to clear. */
+:root:has([data-focus-mode]) {
+  --tabbar-h: env(safe-area-inset-bottom);
 }
 @media (width >= 64rem) {
-  :root {
+  :root,
+  :root:has([data-focus-mode]) {
     --tabbar-h: 0px;
   }
 }

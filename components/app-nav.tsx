@@ -130,6 +130,8 @@ export function AppNav({ email, logout, initialJob }: { email: string; logout: (
   const [moreOpen, setMoreOpen] = useState(false);
   const badge = batchProgress(useActiveJob(initialJob));
   const moreActive = MORE.some((item) => isActive(pathname, item.href));
+  // Adobe review is a focus mode on phones: the page has its own Tutup button.
+  const focusMode = isActive(pathname, "/aset/tinjau");
 
   return (
     <>
@@ -159,7 +161,10 @@ export function AppNav({ email, logout, initialJob }: { email: string; logout: (
 
       <nav
         aria-label="Navigasi utama"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] lg:hidden"
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] lg:hidden",
+          focusMode && "hidden",
+        )}
       >
         {TABS.map((item) => {
           const active = isActive(pathname, item.href);

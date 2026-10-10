@@ -30,7 +30,7 @@ function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
   const [doneIds, setDoneIds] = useState(row.checklistDone);
   const done = doneIds.length;
 
-  const fileLink = cn("inline-flex items-center px-2 underline underline-offset-4 hover:decoration-2", tapTarget);
+  const fileLink = cn("inline-flex min-w-11 items-center justify-center px-2 underline underline-offset-4 hover:decoration-2", tapTarget);
   const finished = done === CHECKLIST_STEPS;
 
   return (
