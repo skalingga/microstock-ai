@@ -78,6 +78,25 @@ bagian sebelum dan sesudahnya:
    berapa batas ukurannya, dan apakah masih masuk free tier. Model Kenari mana yang menerima gambar.
 6. Batas Supabase: ukuran file per upload dan total Storage di paket yang dipakai (lihat Risiko).
 
+## Hasil cek fakta (langkah 1, 10 Okt 2026)
+
+2. Nama file maks 30 karakter termasuk ekstensi, judul maks 70 karakter tanpa koma: sama dengan
+   vektor ([CSV requirements](https://helpx.adobe.com/stock/contributor/manage-your-portfolio/csv-requirements-content.html)).
+   Ekstensi `.jpg` (4 karakter) seperti `.svg`.
+3. Tidak ditemukan kolom CSV untuk "People and Property are fictional": tetap kotak centang di
+   portal. Checklist ekspor menampilkannya. Pastikan saat unggahan foto pertama.
+4. **Belum pasti.** Halaman ketentuan Google tidak bisa dibuka dari sandbox. Sumber pihak ketiga
+   saling bertentangan: hak komersial paket berbayar disebut tercakup, untuk akun gratis tidak jelas.
+   **Pengguna wajib membaca ketentuan Google (Generative AI Additional Terms / Flow) sebelum mengunggah
+   foto ke Adobe.** Kode boleh dikerjakan lebih dulu.
+5. Endpoint OpenAI-compatible Gemini menerima gambar sebagai `image_url` berisi data URL base64
+   (contoh resmi di dokumentasi "OpenAI compatibility"); URL jarak jauh tidak didukung. Batas ukuran
+   tidak tertulis: kirim JPEG kecil (sisi terpanjang 1024 px, sekitar 100-300 KB). Uji langsung di
+   preview Vercel (key tidak ada di sandbox).
+6. Supabase paket Free (dicek lewat MCP): bucket `assets` batas 20 MB per file, MIME
+   svg/png/zip/csv, 368 file = 10 MB. Total Storage paket Free 1 GB menurut sumber umum. Migrasi
+   menambah `image/jpeg`; batas 20 MB cukup karena file Flow sekitar 1 MB (Adobe maks 45 MB).
+
 ## Model data (satu migrasi, `photo_assets`)
 
 Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan ekspor dipakai ulang.
@@ -90,8 +109,7 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
   Prompt yang dipakai disimpan di `assets.concept` seperti konsep vektor.
 - `generation_jobs.style` check ditambah `'photo'`. Satu job = satu set prompt untuk satu tema.
 - `user_settings.photo_model_label text` (bawaan `nano-banana-pro`), opsional.
-- Bucket `assets`: tambah mime `image/jpeg` dan naikkan `file_size_limit` sesuai batas Adobe
-  (cek fakta 1 dan 6). Jalur: `{user_id}/photo/{asset_id}.jpg`, preview tetap
+- Bucket `assets`: tambah mime `image/jpeg` (batas 20 MB per file tetap). Jalur: `{user_id}/photo/{asset_id}.jpg`, preview tetap
   `{user_id}/preview/{asset_id}.png` (atau webp). RLS storage yang ada sudah membatasi per folder user.
 - `provider_usage.kind` dipakai ulang: prompt foto = `concepts`, metadata vision = `metadata`.
 - Semua kolom baru ikut RLS tabel yang sudah ada. Perbarui `lib/database.types.ts`.
