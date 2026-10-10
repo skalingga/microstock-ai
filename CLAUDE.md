@@ -95,6 +95,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [x] 8. Riset tema: kalender event, Google Trends, skor peluang
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 - [ ] 10. Gaya baru: ikon garis, ikon glyph, ubin geometris, mode satu subjek banyak variasi (rincian: `docs/PLAN-tahap-10-13.md`). Kode selesai 9 Okt 2026, menunggu uji batch penuh pengguna
+- [ ] 12b. Foto otomatis lewat API resmi Gemini/Nano Banana (rencana: `docs/PLAN-foto-api.md`, berbayar per foto dengan batas bulanan USD, tombol eksplisit). Belum dimulai: menunggu data penerimaan Adobe untuk foto dari Tahap 12 dan persetujuan perubahan aturan Provider
 - [ ] 11. Bundle: 16 aset Lolos jadi satu SVG grid 4x4 + metadata set
 - [ ] 12. Mode foto (Google Flow, setengah manual; rincian: `docs/PLAN-mode-foto.md`): aplikasi menulis prompt foto, pengguna generate di Flow lalu mengunggah hasilnya, aplikasi menjalankan QC foto, metadata AI vision, ekspor JPEG + CSV. Flow tidak diotomatisasi. Video ditunda. Kode selesai 10 Okt 2026 di branch `dev`, menunggu uji pengguna
 
