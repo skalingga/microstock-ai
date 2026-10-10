@@ -46,13 +46,30 @@ bagian sebelum dan sesudahnya:
 - Aturan 3 iterasi serupa per tema berlaku juga untuk foto. Contoh screenshot (banyak adegan terapi
   dua orang di sofa) sudah berisiko "similar".
 
+## Temuan 10 Okt 2026
+
+- **Flow (screenshot pengguna):** unduhan "1K Original size" = 768p (Nano Banana Pro, 16:9) atau
+  896p (Nano Banana 2.1), sekitar 1 MP. "2K Upscale" tersedia di akun pengguna; "4K" butuh paket
+  Google AI berbayar. Contoh unduhan 2K yang diterima di chat: 16:9 = 2576×1438 (3,7 MP),
+  4:3 = 2400×1792 (4,3 MP); ukuran asli di HP belum dipastikan (chat bisa mengecilkan gambar).
+  Tidak ada watermark terlihat di contoh.
+- **Adobe foto** ([syarat teknis](https://helpx.adobe.com/stock/contributor/submit-your-content/submit-photos/technical-legal-requirements-photo-submission.html),
+  dicek 10 Okt 2026): 4–100 MP, maks 45 MB, JPEG sRGB, tanpa watermark, timestamp, branding,
+  bingkai, atau teks tempelan.
+- **Akibatnya:** 1K selalu ditolak (QC Gagal dengan pesan "Unduh ulang dari Flow dengan 2K").
+  2K berada tipis di sekitar batas 4 MP, terutama 16:9; QC menghitung MP persis dari file.
+  Upscale 2K dari Flow adalah upscale; Adobe tidak punya aturan resmi soal itu (hanya saran komunitas
+  agar tidak upsample), jadi catat tingkat penerimaan foto 2K di data Tahap 6.
+- **Dari contoh foto:** punggung buku berisi tulisan acak dan kotak tisu dengan bulatan mirip logo.
+  Prompt foto harus melarang tulisan, label, dan kemasan bermerek; vision menandai "teks acak/logo".
+
 ## Fakta yang wajib dicek saat implementasi (jangan menebak)
 
-1. Syarat teknis foto Adobe: format (JPEG saja?), resolusi minimum (MP), ukuran file maksimum,
-   ruang warna, apakah foto AI harus di-upscale. Simpan di `lib/adobe/rules.ts` dengan tautan sumber.
+1. Syarat teknis foto Adobe: sudah dicek (lihat Temuan). Saat implementasi cek ulang dan simpan di
+   `lib/adobe/rules.ts` dengan tautan sumber.
 2. Batas nama file dan judul untuk foto (sama dengan vektor: 30 karakter dan 70 karakter?).
 3. Apakah CSV Adobe punya kolom untuk "fictional" atau tetap dicentang manual di portal.
-4. Ketentuan Google: penggunaan komersial hasil Flow untuk paket pengguna, dan watermark
+4. Ketentuan Google: penggunaan komersial hasil Flow untuk akun tanpa paket Google AI berbayar, dan watermark
    terlihat (SynthID tidak terlihat tidak masalah; logo terlihat harus tidak ada).
 5. Gemini 3.5 Flash-Lite lewat endpoint OpenAI-compatible menerima gambar (`image_url` data URL),
    berapa batas ukurannya, dan apakah masih masuk free tier. Model Kenari mana yang menerima gambar.
@@ -148,8 +165,8 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
 
 ## Pertanyaan terbuka (tanya pengguna sebelum langkah terkait)
 
-1. Berapa ukuran (px) file yang diunduh dari Flow untuk Nano Banana Pro, dan apakah ada pilihan
-   unduh resolusi lebih besar? Menentukan perlu tidaknya upscale.
+1. Sebagian terjawab (lihat Temuan): 2K Upscale wajib. Tersisa: ukuran px asli file 2K di HP
+   (16:9) dan formatnya (JPEG atau PNG).
 2. Urutan: kerjakan sebelum atau sesudah Tahap 11 (bundle)? Tahap 6 tetap butuh data keputusan Adobe.
 3. Simpan file asli foto selamanya, atau hapus otomatis setelah ditandai diterima Adobe?
 
