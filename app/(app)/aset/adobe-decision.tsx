@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export type AdobeDecisionValue = "diterima" | "ditolak";
 
 /** Adobe's usual rejection reasons: one tap instead of typing. Similar content feeds the warnings on Generate and Riset. */
-const REASON_CHIPS = ["Similar content", "Quality", "Metadata"];
+export const REASON_CHIPS = ["Similar content", "Quality", "Metadata"];
 
 const CHOICES: { value: AdobeDecisionValue; label: string }[] = [
   { value: "diterima", label: "Diterima" },

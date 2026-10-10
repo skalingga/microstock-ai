@@ -6,8 +6,10 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { PenPath, ProgressLine } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { simpanHasilAdobe } from "../actions";
+import { REASON_CHIPS } from "../adobe-decision";
 
 export type ReviewItem = {
   id: string;
@@ -19,7 +21,8 @@ export type ReviewItem = {
 
 type Decision = "diterima" | "ditolak";
 
-const kbd = "rounded-sm border bg-muted px-1 font-mono text-[0.7rem] text-muted-foreground";
+// Keyboard hints are for a keyboard: hidden on touch screens, and kept out of the button names (aria-keyshortcuts says it).
+const kbd = "rounded-sm border bg-muted px-1 font-mono text-[0.7rem] text-muted-foreground pointer-coarse:hidden";
 
 /** Adobe decisions one asset at a time: D accepts, T rejects (then type the reason and press Enter), L skips. */
 export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; total: number; backHref: string }) {
@@ -165,8 +168,9 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
         </div>
       ) : (
         item && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="bg-checker flex aspect-square max-h-[60vh] items-center justify-center overflow-hidden rounded-md border max-sm:aspect-auto max-sm:h-[34vh]">
+          // One grid, so the pinned decision bar can grow upward over the picture on phones (a sticky element stays inside its parent).
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6">
+            <div className="bg-checker flex aspect-square max-h-[60vh] items-center justify-center overflow-hidden rounded-md border max-sm:aspect-auto max-sm:h-[38dvh] lg:row-span-3">
               {item.svgUrl ? (
                 // Shown through <img>, never inline, so scripts in an SVG can never run.
                 // eslint-disable-next-line @next/next/no-img-element
@@ -176,27 +180,19 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
               )}
             </div>
 
-            <div className="space-y-5">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground tabular-nums">
-                  Aset {index + 1} dari {items.length} · diekspor {item.exportedLabel}
-                  {decided.has(item.id) && ` · sudah dicatat ${decided.get(item.id) === "diterima" ? "Diterima" : "Ditolak"}`}
-                </p>
-                <h2 className="text-2xl leading-tight font-extrabold tracking-tight">{item.title}</h2>
-                <Link href={`/aset/${item.id}`} className="text-sm underline underline-offset-4" target="_blank">
-                  Buka detail (tab baru)
-                </Link>
-              </div>
+            <div className="space-y-1 lg:col-start-2">
+              <p className="text-sm text-muted-foreground tabular-nums">
+                Aset {index + 1} dari {items.length} · diekspor {item.exportedLabel}
+                {decided.has(item.id) && ` · sudah dicatat ${decided.get(item.id) === "diterima" ? "Diterima" : "Ditolak"}`}
+              </p>
+              <h2 className="text-2xl leading-tight font-extrabold tracking-tight">{item.title}</h2>
+              <Link href={`/aset/${item.id}`} className={cn("inline-flex items-center text-sm underline underline-offset-4", tapTarget)} target="_blank">
+                Buka detail (tab baru)
+              </Link>
+            </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button size="lg" onClick={() => save("diterima")} disabled={pending} aria-keyshortcuts="D">
-                  Diterima <kbd className={cn(kbd, "border-primary-foreground/30 bg-transparent text-primary-foreground/80")}>D</kbd>
-                </Button>
-                <Button size="lg" variant="outline" onClick={() => setRejecting(true)} disabled={pending} aria-keyshortcuts="T" aria-expanded={rejecting}>
-                  Ditolak <kbd className={kbd}>T</kbd>
-                </Button>
-              </div>
-
+            {/* Phones: the decision bar is pinned above the tab bar, so every asset is one tap without scrolling. */}
+            <div className="z-20 space-y-3 lg:col-start-2 max-lg:sticky max-lg:bottom-[var(--tabbar-h)] max-lg:-mx-4 max-lg:border-t max-lg:bg-card max-lg:px-4 max-lg:py-3 sm:max-lg:mx-0 sm:max-lg:rounded-md sm:max-lg:border">
               {rejecting && (
                 <form
                   className="flex flex-wrap items-end gap-2"
@@ -205,6 +201,29 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
                     save("ditolak");
                   }}
                 >
+                  <span className="flex w-full flex-wrap gap-1" role="group" aria-label="Alasan yang sering muncul">
+                    {REASON_CHIPS.map((chip) => {
+                      const on = reason.trim().toLowerCase() === chip.toLowerCase();
+                      return (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => {
+                            setReason(chip);
+                            setCarried(false);
+                          }}
+                          aria-pressed={on}
+                          className={cn(
+                            "inline-flex min-h-8 items-center rounded-md border px-2.5 text-xs font-medium hover:bg-muted/50",
+                            tapTarget,
+                            on && "border-foreground bg-secondary font-semibold",
+                          )}
+                        >
+                          {chip}
+                        </button>
+                      );
+                    })}
+                  </span>
                   <label className="min-w-48 flex-1 space-y-1">
                     <span className="block text-xs font-semibold text-muted-foreground">Alasan (opsional, salin dari email Adobe)</span>
                     <Input
@@ -234,7 +253,31 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
                 </p>
               )}
 
-              <div className="flex items-center gap-2 border-t pt-3">
+              {/* Ditolak on the left, Diterima under the right thumb on phones; Diterima first on larger screens. */}
+              <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
+                <Button size="lg" className="w-full max-lg:order-2 lg:w-auto" onClick={() => save("diterima")} disabled={pending} aria-keyshortcuts="D">
+                  Diterima{" "}
+                  <kbd aria-hidden className={cn(kbd, "border-primary-foreground/30 bg-transparent text-primary-foreground/80")}>
+                    D
+                  </kbd>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full border-destructive/60 text-danger-foreground lg:w-auto"
+                  onClick={() => setRejecting(true)}
+                  disabled={pending}
+                  aria-keyshortcuts="T"
+                  aria-expanded={rejecting}
+                >
+                  Ditolak{" "}
+                  <kbd aria-hidden className={kbd}>
+                    T
+                  </kbd>
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 lg:justify-start lg:border-t lg:pt-3">
                 <Button type="button" variant="ghost" size="sm" onClick={() => goTo(index - 1)} disabled={index === 0 || pending}>
                   <ChevronLeft />
                   Sebelumnya
@@ -244,11 +287,11 @@ export function ReviewQueue({ items, total, backHref }: { items: ReviewItem[]; t
                   <ChevronRight />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground max-sm:hidden">
-                Keyboard: <kbd className={kbd}>D</kbd> diterima, <kbd className={kbd}>T</kbd> ditolak lalu Enter, <kbd className={kbd}>L</kbd> atau{" "}
-                <kbd className={kbd}>→</kbd> lewati, <kbd className={kbd}>←</kbd> sebelumnya.
-              </p>
             </div>
+            <p className="text-xs text-muted-foreground max-sm:hidden pointer-coarse:hidden lg:col-start-2">
+              Keyboard: <kbd className={kbd}>D</kbd> diterima, <kbd className={kbd}>T</kbd> ditolak lalu Enter, <kbd className={kbd}>L</kbd> atau{" "}
+              <kbd className={kbd}>→</kbd> lewati, <kbd className={kbd}>←</kbd> sebelumnya.
+            </p>
           </div>
         )
       )}
