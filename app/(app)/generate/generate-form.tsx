@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Clock, FileDown, LayoutGrid, Loader2, Spline, Square, Wallet } from "lucide-react";
+import { ChevronRight, Clock, FileDown, LayoutGrid, Loader2, Minus, Plus, RotateCcw, Spline, Square, Wallet } from "lucide-react";
 import { ProgressLine } from "@/components/pen-motif";
 import { InfoTip } from "@/components/info-tip";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { QcBadge } from "@/components/qc-badge";
-import { StylePreview } from "@/components/style-preview";
+import { StyleArt, isTransparentStyle, styleDescription } from "@/components/style-preview";
 import { Label } from "@/components/ui/label";
 import { MAX_VARIATIONS } from "@/lib/generate/schemas";
 import { runJob, type JobItem, type JobState } from "@/lib/generate/run-job";
@@ -23,6 +23,7 @@ import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
 import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
+import { ChoiceField, Swatches, type Choice } from "./choice-field";
 
 const REQUESTS_PER_MINUTE = 5; // observed on Kenari free models; the queue reads the real limit from headers
 const IMAGE_SECONDS_PER_ASSET = 45; // gpt-image-2 took 13-35s per picture in the Oktober 2026 test, plus metadata
@@ -46,6 +47,12 @@ const SET_MODES = [
 /** A model from the latest /uji-model run, with its result. key = "provider|model". */
 export type TestedModel = { key: string; label: string; score: number };
 
+/** The latest vector batch, offered as "Ulangi batch terakhir". paletteIndex as in the palette picker ("" = Bebas). */
+export type LastJob = { theme: string; style: StyleId; count: number; paletteIndex: string };
+
+/** Style name without the "(gambar AI, berbayar)" note: paid styles sit under their own heading. */
+const shortStyleLabel = (label: string) => label.replace(/\s*\(gambar AI, berbayar\)$/, "");
+
 export function GenerateForm({
   userId,
   defaultStyle,
@@ -60,6 +67,7 @@ export function GenerateForm({
   svgCostIdr,
   saturated,
   activeJob,
+  lastJob,
 }: {
   userId: string;
   defaultStyle: StyleId;
@@ -81,6 +89,7 @@ export function GenerateForm({
   saturated: SaturatedSubject[];
   /** Read-only card for a batch running elsewhere; hidden once this tab runs its own. */
   activeJob: React.ReactNode;
+  lastJob?: LastJob | null;
 }) {
   const [theme, setTheme] = useState(initialTheme);
   const [style, setStyle] = useState<StyleId>(defaultStyle);
@@ -204,6 +213,33 @@ export function GenerateForm({
   const left = kenariBudgetLeftIdr;
   const overBudget = cost.paid && cost.totalIdr !== undefined && left !== null && cost.totalIdr > left;
   const costHeavy = cost.paid && cost.totalIdr !== undefined && left !== null && cost.totalIdr > left / 2;
+
+  const styleChoices: Choice[] = STYLES.map((s) => ({
+    value: s.value,
+    label: shortStyleLabel(s.label),
+    visual: (
+      <span className={cn("flex size-9 items-center justify-center overflow-hidden rounded-sm border", isTransparentStyle(s.value) && "bg-checker")}>
+        <StyleArt style={s.value} palette={isImageStyle(s.value) ? [] : palette} className="size-full" />
+      </span>
+    ),
+    group: isImageStyle(s.value) ? "Berbayar · gambar AI, selalu hitam" : undefined,
+  }));
+  const paletteChoices: Choice[] = [
+    { value: "", label: "Bebas (dipilih AI)" },
+    ...palettes.map((p, i) => ({ value: String(i), label: p.name, visual: <Swatches colors={p.colors} /> })),
+  ];
+  const styleLabel = shortStyleLabel(STYLES.find((s) => s.value === style)?.label ?? style);
+  const paletteLabel = traced ? "Hitam" : paletteIndex === "" ? "Bebas (dipilih AI)" : (palettes[Number(paletteIndex)]?.name ?? "Bebas");
+  const sameAsLast =
+    !!lastJob && theme === lastJob.theme && style === lastJob.style && count === lastJob.count && paletteIndex === lastJob.paletteIndex;
+
+  function applyLastJob() {
+    if (!lastJob) return;
+    setTheme(lastJob.theme);
+    setStyle(lastJob.style);
+    setCountText(String(lastJob.count));
+    setPaletteIndex(lastJob.paletteIndex);
+  }
 
   async function start(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -349,132 +385,135 @@ export function GenerateForm({
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h2 className="text-lg font-extrabold">Tema baru</h2>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={start} noValidate className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="theme">Tema</Label>
-              <Input
-                id="theme"
-                value={theme}
-                onChange={(e) => setTheme(e.target.value)}
-                maxLength={120}
-                required
-                disabled={running}
-                placeholder="mis. autumn harvest icons"
-                aria-invalid={bannedHits.length > 0 ? true : undefined}
-                aria-describedby={cn(bannedHits.length > 0 && "theme-error", saturatedHits.length > 0 && "theme-saturated", "theme-hint")}
-              />
-              {bannedHits.length > 0 && (
-                <p id="theme-error" className="text-sm text-destructive">
-                  Kata terlarang: {bannedHits.join(", ")}. Hapus dari tema, atau ubah daftarnya di Pengaturan.
+      {/* Fields on the left; on large screens the batch summary and Start stay in view on the right. On phones the
+          summary becomes a bar pinned above the tab bar, so Mulai generate is always within thumb reach. */}
+      <form onSubmit={start} noValidate className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2 className="text-lg font-extrabold">Tema baru</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {lastJob && !running && !sameAsLast && (
+              <div className="flex items-center gap-3 rounded-md border border-dashed px-3 py-2">
+                <RotateCcw className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <p className="min-w-0 flex-1 text-sm">
+                  <span className="block font-semibold">Ulangi batch terakhir</span>
+                  <span className="block truncate text-muted-foreground">
+                    {lastJob.theme} · {shortStyleLabel(STYLES.find((s) => s.value === lastJob.style)?.label ?? lastJob.style)} · {lastJob.count}
+                  </span>
                 </p>
-              )}
-              <p id="theme-hint" className="text-sm text-muted-foreground">
-                Bahasa Inggris. Tanpa merek, tokoh, atau karakter: Adobe menolaknya.
-              </p>
-              {saturatedHits.length > 0 && (
-                <p id="theme-saturated" className="text-sm font-medium">
-                  Mirip subjek yang ditolak Adobe sebagai &quot;similar content&quot;:{" "}
-                  {saturatedHits.map((s) => `${s.subject.toLowerCase()} (${s.count} aset)`).join(", ")}. Pilih subjek yang lebih spesifik.
-                </p>
-              )}
-              {uploadBy && theme === initialTheme && (
-                <p className="text-sm font-medium">
-                  Dari Riset: upload sebelum{" "}
-                  {new Date(`${uploadBy}T00:00:00Z`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.
-                </p>
-              )}
-            </div>
+                <Button type="button" size="sm" variant="outline" onClick={applyLastJob}>
+                  Pakai
+                </Button>
+              </div>
+            )}
 
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="style">Gaya</Label>
-                <select
-                  id="style"
-                  value={style}
-                  onChange={(e) => setStyle(e.target.value as StyleId)}
-                  disabled={running}
-                  className={selectClass}
+          <div className="space-y-2">
+            <Label htmlFor="theme">Tema</Label>
+            <Input
+              id="theme"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              maxLength={120}
+              required
+              disabled={running}
+              placeholder="mis. autumn harvest icons"
+              aria-invalid={bannedHits.length > 0 ? true : undefined}
+              aria-describedby={cn(bannedHits.length > 0 && "theme-error", saturatedHits.length > 0 && "theme-saturated", "theme-hint")}
+            />
+            {bannedHits.length > 0 && (
+              <p id="theme-error" className="text-sm text-destructive">
+                Kata terlarang: {bannedHits.join(", ")}. Hapus dari tema, atau ubah daftarnya di Pengaturan.
+              </p>
+            )}
+            <p id="theme-hint" className="text-sm text-muted-foreground">
+              Bahasa Inggris. Tanpa merek, tokoh, atau karakter: Adobe menolaknya.
+            </p>
+            {saturatedHits.length > 0 && (
+              <p id="theme-saturated" className="text-sm font-medium">
+                Mirip subjek yang ditolak Adobe sebagai &quot;similar content&quot;:{" "}
+                {saturatedHits.map((s) => `${s.subject.toLowerCase()} (${s.count} aset)`).join(", ")}. Pilih subjek yang lebih spesifik.
+              </p>
+            )}
+            {uploadBy && theme === initialTheme && (
+              <p className="text-sm font-medium">
+                Dari Riset: upload sebelum{" "}
+                {new Date(`${uploadBy}T00:00:00Z`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.
+              </p>
+            )}
+          </div>
+
+            <ChoiceField
+              id="style"
+              label="Gaya"
+              value={style}
+              onChange={(v) => setStyle(v as StyleId)}
+              choices={styleChoices}
+              disabled={running}
+              hint={styleDescription(style)}
+            />
+
+          <fieldset className="space-y-2" disabled={running}>
+            <legend className="text-sm font-medium">Isi set</legend>
+            <div className="flex flex-wrap gap-1">
+              {SET_MODES.map((mode) => (
+                <label
+                  key={mode.label}
+                  className={cn(
+                    "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm",
+                    tapTarget,
+                    variations === mode.variations ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
+                  )}
                 >
-                  {STYLES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <StylePreview style={style} palette={palette} />
+                  <input
+                    type="radio"
+                    name="set-mode"
+                    checked={variations === mode.variations}
+                    onChange={() => setVariations(mode.variations)}
+                    className="accent-foreground"
+                  />
+                  {mode.label}
+                </label>
+              ))}
             </div>
+            <p className="text-sm text-muted-foreground">
+              {variations
+                ? "Tulis satu subjek sebagai tema, mis. tropical fish. Tiap aset subjek yang sama dengan pose, detail, atau pola berbeda."
+                : "Tiap aset subjek berbeda dari tema yang sama."}
+            </p>
+          </fieldset>
 
-            <fieldset className="space-y-2" disabled={running}>
-              <legend className="text-sm font-medium">Isi set</legend>
-              <div className="flex flex-wrap gap-1">
-                {SET_MODES.map((mode) => (
-                  <label
-                    key={mode.label}
-                    className={cn(
-                      "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm",
-                      tapTarget,
-                      variations === mode.variations ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="set-mode"
-                      checked={variations === mode.variations}
-                      onChange={() => setVariations(mode.variations)}
-                      className="accent-foreground"
-                    />
-                    {mode.label}
-                  </label>
-                ))}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {variations
-                  ? "Tulis satu subjek sebagai tema, mis. tropical fish. Tiap aset subjek yang sama dengan pose, detail, atau pola berbeda."
-                  : "Tiap aset subjek berbeda dari tema yang sama."}
+            {traced ? (
+              <p className="text-sm">
+                <span className="font-medium">Palet warna:</span> <span className="text-muted-foreground">hitam, gaya ini selalu hitam.</span>
               </p>
-            </fieldset>
+            ) : (
+              <ChoiceField
+                id="palette"
+                label="Palet warna"
+                value={paletteIndex}
+                onChange={setPaletteIndex}
+                choices={paletteChoices}
+                disabled={running}
+              />
+            )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="palette">Palet warna</Label>
-                {traced ? (
-                  <select id="palette" disabled className={selectClass} value="hitam">
-                    <option value="hitam">Hitam (gaya ini selalu hitam)</option>
-                  </select>
-                ) : (
-                  <select
-                    id="palette"
-                    value={paletteIndex}
-                    onChange={(e) => setPaletteIndex(e.target.value)}
-                    disabled={running}
-                    className={selectClass}
-                  >
-                    <option value="">Bebas (dipilih AI)</option>
-                    {palettes.map((p, i) => (
-                      <option key={`${p.name}-${i}`} value={i}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {palette.length > 0 && (
-                  <div className="flex gap-1" aria-hidden>
-                    {palette.map((c) => (
-                      <span key={c} className="size-4 rounded-sm border" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="count">Jumlah variasi</Label>
+            <div className="space-y-2">
+              <Label htmlFor="count">Jumlah variasi</Label>
+              <div className="flex max-w-60 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="max-sm:size-11"
+                  aria-label="Kurangi satu"
+                  onClick={() => setCountText(String(Math.max(1, count - 1)))}
+                  disabled={running || count <= 1}
+                >
+                  <Minus />
+                </Button>
                 <Input
                   id="count"
                   inputMode="numeric"
@@ -482,142 +521,187 @@ export function GenerateForm({
                   onChange={(e) => setCountText(e.target.value.replace(/\D/g, "").slice(0, 3))}
                   onBlur={() => setCountText(String(count))}
                   disabled={running}
+                  className="text-center tabular-nums"
                   aria-invalid={countValid ? undefined : true}
                   aria-describedby="count-hint"
                 />
-                <p id="count-hint" className={cn("text-sm", countValid ? "text-muted-foreground" : "text-destructive")}>
-                  1 sampai {MAX_VARIATIONS} per batch.
-                </p>
-              </div>
-            </div>
-
-            <details className="group rounded-xl border" open={model !== "" || imageModel !== "" ? true : undefined}>
-              <summary
-                className={cn(
-                  "flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden",
-                  "min-h-11",
-                )}
-              >
-                <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
-                <span className="font-semibold">Lanjutan</span>
-                <span className="min-w-0 truncate text-muted-foreground">
-                  {traced ? "Model gambar" : "Model SVG"}: {cost.modelLabel}
-                </span>
-              </summary>
-              <div className="space-y-2 border-t p-3">
-                {traced ? (
-                  <>
-                    <div className="flex items-center gap-1">
-                      <Label htmlFor="image-model">Model gambar</Label>
-                      <InfoTip align="start" label="Tentang model gambar">
-                        Berbayar dari saldo Kenari. Model menggambar hitam-putih, lalu server mengubahnya jadi SVG. Konsep dan
-                        metadata tetap memakai model teks. Tanpa cadangan; gambar yang gagal dicoba ulang sekali.
-                      </InfoTip>
-                    </div>
-                    <select
-                      id="image-model"
-                      value={imageModel}
-                      onChange={(e) => setImageModel(e.target.value)}
-                      disabled={running}
-                      className={selectClass}
-                    >
-                      <option value="">
-                        Sesuai Pengaturan ({defaultImageModel}
-                        {imagePriceIdr(defaultImageModel) !== undefined ? ` · ${formatIdr(imagePriceIdr(defaultImageModel)!)}` : ""})
-                      </option>
-                      {IMAGE_MODELS.map(([id, price]) => (
-                        <option key={id} value={id}>
-                          {id} · {formatIdr(price)} per gambar
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-1">
-                      <Label htmlFor="model">Model SVG</Label>
-                      <InfoTip align="start" label="Tentang model SVG">
-                        Hanya untuk menggambar SVG; konsep dan metadata memakai model dari Pengaturan. Model yang dipilih di
-                        sini jalan sendiri tanpa cadangan. Model Kenari berbayar masuk batas biaya bulanan.
-                      </InfoTip>
-                    </div>
-                    {catalog && catalog.length > 0 ? (
-                      <ModelSelect
-                        value={model}
-                        onChange={setModel}
-                        disabled={running}
-                        catalog={catalog}
-                        geminiModels={geminiModels}
-                        tested={tested}
-                        svgCostIdr={svgCostIdr}
-                        defaultLabel={orderLabel(providerOrder)}
-                      />
-                    ) : (
-                      <Input
-                        id="model"
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        disabled={running || catalog === null}
-                        maxLength={120}
-                        placeholder={catalog === null ? "Memuat daftar model..." : "Kosong = model dari Pengaturan; atau ketik nama model Kenari"}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-            </details>
-
-            {overBudget && (
-              <p id="cost-warning" className="rounded-xl bg-warning-soft px-3 py-2 text-sm font-medium text-warning-foreground">
-                Perkiraan biaya melebihi sisa batas Kenari bulan ini ({formatIdr(left!)}). Antrean berhenti saat batas tercapai.
-              </p>
-            )}
-
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
                 <Button
-                  type="submit"
-                  size="lg"
-                  disabled={running || blockReason !== null}
-                  aria-describedby={cn(blockReason && !running && "start-hint", overBudget && "cost-warning") || undefined}
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="max-sm:size-11"
+                  aria-label="Tambah satu"
+                  onClick={() => setCountText(String(Math.min(MAX_VARIATIONS, count + 1)))}
+                  disabled={running || count >= MAX_VARIATIONS}
                 >
-                  {running ? <Loader2 className="animate-spin" /> : <Spline />}
-                  {running ? "Sedang berjalan..." : "Mulai generate"}
+                  <Plus />
                 </Button>
-                {running && (
-                  <Button type="button" size="lg" variant="outline" onClick={() => abortRef.current?.abort()}>
-                    <Square />
-                    Hentikan
-                  </Button>
-                )}
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                  <Clock className="size-3.5" aria-hidden />±{estimatedMinutes} menit
-                </span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium",
-                    costHeavy ? "bg-warning-soft text-warning-foreground" : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  <Wallet className="size-3.5" aria-hidden />
-                  {cost.chip}
-                </span>
               </div>
-              {blockReason && !running && (
-                <p id="start-hint" className="text-sm text-muted-foreground">
-                  {blockReason}
-                </p>
+              <p id="count-hint" className={cn("text-sm", countValid ? "text-muted-foreground" : "text-destructive")}>
+                1 sampai {MAX_VARIATIONS} per batch.
+              </p>
+            </div>
+
+          <details className="group rounded-lg border" open={model !== "" || imageModel !== "" ? true : undefined}>
+            <summary
+              className={cn(
+                "flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden",
+                "min-h-11",
               )}
-              {cost.detail && (
-                <p className="text-sm text-muted-foreground">
-                  {cost.detail}
-                  {cost.paid && left !== null && ` · sisa batas bulan ini ${formatIdr(left)}`}
-                </p>
+            >
+              <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
+              <span className="font-semibold">Lanjutan</span>
+              <span className="min-w-0 truncate text-muted-foreground">
+                {traced ? "Model gambar" : "Model SVG"}: {cost.modelLabel}
+              </span>
+            </summary>
+            <div className="space-y-2 border-t p-3">
+              {traced ? (
+                <>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="image-model">Model gambar</Label>
+                    <InfoTip align="start" label="Tentang model gambar">
+                      Berbayar dari saldo Kenari. Model menggambar hitam-putih, lalu server mengubahnya jadi SVG. Konsep dan
+                      metadata tetap memakai model teks. Tanpa cadangan; gambar yang gagal dicoba ulang sekali.
+                    </InfoTip>
+                  </div>
+                  <select
+                    id="image-model"
+                    value={imageModel}
+                    onChange={(e) => setImageModel(e.target.value)}
+                    disabled={running}
+                    className={selectClass}
+                  >
+                    <option value="">
+                      Sesuai Pengaturan ({defaultImageModel}
+                      {imagePriceIdr(defaultImageModel) !== undefined ? ` · ${formatIdr(imagePriceIdr(defaultImageModel)!)}` : ""})
+                    </option>
+                    {IMAGE_MODELS.map(([id, price]) => (
+                      <option key={id} value={id}>
+                        {id} · {formatIdr(price)} per gambar
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="model">Model SVG</Label>
+                    <InfoTip align="start" label="Tentang model SVG">
+                      Hanya untuk menggambar SVG; konsep dan metadata memakai model dari Pengaturan. Model yang dipilih di
+                      sini jalan sendiri tanpa cadangan. Model Kenari berbayar masuk batas biaya bulanan.
+                    </InfoTip>
+                  </div>
+                  {catalog && catalog.length > 0 ? (
+                    <ModelSelect
+                      value={model}
+                      onChange={setModel}
+                      disabled={running}
+                      catalog={catalog}
+                      geminiModels={geminiModels}
+                      tested={tested}
+                      svgCostIdr={svgCostIdr}
+                      defaultLabel={orderLabel(providerOrder)}
+                    />
+                  ) : (
+                    <Input
+                      id="model"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      disabled={running || catalog === null}
+                      maxLength={120}
+                      placeholder={catalog === null ? "Memuat daftar model..." : "Kosong = model dari Pengaturan; atau ketik nama model Kenari"}
+                    />
+                  )}
+                </>
               )}
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </details>
+
+          </CardContent>
+        </Card>
+
+        <aside
+          aria-label="Ringkasan batch"
+          className={cn(
+            "z-20 space-y-3",
+            "max-lg:sticky max-lg:bottom-[var(--tabbar-h)] max-lg:-mx-4 max-lg:mt-4 max-lg:border-t max-lg:bg-card max-lg:px-4 max-lg:py-3 sm:max-lg:mx-0 sm:max-lg:rounded-md sm:max-lg:border",
+            "lg:sticky lg:top-6 lg:rounded-lg lg:border lg:bg-card lg:p-5",
+          )}
+        >
+          <div className="space-y-4 max-lg:hidden">
+            <h2 className="text-base font-extrabold">Ringkasan batch</h2>
+            <div className="flex items-center gap-3">
+              <div className={cn("w-24 shrink-0 overflow-hidden rounded-md border", isTransparentStyle(style) && "bg-checker")}>
+                <StyleArt style={style} palette={palette} label={`Contoh gaya ${styleLabel}`} />
+              </div>
+              <p className="text-sm text-muted-foreground">Contoh bentuk hasil, bukan hasil AI sungguhan.</p>
+            </div>
+            <dl className="divide-y text-sm">
+              {[
+                ["Tema", theme.trim() || "–"],
+                ["Gaya", styleLabel],
+                ["Palet", paletteLabel],
+                ["Isi set", variations ? "Variasi satu subjek" : "Set beragam"],
+              ].map(([term, value]) => (
+                <div key={term} className="flex justify-between gap-3 py-1.5">
+                  <dt className="text-muted-foreground">{term}</dt>
+                  <dd className="min-w-0 truncate text-right font-semibold">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          {overBudget && (
+            <p id="cost-warning" className="rounded-md bg-warning-soft px-3 py-2 text-sm font-medium text-warning-foreground">
+              Perkiraan biaya melebihi sisa batas Kenari bulan ini ({formatIdr(left!)}). Antrean berhenti saat batas tercapai.
+            </p>
+          )}
+
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">
+              {count} {traced ? "gambar" : "SVG"}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3.5" aria-hidden />±{estimatedMinutes} menit
+            </span>
+            <span className={cn("inline-flex items-center gap-1", costHeavy && "font-semibold text-warning-foreground")}>
+              <Wallet className="size-3.5" aria-hidden />
+              {cost.chip}
+            </span>
+          </p>
+
+          <div className={cn("grid gap-2", running && "grid-cols-2")}>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={running || blockReason !== null}
+              aria-describedby={cn(blockReason && !running && "start-hint", overBudget && "cost-warning") || undefined}
+            >
+              {running ? <Loader2 className="animate-spin" /> : <Spline />}
+              {running ? "Sedang berjalan..." : "Mulai generate"}
+            </Button>
+            {running && (
+              <Button type="button" size="lg" variant="outline" className="w-full" onClick={() => abortRef.current?.abort()}>
+                <Square />
+                Hentikan
+              </Button>
+            )}
+          </div>
+          {blockReason && !running && (
+            <p id="start-hint" className="text-sm text-muted-foreground">
+              {blockReason}
+            </p>
+          )}
+          {cost.detail && (
+            <p className="text-sm text-muted-foreground max-lg:hidden">
+              {cost.detail}
+              {cost.paid && left !== null && ` · sisa batas bulan ini ${formatIdr(left)}`}
+            </p>
+          )}
+        </aside>
+      </form>
     </div>
   );
 }
