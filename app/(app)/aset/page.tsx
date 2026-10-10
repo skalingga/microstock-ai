@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Search, Spline } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { InfoTip } from "@/components/info-tip";
 import { PageHeader } from "@/components/page-header";
@@ -13,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
 import { applyGalleryFilter, FILTERS, KINDS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
+
+export const metadata: Metadata = { title: "Aset" };
 
 const PAGE_SIZE = 24;
 const BATCH_CHOICES = 50;
@@ -241,22 +244,23 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
           />
 
           {lastPage > 1 && (
-            <nav aria-label="Halaman" className="flex items-center justify-center gap-3 text-sm">
+            <nav aria-label="Halaman" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm">
+              {/* Phones: Sebelumnya and Berikutnya share the first row; the page number and jump field wrap below. */}
               {page > 1 ? (
-                <Link href={href({ page: page - 1 })} className={buttonVariants({ variant: "outline" })}>
+                <Link href={href({ page: page - 1 })} className={buttonVariants({ variant: "outline", className: "max-sm:order-1 max-sm:flex-1" })}>
                   <ChevronLeft />
                   Sebelumnya
                 </Link>
               ) : (
-                <span aria-disabled="true" className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
+                <span aria-disabled="true" className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50 max-sm:order-1 max-sm:flex-1" })}>
                   <ChevronLeft />
                   Sebelumnya
                 </span>
               )}
-              <span className="px-2 text-muted-foreground tabular-nums">
+              <span className="px-2 text-muted-foreground tabular-nums max-sm:order-3">
                 Halaman <span className="font-semibold text-foreground">{page}</span> dari {lastPage}
               </span>
-              <form action="/aset" method="get" className="flex items-center gap-1">
+              <form action="/aset" method="get" className="flex items-center gap-1 max-sm:order-4">
                 {job && <input type="hidden" name="job" value={job} />}
                 {status !== "semua" && <input type="hidden" name="status" value={status} />}
                 {kind !== "semua" && <input type="hidden" name="jenis" value={kind} />}
@@ -268,12 +272,12 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
                 </Button>
               </form>
               {page < lastPage ? (
-                <Link href={href({ page: page + 1 })} className={buttonVariants({ variant: "outline" })}>
+                <Link href={href({ page: page + 1 })} className={buttonVariants({ variant: "outline", className: "max-sm:order-2 max-sm:flex-1" })}>
                   Berikutnya
                   <ChevronRight />
                 </Link>
               ) : (
-                <span aria-disabled="true" className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50" })}>
+                <span aria-disabled="true" className={buttonVariants({ variant: "outline", className: "pointer-events-none opacity-50 max-sm:order-2 max-sm:flex-1" })}>
                   Berikutnya
                   <ChevronRight />
                 </span>

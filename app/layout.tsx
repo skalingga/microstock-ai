@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   title: { default: "MicroStock Vector AI", template: "%s · MicroStock Vector AI" },
   description: "Buat aset vektor SVG siap upload ke Adobe Stock dari satu tema.",
 };
+
+// Lets bars pinned to the bottom read env(safe-area-inset-*) and clear the iPhone home indicator.
+export const viewport: Viewport = { viewportFit: "cover" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

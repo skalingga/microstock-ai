@@ -1,9 +1,9 @@
 "use client";
 
-import { Download, Trash2 } from "lucide-react";
+import { Download, Ellipsis, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { SelectionHandles } from "@/components/pen-motif";
 import { QcBadge } from "@/components/qc-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -52,6 +52,21 @@ export function AssetGrid({
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
+  // Phones: the pinned bar keeps one row (count, Ekspor, Catat, ⋯); the rest opens behind ⋯.
+  const [more, setMore] = useState(false);
+  // Height of the bar while it sits in the page, so pinning it on phones leaves a spacer and the grid does not jump.
+  const barRef = useRef<HTMLDivElement>(null);
+  const [restHeight, setRestHeight] = useState(0);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const observer = new ResizeObserver(() => {
+      if (!bar.dataset.pinned) setRestHeight(bar.offsetHeight);
+    });
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
 
   // Picks made on other pages stay in the selection; ids that no longer exist (deleted) drop out.
   const known = new Map<string, PickableAsset>([...filterFirst, ...assets].map((a) => [a.id, a]));
@@ -71,6 +86,7 @@ export function AssetGrid({
     setSelected(next);
     setMode("pilih");
     setMessage(null);
+    if (next.size === 0) setMore(false);
   }
 
   function remove() {
@@ -83,6 +99,7 @@ export function AssetGrid({
         return;
       }
       setSelected(new Set());
+      setMore(false);
       setMessage({ text: `${result.deleted} aset dihapus.${result.warning ? ` ${result.warning}` : ""}`, error: !!result.warning });
       router.refresh();
     });
@@ -98,6 +115,7 @@ export function AssetGrid({
       }
       setMode("pilih");
       setSelected(new Set());
+      setMore(false);
       setReason("");
       setAdobeStatus(null);
       const what = status === "belum" ? "Catatan Adobe dihapus" : `Dicatat ${status === "diterima" ? "Diterima" : "Ditolak"} Adobe`;
@@ -106,15 +124,22 @@ export function AssetGrid({
     });
   }
 
+  const pinned = picked.length > 0;
+  // While pinned on a phone, secondary actions wait behind ⋯ so the bar stays one row wide; opened, they line up below the main row.
+  const secondary = pinned ? (more ? "max-sm:order-1" : "max-sm:hidden") : undefined;
+
   return (
     <div className="space-y-4">
+      {pinned && <div aria-hidden className="sm:hidden" style={{ height: restHeight }} />}
       <div
+        ref={barRef}
+        data-pinned={pinned || undefined}
         className={cn(
           "space-y-2 rounded-md border p-2 text-sm transition-colors duration-150",
           // Only pinned while something is picked, so it does not take phone screen space the rest of the time.
-          // Phones: pinned to the bottom, within thumb reach. Larger screens: pinned under the header.
-          picked.length > 0
-            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 sm:sticky sm:top-16 lg:top-3"
+          // Phones: pinned to the bottom, within thumb reach and above the iPhone home indicator. Larger screens: pinned under the header.
+          pinned
+            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[max(0.5rem,env(safe-area-inset-bottom))] sm:sticky sm:top-16 lg:top-3"
             : "bg-card/70",
         )}
       >
@@ -128,6 +153,7 @@ export function AssetGrid({
             type="button"
             size="sm"
             variant="ghost"
+            className={secondary}
             onClick={() => {
               setSelected(
                 allPicked ? new Set([...selected].filter((id) => !assets.some((a) => a.id === id))) : new Set([...selected, ...assets.map((a) => a.id)]),
@@ -144,6 +170,7 @@ export function AssetGrid({
               type="button"
               size="sm"
               variant="ghost"
+              className={secondary}
               onClick={() => {
                 setSelected(new Set([...selected, ...filterFirst.map((a) => a.id)]));
                 setMode("pilih");
@@ -154,7 +181,7 @@ export function AssetGrid({
               {filterTotal > firstCount ? `Pilih ${firstCount} pertama di filter ini (dari ${filterTotal})` : `Pilih semua ${filterTotal} di filter ini`}
             </Button>
           )}
-          {offPage > 0 && <span className="px-1 text-xs text-muted-foreground">{offPage} dari halaman lain</span>}
+          {offPage > 0 && <span className={cn("px-1 text-xs text-muted-foreground", secondary)}>{offPage} dari halaman lain</span>}
 
           {picked.length > 0 && mode === "pilih" && (
             <>
@@ -170,12 +197,33 @@ export function AssetGrid({
                 </Button>
               )}
               <Button type="button" size="sm" variant="outline" onClick={() => setMode("adobe")}>
-                Catat hasil Adobe
+                Catat <span className="max-sm:hidden">hasil</span> Adobe
               </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setSelected(new Set())} disabled={pending}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="sm:hidden"
+                onClick={() => setMore(!more)}
+                aria-expanded={more}
+                aria-label={more ? "Sembunyikan aksi lain" : "Aksi lain: pilih semua, batal, hapus"}
+              >
+                <Ellipsis />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className={secondary}
+                onClick={() => {
+                  setSelected(new Set());
+                  setMore(false);
+                }}
+                disabled={pending}
+              >
                 Batal
               </Button>
-              <Button type="button" size="sm" variant="ghost" className="text-destructive sm:ml-auto" onClick={() => setMode("hapus")}>
+              <Button type="button" size="sm" variant="ghost" className={cn("text-destructive sm:ml-auto", secondary)} onClick={() => setMode("hapus")}>
                 <Trash2 />
                 Hapus
               </Button>

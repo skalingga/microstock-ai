@@ -320,7 +320,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
               value={imageModel}
               onChange={(e) => setImageModel(e.target.value)}
               placeholder={`Bawaan: ${defaults.image}`}
-              className="font-mono text-sm"
+              className="font-mono md:text-sm"
               autoComplete="off"
               spellCheck={false}
               {...describe("kenari_image_model", errors.kenari_image_model, true)}
@@ -374,7 +374,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                   setModelNote((n) => ({ ...n, primary: undefined }));
                 }}
                 placeholder={modelPlaceholder(primaryProvider)}
-                className="font-mono text-sm"
+                className="font-mono md:text-sm"
                 autoComplete="off"
                 spellCheck={false}
                 {...describe("primary_model", errors.primary_model, true)}
@@ -412,7 +412,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                     setModelNote((n) => ({ ...n, backup: undefined }));
                   }}
                   placeholder={modelPlaceholder(backupProvider)}
-                  className="font-mono text-sm"
+                  className="font-mono md:text-sm"
                   autoComplete="off"
                   spellCheck={false}
                   {...describe("backup_model", errors.backup_model, true)}
@@ -437,7 +437,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
               value={textModel}
               onChange={(e) => setTextModel(e.target.value)}
               placeholder="Sama dengan model Kenari di atas"
-              className="font-mono text-sm"
+              className="font-mono md:text-sm"
               autoComplete="off"
               spellCheck={false}
               {...describe("kenari_text_model", errors.kenari_text_model, true)}
@@ -486,7 +486,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
             id="palettes"
             name="palettes"
             rows={5}
-            className="font-mono text-sm"
+            className="font-mono md:text-sm"
             value={palettes}
             onChange={(e) => setPalettes(e.target.value)}
             spellCheck={false}
@@ -560,7 +560,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
       <div
         className={cn(
           "flex flex-wrap items-center justify-end gap-x-4 gap-y-2 rounded-md border p-3",
-          dirty || summary ? "sticky bottom-4 z-10 border-foreground/30 bg-card shadow-md" : "bg-card/70",
+          dirty || summary ? "sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 border-foreground/30 bg-card shadow-md" : "bg-card/70",
         )}
       >
         <p className="mr-auto text-sm" role="status">
