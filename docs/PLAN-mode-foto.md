@@ -50,14 +50,17 @@ bagian sebelum dan sesudahnya:
 
 - **Flow (screenshot pengguna):** unduhan "1K Original size" = 768p (Nano Banana Pro, 16:9) atau
   896p (Nano Banana 2.1), sekitar 1 MP. "2K Upscale" tersedia di akun pengguna; "4K" butuh paket
-  Google AI berbayar. Contoh unduhan 2K yang diterima di chat: 16:9 = 2576×1438 (3,7 MP),
-  4:3 = 2400×1792 (4,3 MP); ukuran asli di HP belum dipastikan (chat bisa mengecilkan gambar).
-  Tidak ada watermark terlihat di contoh.
+  Google AI berbayar. Ukuran asli file 2K di HP (info Photos iPhone): 16:9 = 2752×1536
+  (4,23 MP, JPEG, 1 MB), 4:3 = 2400×1792 (4,30 MP, JPEG, 697 KB). Gambar yang dikirim lewat chat
+  dikecilkan, jadi jangan ukur dari situ. Tidak ada watermark terlihat di contoh.
 - **Adobe foto** ([syarat teknis](https://helpx.adobe.com/stock/contributor/submit-your-content/submit-photos/technical-legal-requirements-photo-submission.html),
   dicek 10 Okt 2026): 4–100 MP, maks 45 MB, JPEG sRGB, tanpa watermark, timestamp, branding,
   bingkai, atau teks tempelan.
 - **Akibatnya:** 1K selalu ditolak (QC Gagal dengan pesan "Unduh ulang dari Flow dengan 2K").
-  2K berada tipis di sekitar batas 4 MP, terutama 16:9; QC menghitung MP persis dari file.
+  2K lolos tipis (4,2–4,3 MP); QC menghitung MP persis dari file (4.000.000 piksel).
+  File JPEG dari Flow **tidak boleh di-encode ulang** (kualitas turun, file sudah terkompres);
+  hanya PNG/WebP yang diubah ke JPEG. Ukuran sekitar 1 MB per foto, jadi Storage tidak secepat
+  dugaan awal penuh (sekitar 1.000 foto per 1 GB).
   Upscale 2K dari Flow adalah upscale; Adobe tidak punya aturan resmi soal itu (hanya saran komunitas
   agar tidak upsample), jadi catat tingkat penerimaan foto 2K di data Tahap 6.
 - **Dari contoh foto:** punggung buku berisi tulisan acak dan kotak tisu dengan bulatan mirip logo.
@@ -119,7 +122,7 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
 2. Kotak unggah di kartu job yang sama (dan di `/aset`): pilih atau seret banyak file
    (PNG/JPEG/WebP). Pengguna boleh mencocokkan file ke prompt, atau biarkan tanpa pasangan.
 3. Untuk tiap file, satu per satu (`lib/generate/queue.ts`):
-   baca dimensi → tolak bila di bawah minimum → ubah ke JPEG bila perlu (canvas, kualitas tinggi)
+   baca dimensi → tolak bila di bawah minimum → JPEG disimpan apa adanya, PNG/WebP diubah ke JPEG (canvas, kualitas tinggi)
    → buat preview dan perceptual hash (kode QC yang ada) → unggah langsung ke Storage → simpan baris
    `assets` → panggil metadata vision → QC → status.
 
@@ -165,8 +168,7 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
 
 ## Pertanyaan terbuka (tanya pengguna sebelum langkah terkait)
 
-1. Sebagian terjawab (lihat Temuan): 2K Upscale wajib. Tersisa: ukuran px asli file 2K di HP
-   (16:9) dan formatnya (JPEG atau PNG).
+1. Terjawab 10 Okt 2026: 2K Upscale wajib, hasilnya JPEG 4,2–4,3 MP (lihat Temuan).
 2. Urutan: kerjakan sebelum atau sesudah Tahap 11 (bundle)? Tahap 6 tetap butuh data keputusan Adobe.
 3. Simpan file asli foto selamanya, atau hapus otomatis setelah ditandai diterima Adobe?
 
