@@ -179,31 +179,12 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         return;
       }
 
-      // Save to the history first, then download. A phone (iOS Safari) can suspend the page while a file downloads,
-      // which used to cut the save short: the files were never kept and the assets were never marked. The files
-      // are in memory either way, and a stored export can be downloaded again from the history.
+      // Save to the history first, then download. On iOS Safari the download (link click) stopped the save that came
+      // right after it: the Supabase logs of 10 Oct 2026 show the photos fetched for the ZIP, then no upload request
+      // at all. The files are in memory either way, and a stored export can be downloaded again from the history.
       setResult(next);
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
-      const includedIds = new Set(data.included.map((i) => i.id));
-      const exported = candidates.filter((c) => includedIds.has(c.id));
-      let saveError: string | undefined;
-      let saved: Awaited<ReturnType<typeof saveExport>> = null;
-      try {
-        saved = await saveExport(
-          supabase,
-          userId,
-          data,
-          {
-            label: exportLabel(exported.map((c) => c.groupLabel)),
-            releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
-            fictionalFiles: fictionalFilesOf(data.included, candidates),
-          },
-          (reason) => (saveError = reason),
-        );
-      } catch (err) {
-        // A thrown error (network cut, memory) is a failed save too, not a reason to lose the files in hand.
-        saveError = err instanceof Error ? err.message : "kesalahan tak terduga";
-      }
+      const { saved, saveError } = await storeExport(data);
       setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
       downloadZip(next);
       if (saved?.marked) {
@@ -223,6 +204,42 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         resultHeading.current?.focus({ preventScroll: true });
       });
     }
+  }
+
+  /** Keeps the export in the history and marks its assets. Never throws: a failed save must not lose the files in hand. */
+  async function storeExport(data: ExportResult) {
+    const includedIds = new Set(data.included.map((i) => i.id));
+    const exported = candidates.filter((c) => includedIds.has(c.id));
+    let saveError: string | undefined;
+    let saved: Awaited<ReturnType<typeof saveExport>> = null;
+    try {
+      saved = await saveExport(
+        createClient(),
+        userId,
+        data,
+        {
+          label: exportLabel(exported.map((c) => c.groupLabel)),
+          releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
+          fictionalFiles: fictionalFilesOf(data.included, candidates),
+        },
+        (reason) => (saveError = reason),
+      );
+    } catch (err) {
+      saveError = err instanceof Error ? err.message : "kesalahan tak terduga";
+    }
+    return { saved, saveError };
+  }
+
+  async function retrySave() {
+    if (!result) return;
+    setResult({ ...result, exportId: undefined, saveError: undefined });
+    const { saved, saveError } = await storeExport(result.data);
+    setResult({ ...result, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
+    if (saved?.marked) {
+      setSelected(new Set());
+      setConfirmedCek("");
+    }
+    router.refresh();
   }
 
   async function retryMark() {
@@ -306,8 +323,11 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
           {result.exportId === null && included.length > 0 && (
             <p role="alert" className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
               Riwayat gagal disimpan, jadi aset belum ditandai diekspor dan file ini tidak ada di Riwayat. Simpan ZIP dan CSV-nya
-              sekarang.
+              sekarang, atau coba simpan lagi.
               {result.saveError && <span className="mt-1 block font-mono text-xs break-words">Sebab: {result.saveError}</span>}
+              <Button type="button" size="sm" className="mt-2" onClick={retrySave}>
+                Simpan ke Riwayat lagi
+              </Button>
             </p>
           )}
           {result.data.problems.map((p) => (
