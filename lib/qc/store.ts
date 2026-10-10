@@ -30,9 +30,9 @@ export async function runVisualQc(args: {
   });
 }
 
-/** Hashes of every asset the user already has, for the similarity check. */
-export async function fetchHashPool(supabase: Client): Promise<HashPoolEntry[]> {
-  const { data } = await supabase.from("assets").select("id, phash").not("phash", "is", null).limit(5000);
+/** Hashes of every asset of one kind the user already has, for the similarity check. Photos and vectors never compete. */
+export async function fetchHashPool(supabase: Client, kind: "vector" | "photo" = "vector"): Promise<HashPoolEntry[]> {
+  const { data } = await supabase.from("assets").select("id, phash").eq("kind", kind).not("phash", "is", null).limit(5000);
   return data ?? [];
 }
 

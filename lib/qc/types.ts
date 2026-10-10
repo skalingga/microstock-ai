@@ -13,7 +13,12 @@ export type QcCheckId =
   | "pola"
   | "kontur"
   | "kemiripan"
-  | "metadata";
+  | "metadata"
+  // Stage 12 photos.
+  | "resolusi"
+  | "berkas"
+  | "isi"
+  | "orang";
 
 /** One line of QC feedback, stored as-is in assets.qc_notes. */
 export type QcNote = { check: QcCheckId; status: NoteStatus; message: string };
@@ -52,6 +57,10 @@ const CHECK_IDS: QcCheckId[] = [
   "kontur",
   "kemiripan",
   "metadata",
+  "resolusi",
+  "berkas",
+  "isi",
+  "orang",
 ];
 
 /** Reads assets.qc_notes back into typed notes, ignoring anything malformed. */

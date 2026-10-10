@@ -129,3 +129,36 @@ describe("photo request schemas", () => {
     expect(photoPromptsRequestSchema.safeParse({ theme: "forest", count: 5, aspect: "21:9" }).success).toBe(false);
   });
 });
+
+describe("photo QC", () => {
+  it("refuses 1K downloads and accepts the 2K sizes Flow gives", async () => {
+    const { photoRejection } = await import("@/lib/qc/photo");
+    expect(photoRejection({ width: 1376, height: 768, bytes: 300_000 })).toMatch(/2K Upscale/);
+    expect(photoRejection({ width: 2752, height: 1536, bytes: 1_000_000 })).toBeNull();
+    expect(photoRejection({ width: 2400, height: 1792, bytes: 697_000 })).toBeNull();
+    expect(photoRejection({ width: 2752, height: 1536, bytes: 50 * 1024 * 1024 })).toMatch(/batas Adobe/);
+  });
+
+  it("turns vision problems into Perlu cek notes and reminds about fictional people", async () => {
+    const { photoContentNotes } = await import("@/lib/qc/photo");
+    const { combine } = await import("@/lib/qc/evaluate");
+    const notes = photoContentNotes(["visible_text"], true);
+    expect(notes.map((n) => [n.check, n.status])).toEqual([
+      ["isi", "cek"],
+      ["orang", "ok"],
+    ]);
+    const meta = { title: "Therapist listening", keywords: ["therapy"], category: "People", needsRelease: false };
+    expect(combine(notes, meta, []).status).toBe("perlu_cek");
+    expect(combine(photoContentNotes([], true), meta, []).status).toBe("lolos");
+  });
+});
+
+describe("parsePhotoJob", () => {
+  it("reads the stored prompts and ignores broken rows", async () => {
+    const { parsePhotoJob } = await import("@/lib/photo/run");
+    const job = parsePhotoJob({ aspect: "16:9", model: "m", provider: "gemini", prompts: [{ subject: "a", prompt: "b" }, { subject: 1 }] });
+    expect(job?.prompts).toEqual([{ subject: "a", prompt: "b" }]);
+    expect(parsePhotoJob(null)).toBeNull();
+    expect(parsePhotoJob([])).toBeNull();
+  });
+});

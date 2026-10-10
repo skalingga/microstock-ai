@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -13,6 +14,10 @@ import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { STYLES, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
 import { ActiveJobCard } from "./active-job-card";
 import { GenerateForm, type TestedModel } from "./generate-form";
+import { PhotoForm, type OpenPhotoJob, type PhotoJobSummary } from "./photo-form";
+import { parsePhotoJob } from "@/lib/photo/run";
+import { UUID_RE } from "@/lib/assets";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Generate" };
 
@@ -22,9 +27,10 @@ const DAILY_LOLOS_TARGET = 33;
 export default async function HalamanGenerate({
   searchParams,
 }: {
-  searchParams: Promise<{ tema?: string; batas?: string }>;
+  searchParams: Promise<{ tema?: string; batas?: string; jenis?: string; job?: string }>;
 }) {
-  const { tema, batas } = await searchParams;
+  const { tema, batas, jenis, job } = await searchParams;
+  const photo = jenis === "foto";
   const supabase = await createClient();
   const {
     data: { user },
@@ -72,6 +78,10 @@ export default async function HalamanGenerate({
   for (const row of svgCosts ?? []) (costRuns[row.model] ??= []).push(Number(row.cost_idr));
   for (const [model, costs] of Object.entries(costRuns)) svgCostIdr[model] = costs.reduce((a, b) => a + b, 0) / costs.length;
 
+  const initialTheme = tema?.slice(0, 120) ?? "";
+  const uploadBy = batas && /^\d{4}-\d{2}-\d{2}$/.test(batas) ? batas : undefined;
+  const photoData = photo ? await loadPhotoJobs(supabase, job) : null;
+
   return (
     <div className="space-y-6">
       <PageHeader title="Generate" description="Biarkan tab ini terbuka selama antrean berjalan.">
@@ -101,13 +111,51 @@ export default async function HalamanGenerate({
         </p>
       )}
 
+      <nav aria-label="Jenis aset" className="flex gap-1">
+        {[
+          { label: "Vektor (SVG)", href: `/generate${tema ? `?tema=${encodeURIComponent(tema)}` : ""}`, active: !photo },
+          { label: "Foto (Google Flow)", href: `/generate?jenis=foto${tema ? `&tema=${encodeURIComponent(tema)}` : ""}`, active: photo },
+        ].map((tab) => (
+          <Link
+            key={tab.label}
+            href={tab.href}
+            aria-current={tab.active ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-9 items-center rounded-md border px-3 text-sm no-underline max-sm:min-h-11",
+              tab.active ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
+            )}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </nav>
+
+      {photo && photoData ? (
+        <>
+          {photoData.error && (
+            <p role="alert" className="text-sm text-destructive">
+              {photoData.error}
+            </p>
+          )}
+          <PhotoForm
+            key={photoData.openJob?.id ?? "baru"}
+            userId={user.id}
+            bannedWords={settings?.banned_words ?? []}
+            saturated={saturated}
+            initialTheme={initialTheme}
+            uploadBy={uploadBy}
+            recentJobs={photoData.recentJobs}
+            openJob={photoData.openJob}
+          />
+        </>
+      ) : (
       <GenerateForm
         userId={user.id}
         defaultStyle={defaultStyle}
         palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
         bannedWords={settings?.banned_words ?? []}
-        initialTheme={tema?.slice(0, 120) ?? ""}
-        uploadBy={batas && /^\d{4}-\d{2}-\d{2}$/.test(batas) ? batas : undefined}
+        initialTheme={initialTheme}
+        uploadBy={uploadBy}
         defaultImageModel={defaultImageModel}
         kenariBudgetLeftIdr={spentError ? null : kenariBudgetLeftIdr}
         providerOrder={providerOrder}
@@ -116,6 +164,54 @@ export default async function HalamanGenerate({
         saturated={saturated}
         activeJob={activeJob ? <ActiveJobCard initial={activeJob} /> : null}
       />
+      )}
     </div>
   );
+}
+
+/** Stage 12: the latest photo jobs (prompts for Google Flow), and the one opened with ?job= for uploads. */
+async function loadPhotoJobs(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  jobId: string | undefined,
+): Promise<{ recentJobs: PhotoJobSummary[]; openJob: OpenPhotoJob | null; error?: string }> {
+  const { data, error } = await supabase
+    .from("generation_jobs")
+    .select("id, created_at, photo_prompts, themes(title), assets(count)")
+    .eq("style", "photo")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) return { recentJobs: [], openJob: null, error: "Prompt foto sebelumnya tidak bisa dimuat." };
+
+  const rows = (data ?? []).map((row) => ({
+    id: row.id,
+    theme: row.themes?.title ?? "Tanpa tema",
+    createdAt: row.created_at,
+    data: parsePhotoJob(row.photo_prompts),
+    uploaded: row.assets?.[0]?.count ?? 0,
+  }));
+  let open = jobId && UUID_RE.test(jobId) ? rows.find((r) => r.id === jobId) : undefined;
+  if (jobId && UUID_RE.test(jobId) && !open) {
+    // Older than the ten listed: read it on its own.
+    const { data: one } = await supabase
+      .from("generation_jobs")
+      .select("id, created_at, photo_prompts, themes(title), assets(count)")
+      .eq("style", "photo")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (one) {
+      open = {
+        id: one.id,
+        theme: one.themes?.title ?? "Tanpa tema",
+        createdAt: one.created_at,
+        data: parsePhotoJob(one.photo_prompts),
+        uploaded: one.assets?.[0]?.count ?? 0,
+      };
+    }
+  }
+
+  return {
+    recentJobs: rows.map((r) => ({ id: r.id, theme: r.theme, createdAt: r.createdAt, prompts: r.data?.prompts.length ?? 0, uploaded: r.uploaded })),
+    openJob: open?.data ? { id: open.id, theme: open.theme, data: open.data, uploaded: open.uploaded } : null,
+    error: jobId && !open?.data ? "Prompt foto itu tidak ditemukan." : undefined,
+  };
 }
