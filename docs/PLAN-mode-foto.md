@@ -148,7 +148,7 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
 
 | Risiko | Mitigasi |
 | --- | --- |
-| Storage penuh: foto beberapa MB per file, sedangkan SVG beberapa KB | Tampilkan pemakaian Storage; tombol "Hapus file asli foto yang sudah diterima Adobe" (preview dan metadata tetap). Cek batas paket Supabase (fakta 6) |
+| Storage penuh: foto sekitar 1 MB per file, sedangkan SVG beberapa KB | Tampilkan pemakaian Storage di `/pengaturan`; tombol hapus file asli ditunda sampai perlu. Cek batas paket Supabase (fakta 6) |
 | Ukuran unduhan Flow di bawah minimum Adobe | Cek di langkah pertama; bila kurang, berhenti dan tanya pengguna (upscale di luar lingkup) |
 | Ketentuan Google berubah atau melarang penggunaan komersial | Cek fakta 4 sebelum unggah batch pertama |
 | Foto orang AI sangat jenuh di Adobe | Prompt spesifik dan beragam, daftar `avoid`, batas 3 iterasi serupa per tema |
@@ -169,10 +169,12 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
 ## Pertanyaan terbuka (tanya pengguna sebelum langkah terkait)
 
 1. Terjawab 10 Okt 2026: 2K Upscale wajib, hasilnya JPEG 4,2–4,3 MP (lihat Temuan).
-2. Urutan: kerjakan sebelum atau sesudah Tahap 11 (bundle)? Tahap 6 tetap butuh data keputusan Adobe.
-3. Simpan file asli foto selamanya, atau hapus otomatis setelah ditandai diterima Adobe?
+2. Terjawab: Tahap 12 dikerjakan sebelum Tahap 11.
+3. Terjawab: file asli disimpan; `/pengaturan` menampilkan pemakaian Storage. Tombol hapus baru dibuat bila mulai penuh.
 
 ## Keputusan pengguna
 
 1. 10 Okt 2026: setuju Mode foto setengah manual lewat Google Flow; aplikasi tidak memanggil Flow.
    Video (Veo) ditunda.
+2. 10 Okt 2026: Tahap 12 sebelum Tahap 11. File asli foto disimpan, pemakaian Storage ditampilkan
+   di `/pengaturan`; tombol hapus file asli ditunda sampai perlu.

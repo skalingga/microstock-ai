@@ -50,7 +50,7 @@ Tahap 1, 2, 3, 3b, 4, 5, 7, dan 8 selesai dan sudah di `main`. Tahap 6 (uji ke A
 - Tahap 6 menunggu data dari pengguna: unggah batch 50-100 aset lintas banyak tema (maks 3 iterasi serupa per tema), isi keputusan Adobe di `/aset/[id]`, lihat kartu "Tingkat penerimaan Adobe" di `/ekspor`, lalu setel `lib/qc/config.ts` dari datanya. Belum dicentang.
 
 ## Langkah berikutnya
-0. Tahap 12 Mode foto: jawab pertanyaan terbuka di `docs/PLAN-mode-foto.md` (ukuran px unduhan Flow, urutan terhadap Tahap 11, simpan/hapus file asli), lalu langkah 1 = cek fakta Adobe/Google/Gemini vision/Supabase sebelum migrasi.
+0. Tahap 12 Mode foto (sebelum Tahap 11, semua pertanyaan terbuka sudah dijawab): langkah 1 = cek fakta tersisa (nama file/judul foto, kolom CSV fiktif, ketentuan Google Flow, Gemini vision, batas Supabase), lalu migrasi.
 1. Gabungkan `dev` ke `main` lewat PR (semua sisa temuan kritik 9 Okt sudah dikerjakan).
 2. Uji di produksi (tidak bisa diuji tanpa data/aksi sungguhan): ekspor kecil (Riwayat tampil dengan label tema + thumbnail, ZIP terunduh otomatis, kartu hasil, centang checklist di HP lalu buka Riwayat di PC: centang sama); "Pakai saran ini" + Urungkan di `/uji-model`; simpan keputusan Adobe di `/aset/tinjau`.
 3. Catat 68 keputusan Adobe lewat `/aset/tinjau` (data Tahap 6), lalu setel `lib/qc/config.ts` (terutama pemeriksa kemiripan).
