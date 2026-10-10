@@ -133,6 +133,8 @@ export async function saveExport(
   userId: string,
   result: ExportResult,
   summary: ExportSummary = { label: "", releaseTitles: [] },
+  /** Told which step failed and why, so the page can show more than "gagal". */
+  onError?: (reason: string) => void,
 ): Promise<SavedExport | null> {
   const exportId = crypto.randomUUID();
   const zipPath = `${userId}/exports/${exportId}.zip`;
@@ -140,9 +142,13 @@ export async function saveExport(
   const storage = supabase.storage.from("assets");
 
   const zipUpload = await storage.upload(zipPath, result.zip, { contentType: "application/zip" });
-  if (zipUpload.error) return null;
+  if (zipUpload.error) {
+    onError?.(`unggah ZIP ke penyimpanan: ${zipUpload.error.message}`);
+    return null;
+  }
   const csvUpload = await storage.upload(csvPath, new Blob([result.csv], { type: "text/csv" }), { contentType: "text/csv" });
   if (csvUpload.error) {
+    onError?.(`unggah CSV ke penyimpanan: ${csvUpload.error.message}`);
     await storage.remove([zipPath]);
     return null;
   }
@@ -161,6 +167,7 @@ export async function saveExport(
       fictional_files: summary.fictionalFiles ?? [],
     });
   if (insert.error) {
+    onError?.(`menulis baris Riwayat: ${insert.error.message}`);
     await storage.remove([zipPath, csvPath]);
     return null;
   }

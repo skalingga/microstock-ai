@@ -48,6 +48,8 @@ type Result = {
   exportId: string | null | undefined;
   /** Whether the assets were marked exported; false offers a retry. */
   marked?: boolean;
+  /** Why saving to the history failed, when it did. */
+  saveError?: string;
 };
 
 const MAX_PER_EXPORT = 500;
@@ -184,12 +186,25 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
       const includedIds = new Set(data.included.map((i) => i.id));
       const exported = candidates.filter((c) => includedIds.has(c.id));
-      const saved = await saveExport(supabase, userId, data, {
-        label: exportLabel(exported.map((c) => c.groupLabel)),
-        releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
-        fictionalFiles: fictionalFilesOf(data.included, candidates),
-      });
-      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked });
+      let saveError: string | undefined;
+      let saved: Awaited<ReturnType<typeof saveExport>> = null;
+      try {
+        saved = await saveExport(
+          supabase,
+          userId,
+          data,
+          {
+            label: exportLabel(exported.map((c) => c.groupLabel)),
+            releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
+            fictionalFiles: fictionalFilesOf(data.included, candidates),
+          },
+          (reason) => (saveError = reason),
+        );
+      } catch (err) {
+        // A thrown error (network cut, memory) is a failed save too, not a reason to lose the files in hand.
+        saveError = err instanceof Error ? err.message : "kesalahan tak terduga";
+      }
+      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
       downloadZip(next);
       if (saved?.marked) {
         setSelected(new Set());
@@ -292,6 +307,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
             <p role="alert" className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
               Riwayat gagal disimpan, jadi aset belum ditandai diekspor dan file ini tidak ada di Riwayat. Simpan ZIP dan CSV-nya
               sekarang.
+              {result.saveError && <span className="mt-1 block font-mono text-xs break-words">Sebab: {result.saveError}</span>}
             </p>
           )}
           {result.data.problems.map((p) => (
