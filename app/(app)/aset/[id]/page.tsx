@@ -1,4 +1,5 @@
 import { ChevronDown, Download } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { QcBadge } from "@/components/qc-badge";
@@ -19,6 +20,8 @@ import { DeleteButton } from "./delete-button";
 import { DetailNav } from "./detail-nav";
 import { FictionalToggle } from "./fictional-toggle";
 import { MetadataForm } from "./metadata-form";
+
+export const metadata: Metadata = { title: "Detail aset" };
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "medium",

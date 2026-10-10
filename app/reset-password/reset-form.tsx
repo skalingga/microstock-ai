@@ -82,7 +82,7 @@ export function ResetForm() {
           </Button>
           {/* The email link already signed the user in, so skipping goes straight into the app. */}
           <Link
-            href="/generate"
+            href="/meja"
             className={cn(
               "inline-flex items-center text-sm font-semibold underline underline-offset-4 outline-none hover:decoration-2 focus-visible:ring-2 focus-visible:ring-ring",
               tapTarget,

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
@@ -10,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { AcceptanceReport } from "./acceptance-report";
 import { ExportHistory } from "./export-history";
 import { ExportPanel, type Candidate } from "./export-panel";
+
+export const metadata: Metadata = { title: "Ekspor" };
 
 const dayFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
 

@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
@@ -8,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { ReviewQueue, type ReviewItem } from "./review-queue";
 
 /** One sitting rarely gets through more than this; the rest load on the next visit. */
+export const metadata: Metadata = { title: "Tinjau Adobe" };
+
 const QUEUE_LIMIT = 200;
 
 const dayFormat = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "Asia/Jakarta" });

@@ -20,7 +20,7 @@ export function StatCard({
 }) {
   const pct = progress === undefined ? undefined : Math.round(Math.min(1, Math.max(0, progress)) * 100);
   return (
-    <div className={cn("rounded-2xl border bg-card p-4", className)}>
+    <div className={cn("rounded-lg border bg-card p-4", className)}>
       <p className="text-sm font-semibold text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-2xl leading-none font-extrabold tabular-nums sm:text-3xl">{value}</p>
       {pct !== undefined && (

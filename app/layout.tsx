@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   description: "Buat aset vektor SVG siap upload ke Adobe Stock dari satu tema.",
 };
 
+// Lets bars pinned to the bottom read env(safe-area-inset-*) and clear the iPhone home indicator.
+export const viewport: Viewport = { viewportFit: "cover" };
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // next-themes sets the class before hydration, so the server and client class lists differ on purpose.
@@ -28,7 +31,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
-          <Toaster richColors position="top-center" />
+          {/* Bottom, above the phone tab bar and near the actions that raise toasts. */}
+          <Toaster richColors position="bottom-center" offset={{ bottom: "calc(var(--tabbar-h) + 1rem)" }} mobileOffset={{ bottom: "calc(var(--tabbar-h) + 0.75rem)" }} />
         </ThemeProvider>
       </body>
     </html>

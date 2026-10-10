@@ -13,7 +13,7 @@ import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricin
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { STYLES, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
 import { ActiveJobCard } from "./active-job-card";
-import { GenerateForm, type TestedModel } from "./generate-form";
+import { GenerateForm, type LastJob, type TestedModel } from "./generate-form";
 import { PhotoForm, type OpenPhotoJob, type PhotoJobSummary } from "./photo-form";
 import { parsePhotoJob } from "@/lib/photo/run";
 import { UUID_RE } from "@/lib/assets";
@@ -45,6 +45,7 @@ export default async function HalamanGenerate({
     { data: benchmarks },
     { data: svgCosts },
     saturated,
+    { data: lastJobRow },
   ] = await Promise.all([
     supabase.from("user_settings").select("*").maybeSingle(),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
@@ -54,6 +55,8 @@ export default async function HalamanGenerate({
     // What paid SVG calls really cost, per model: the estimate shown before a batch.
     supabase.from("provider_usage").select("model, cost_idr").eq("kind", "svg").eq("provider", "kenari").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(500),
     fetchSaturatedSubjects(supabase),
+    // The latest vector batch, offered as "Ulangi batch terakhir".
+    supabase.from("generation_jobs").select("count, style, palette, themes(title)").neq("style", "photo").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const defaultStyle = (STYLES.find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
@@ -78,6 +81,9 @@ export default async function HalamanGenerate({
   for (const row of svgCosts ?? []) (costRuns[row.model] ??= []).push(Number(row.cost_idr));
   for (const [model, costs] of Object.entries(costRuns)) svgCostIdr[model] = costs.reduce((a, b) => a + b, 0) / costs.length;
 
+  const palettes = withPresetPalettes(settings ? toPalettes(settings.palettes) : []);
+  const lastJob = toLastJob(lastJobRow, palettes);
+
   const initialTheme = tema?.slice(0, 120) ?? "";
   const uploadBy = batas && /^\d{4}-\d{2}-\d{2}$/.test(batas) ? batas : undefined;
   const photoData = photo ? await loadPhotoJobs(supabase, job) : null;
@@ -85,7 +91,17 @@ export default async function HalamanGenerate({
   return (
     <div className="space-y-6">
       <PageHeader title="Generate" description="Biarkan tab ini terbuka selama antrean berjalan.">
-        <div className="grid grid-cols-2 gap-3 sm:max-w-xl">
+        <p className="flex flex-wrap gap-2 text-sm sm:hidden">
+          <span className="rounded-md bg-muted px-2.5 py-1 font-semibold tabular-nums">
+            Lolos hari ini {lolosError ? "–" : `${lolosToday ?? 0}/${DAILY_LOLOS_TARGET}`}
+          </span>
+          {settings && (
+            <span className="rounded-md bg-muted px-2.5 py-1 font-semibold tabular-nums">
+              Sisa {spentError ? "–" : formatIdr(kenariBudgetLeftIdr)}
+            </span>
+          )}
+        </p>
+        <div className="grid grid-cols-2 gap-3 max-sm:hidden sm:max-w-xl">
           <StatCard
             label="Lolos hari ini"
             value={lolosError ? "–" : `${lolosToday ?? 0}/${DAILY_LOLOS_TARGET}`}
@@ -152,7 +168,7 @@ export default async function HalamanGenerate({
       <GenerateForm
         userId={user.id}
         defaultStyle={defaultStyle}
-        palettes={withPresetPalettes(settings ? toPalettes(settings.palettes) : [])}
+        palettes={palettes}
         bannedWords={settings?.banned_words ?? []}
         initialTheme={initialTheme}
         uploadBy={uploadBy}
@@ -163,10 +179,23 @@ export default async function HalamanGenerate({
         svgCostIdr={svgCostIdr}
         saturated={saturated}
         activeJob={activeJob ? <ActiveJobCard initial={activeJob} /> : null}
+        lastJob={tema ? null : lastJob}
       />
       )}
     </div>
   );
+}
+
+/** The latest vector batch as form values; its palette is matched back to a palette in the picker by its colors. */
+function toLastJob(
+  row: { count: number; style: string; palette: unknown; themes: { title: string } | null } | null,
+  palettes: { colors: string[] }[],
+): LastJob | null {
+  const style = STYLES.find((s) => s.value === row?.style)?.value;
+  if (!row || !style || !row.themes?.title) return null;
+  const colors = Array.isArray(row.palette) ? row.palette.map((c) => String(c).toLowerCase()) : [];
+  const match = colors.length > 0 ? palettes.findIndex((p) => p.colors.map((c) => c.toLowerCase()).join() === colors.join()) : -1;
+  return { theme: row.themes.title, style, count: row.count, paletteIndex: match >= 0 ? String(match) : "" };
 }
 
 /** Stage 12: the latest photo jobs (prompts for Google Flow), and the one opened with ?job= for uploads. */

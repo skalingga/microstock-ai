@@ -11,6 +11,33 @@
         ],
         "createdAt": "2026-10-08T23:19:45.601Z",
         "reason": "Claude: src is a signed Supabase URL rendered only when item.svgUrl exists (guarded ternary), not a placeholder"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/mockups/opsi-tata-letak.html"
+        ],
+        "createdAt": "2026-10-10T04:57:45.693Z",
+        "reason": "Claude: underline tabs and device/browser frames in a static mockup are intentionally flush; not app UI"
+      },
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "docs/mockups/opsi-tata-letak.html"
+        ],
+        "createdAt": "2026-10-10T04:57:45.838Z",
+        "reason": "Claude: phone and desktop frames clip their screens on purpose (device mockup); no popovers inside"
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist mono",
+        "files": [
+          "docs/mockups/opsi-tata-letak.html"
+        ],
+        "createdAt": "2026-10-10T06:03:38.930Z",
+        "reason": "Claude: DESIGN.md sets Geist Mono for model IDs and hex codes only; the mockup copies the app's tokens"
       }
     ]
   }

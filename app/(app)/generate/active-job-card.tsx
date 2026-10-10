@@ -51,7 +51,7 @@ export function ActiveJobCard({ initial }: { initial: ActiveJob }) {
   ];
 
   return (
-    <section aria-labelledby="active-job-title" className="space-y-4 rounded-2xl border bg-card p-5">
+    <section aria-labelledby="active-job-title" className="space-y-4 rounded-lg border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <h2 id="active-job-title" className="text-lg font-extrabold">

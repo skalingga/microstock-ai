@@ -1,6 +1,6 @@
 // Where to send the user after sign-in. Only same-site paths are accepted, so a crafted
 // ?lanjut= link cannot bounce the user to another site.
-export const DEFAULT_AFTER_LOGIN = "/generate";
+export const DEFAULT_AFTER_LOGIN = "/meja";
 
 export function safeNextPath(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/")) return DEFAULT_AFTER_LOGIN;

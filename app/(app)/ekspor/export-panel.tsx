@@ -553,8 +553,8 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
           </ul>
         )}
 
-        {/* Pinned to the bottom while the list scrolls, so the main action is always one tap away. */}
-        <div className="sticky bottom-0 z-20 -mx-1 space-y-3 rounded-md border border-foreground/30 bg-card p-3 shadow-md sm:mx-0">
+        {/* Pinned to the bottom while the list scrolls, so the main action is always one tap away; lifted above the phone tab bar and the iPhone home indicator. */}
+        <div className="sticky bottom-[max(var(--tabbar-h),env(safe-area-inset-bottom))] z-20 -mx-1 space-y-3 rounded-md border border-foreground/30 bg-card p-3 shadow-md sm:mx-0">
           {cekChosen.length > 0 && !building && (
             <label className="flex cursor-pointer items-start gap-2 text-sm text-warning-foreground">
               <input
