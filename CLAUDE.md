@@ -58,12 +58,12 @@ export interface SvgProvider {
 
 ## Aturan Adobe Stock yang dipaksakan aplikasi
 
-- Ekspor hanya file SVG (tipe Vector). Pengguna wajib mencentang "Created using generative AI tools" di portal Adobe untuk setiap aset; tampilkan sebagai checklist di halaman ekspor.
+- Ekspor hanya file SVG (tipe Vector) untuk aset vektor; foto dari Mode foto (Tahap 12) diekspor sebagai JPEG dengan aturan di `docs/PLAN-mode-foto.md`. Pengguna wajib mencentang "Created using generative AI tools" di portal Adobe untuk setiap aset; tampilkan sebagai checklist di halaman ekspor.
 - Vektor harus rapi dan mudah diedit: batasi jumlah path dan titik, tanpa elemen teks, tanpa gambar raster tertanam.
 - Ikon: latar transparan. Pola: harus seamless (uji tile 2x2).
 - Dilarang nama artis, orang terkenal, karakter fiksi, merek, atau IP lain di prompt, judul, dan keyword. Pakai daftar kata terlarang yang bisa diedit di pengaturan.
 - Judul tidak boleh menyiratkan peristiwa berita nyata.
-- Aset yang menggambarkan orang atau properti nyata ditandai "Perlu Release". Hindari orang realistis.
+- Aset yang menggambarkan orang atau properti nyata ditandai "Perlu Release". Hindari orang realistis di vektor. Foto (Tahap 12) boleh menampilkan orang fiktif dan wajib dicentang "People and Property are fictional" di portal Adobe.
 - Keyword maksimal 49, urut dari yang terpenting (cek ulang batas ini di dokumentasi Adobe saat implementasi).
 - Ukuran artboard 15 sampai 65 MP dan maksimal 4800 px per sisi: ekspor mengatur `width`/`height` SVG (sisi terpanjang 4800 px) tanpa mengubah `viewBox`. Rasio lebar-tinggi di bawah sekitar 0,65 (mis. 16:9) tidak bisa memenuhi keduanya, jadi gaya background memakai 3:2.
 - Nama file maksimal 30 karakter termasuk `.svg`, judul maksimal 70 karakter tanpa koma. Adobe tidak menerima ZIP untuk vektor: ZIP hanya kemudahan unduh.
@@ -96,6 +96,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 - [ ] 10. Gaya baru: ikon garis, ikon glyph, ubin geometris, mode satu subjek banyak variasi (rincian: `docs/PLAN-tahap-10-13.md`). Kode selesai 9 Okt 2026, menunggu uji batch penuh pengguna
 - [ ] 11. Bundle: 16 aset Lolos jadi satu SVG grid 4x4 + metadata set
+- [ ] 12. Mode foto (Google Flow, setengah manual; rincian: `docs/PLAN-mode-foto.md`): aplikasi menulis prompt foto, pengguna generate di Flow lalu mengunggah hasilnya, aplikasi menjalankan QC foto, metadata AI vision, ekspor JPEG + CSV. Flow tidak diotomatisasi. Video ditunda
 
 Centang tahap setelah selesai dan diverifikasi pengguna.
 
