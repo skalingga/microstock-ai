@@ -96,6 +96,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [ ] 9. Lanjutan bila dijual: kuota, langganan, pindah ke Vercel Pro
 - [ ] 10. Gaya baru: ikon garis, ikon glyph, ubin geometris, mode satu subjek banyak variasi (rincian: `docs/PLAN-tahap-10-13.md`). Kode selesai 9 Okt 2026, menunggu uji batch penuh pengguna
 - [ ] 12b. Foto otomatis lewat API resmi Gemini/Nano Banana (rencana: `docs/PLAN-foto-api.md`, berbayar per foto dengan batas bulanan USD, tombol eksplisit). Belum dimulai: menunggu data penerimaan Adobe untuk foto dari Tahap 12 dan persetujuan perubahan aturan Provider
+- [ ] 10b. Tata letak HP dan PC (sisipan, opsi B "Meja hari ini" dari `docs/mockups/opsi-tata-letak.html`, kritik 10 Okt 2026): bilah tab bawah di HP dengan lencana batch, halaman awal `/meja`, Generate ringkas dengan lembar pilihan dan bilah aksi menempel, Tinjau dengan bilah keputusan menempel, filter galeri di lembar bawah
 - [ ] 11. Bundle: 16 aset Lolos jadi satu SVG grid 4x4 + metadata set
 - [ ] 12. Mode foto (Google Flow, setengah manual; rincian: `docs/PLAN-mode-foto.md`): aplikasi menulis prompt foto, pengguna generate di Flow lalu mengunggah hasilnya, aplikasi menjalankan QC foto, metadata AI vision, ekspor JPEG + CSV. Flow tidak diotomatisasi. Video ditunda. Kode selesai 10 Okt 2026 di branch `dev`, menunggu uji pengguna
 

@@ -31,7 +31,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
-          <Toaster richColors position="top-center" />
+          {/* Bottom, above the phone tab bar and near the actions that raise toasts. */}
+          <Toaster richColors position="bottom-center" offset={{ bottom: "calc(var(--tabbar-h) + 1rem)" }} mobileOffset={{ bottom: "calc(var(--tabbar-h) + 0.75rem)" }} />
         </ThemeProvider>
       </body>
     </html>

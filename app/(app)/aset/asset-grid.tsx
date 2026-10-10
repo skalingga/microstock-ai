@@ -139,7 +139,7 @@ export function AssetGrid({
           // Only pinned while something is picked, so it does not take phone screen space the rest of the time.
           // Phones: pinned to the bottom, within thumb reach and above the iPhone home indicator. Larger screens: pinned under the header.
           pinned
-            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[max(0.5rem,env(safe-area-inset-bottom))] sm:sticky sm:top-16 lg:top-3"
+            ? "z-20 border-foreground/30 bg-card shadow-md max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(var(--tabbar-h)+0.5rem)] sm:sticky sm:top-16 lg:top-3"
             : "bg-card/70",
         )}
       >

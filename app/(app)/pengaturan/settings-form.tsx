@@ -560,7 +560,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
       <div
         className={cn(
           "flex flex-wrap items-center justify-end gap-x-4 gap-y-2 rounded-md border p-3",
-          dirty || summary ? "sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 border-foreground/30 bg-card shadow-md" : "bg-card/70",
+          dirty || summary ? "sticky bottom-[calc(max(var(--tabbar-h),env(safe-area-inset-bottom))+1rem)] z-10 border-foreground/30 bg-card shadow-md" : "bg-card/70",
         )}
       >
         <p className="mr-auto text-sm" role="status">
