@@ -32,5 +32,5 @@ export async function ubahPassword(_prev: ResetState, formData: FormData): Promi
             : "Gagal mengubah password. Minta tautan baru lewat halaman masuk.",
     };
   }
-  redirect("/generate");
+  redirect("/meja");
 }
