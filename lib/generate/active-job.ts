@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import type { Database } from "@/lib/database.types";
 
 // The queue lives in one browser tab, but every asset it makes is stored right away. Reading the latest job and its
@@ -26,9 +27,15 @@ export type ActiveJob = {
   menunggu: number;
   lastActivityAt: string;
   checkedAt: string;
+  /** Newest assets first, when asked for: what the batch is actually making, seen from the phone. */
+  previews?: { url: string; qcStatus: string }[];
 };
 
-export async function fetchActiveJob(supabase: SupabaseClient<Database>, now = Date.now()): Promise<ActiveJob | null> {
+/** The latest batch; with `previews`, also signed thumbnails of its newest assets (the nav badge does not need them). */
+export async function fetchActiveJob(
+  supabase: SupabaseClient<Database>,
+  { now = Date.now(), previews = 0 }: { now?: number; previews?: number } = {},
+): Promise<ActiveJob | null> {
   const { data: job, error } = await supabase
     .from("generation_jobs")
     .select("id, count, status, style, created_at, themes(title)")
@@ -39,13 +46,17 @@ export async function fetchActiveJob(supabase: SupabaseClient<Database>, now = D
     .maybeSingle();
   if (error || !job) return null;
 
-  const { data: assets } = await supabase.from("assets").select("qc_status, created_at").eq("job_id", job.id);
+  const { data: assets } = await supabase.from("assets").select("qc_status, created_at, preview_path").eq("job_id", job.id);
   const rows = assets ?? [];
   const lastActivityAt = rows.reduce((latest, a) => (a.created_at > latest ? a.created_at : latest), job.created_at);
   const idleMs = now - new Date(lastActivityAt).getTime();
 
   const running = job.status === "berjalan";
   if (!running && idleMs > SHOW_FINISHED_MS) return null;
+
+  const newest = previews > 0 ? [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at)).filter((a) => a.preview_path).slice(0, previews) : [];
+  const signed = newest.length > 0 ? await supabase.storage.from("assets").createSignedUrls(newest.map((a) => a.preview_path!), SIGNED_URL_TTL_SEC) : null;
+  const urlByPath = new Map((signed?.data ?? []).map((s) => [s.path, s.signedUrl]));
 
   return {
     id: job.id,
@@ -60,5 +71,9 @@ export async function fetchActiveJob(supabase: SupabaseClient<Database>, now = D
     menunggu: rows.filter((a) => a.qc_status === "menunggu").length,
     lastActivityAt,
     checkedAt: new Date(now).toISOString(),
+    previews: newest.flatMap((a) => {
+      const url = urlByPath.get(a.preview_path!);
+      return url ? [{ url, qcStatus: a.qc_status }] : [];
+    }),
   };
 }

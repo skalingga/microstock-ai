@@ -12,7 +12,7 @@ import { withPresetPalettes } from "@/lib/settings/palettes";
 import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { STYLES, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
-import { ActiveJobCard } from "./active-job-card";
+import { ActiveJobCard, JOB_PREVIEWS } from "./active-job-card";
 import { GenerateForm, type LastJob, type TestedModel } from "./generate-form";
 import { PhotoForm, type OpenPhotoJob, type PhotoJobSummary } from "./photo-form";
 import { parsePhotoJob } from "@/lib/photo/run";
@@ -50,7 +50,7 @@ export default async function HalamanGenerate({
     supabase.from("user_settings").select("*").maybeSingle(),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "lolos").gte("created_at", startOfDayWib()),
-    fetchActiveJob(supabase),
+    fetchActiveJob(supabase, { previews: JOB_PREVIEWS }),
     supabase.from("model_benchmarks").select("results").order("created_at", { ascending: false }).limit(5),
     // What paid SVG calls really cost, per model: the estimate shown before a batch.
     supabase.from("provider_usage").select("model, cost_idr").eq("kind", "svg").eq("provider", "kenari").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(500),

@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -51,12 +51,28 @@ export default async function HalamanTinjauAdobe({ searchParams }: { searchParam
   const backHref = job ? `/aset?adobe=belum&job=${job}` : "/aset?adobe=belum";
 
   return (
-    <div className="space-y-6">
-      <Link href={backHref} className={cn("inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground", tapTarget)}>
+    <div className="space-y-6 max-lg:space-y-3">
+      {/* Focus mode on phones and tablets: the tab bar steps aside (app-nav.tsx, globals.css) and the header is one line. */}
+      <div data-focus-mode hidden />
+      <div className="-mt-2 flex items-center justify-between gap-3 lg:hidden">
+        <h1 className="text-xl font-extrabold">Tinjau hasil Adobe</h1>
+        <Link href={backHref} className={cn("inline-flex items-center gap-1.5 rounded-md px-2 text-sm font-semibold hover:bg-muted", tapTarget)}>
+          <X className="size-4" />
+          Tutup
+        </Link>
+      </div>
+      <Link
+        href={backHref}
+        className={cn("inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground max-lg:hidden", tapTarget)}
+      >
         <ArrowLeft className="size-4" />
         Kembali ke galeri
       </Link>
-      <PageHeader title="Tinjau hasil Adobe" description="Satu aset sekali, sesuai urutan ekspor. Catat keputusan dari email atau portal Adobe." />
+      <PageHeader
+        title="Tinjau hasil Adobe"
+        description="Satu aset sekali, sesuai urutan ekspor. Catat keputusan dari email atau portal Adobe."
+        className="max-lg:hidden"
+      />
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           Daftar aset tidak bisa dimuat. Muat ulang halaman.

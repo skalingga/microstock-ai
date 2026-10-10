@@ -136,8 +136,8 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
       )}
 
       <div className="flex items-center gap-x-3 gap-y-2 sm:flex-wrap">
-        {/* Phones: one row that scrolls sideways instead of wrapping onto two. */}
-        <nav aria-label="Filter status" className="flex min-w-0 gap-1 rounded-md border bg-card p-1 max-sm:flex-1 max-sm:overflow-x-auto sm:inline-flex sm:flex-wrap">
+        {/* Phones: wraps instead of scrolling, so Perlu cek and Gagal are never off-screen; empty statuses step aside. */}
+        <nav aria-label="Filter status" className="flex min-w-0 flex-wrap gap-1 rounded-md border bg-card p-1 max-sm:flex-1 sm:inline-flex">
           {FILTERS.map((f) => {
             const active = status === f.value;
             return (
@@ -146,8 +146,9 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
                 href={href({ status: f.value, page: 1 })}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-sm px-3.5 text-sm font-medium transition-colors duration-150",
+                  "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-sm px-3.5 text-sm font-medium transition-colors duration-150 max-sm:px-2.5",
                   tapTarget,
+                  counts[f.value] === 0 && !active && f.value !== "semua" && "max-sm:hidden",
                   active ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >

@@ -12,7 +12,7 @@ import { ADOBE } from "@/lib/adobe/rules";
 import { exportLabel } from "@/lib/export/label";
 import { buildExport, downloadBlob, exportStamp, markExported, saveExport, type ExportResult } from "@/lib/export/build";
 import { createClient } from "@/lib/supabase/client";
-import { tapTarget } from "@/lib/ui";
+import { pinnedBar, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { UploadChecklist } from "./upload-checklist";
 
@@ -553,8 +553,14 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
           </ul>
         )}
 
-        {/* Pinned to the bottom while the list scrolls, so the main action is always one tap away; lifted above the phone tab bar and the iPhone home indicator. */}
-        <div className="sticky bottom-[max(var(--tabbar-h),env(safe-area-inset-bottom))] z-20 -mx-1 space-y-3 rounded-md border border-foreground/30 bg-card p-3 shadow-md sm:mx-0">
+        {/* Pinned to the bottom while the list scrolls, so the main action is always one tap away: the shared band above the
+            phone tab bar, a floating card on PC (lifted above the iPad home indicator). */}
+        <div
+          className={cn(
+            "space-y-3 lg:sticky lg:bottom-[max(0.5rem,env(safe-area-inset-bottom))] lg:z-20 lg:rounded-md lg:border lg:border-foreground/30 lg:bg-card lg:p-3 lg:shadow-md",
+            pinnedBar,
+          )}
+        >
           {cekChosen.length > 0 && !building && (
             <label className="flex cursor-pointer items-start gap-2 text-sm text-warning-foreground">
               <input

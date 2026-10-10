@@ -4,10 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LayoutGrid, RefreshCw } from "lucide-react";
 import { ProgressLine } from "@/components/pen-motif";
+import { QcBadge } from "@/components/qc-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { POLL_MS, fetchActiveJob, type ActiveJob } from "@/lib/generate/active-job";
 import { STYLES } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
+
+/** Thumbnails of the newest assets in the card: enough to judge the batch from a phone. */
+export const JOB_PREVIEWS = 6;
 
 const TITLE: Record<ActiveJob["state"], string> = {
   berjalan: "Antrean sedang berjalan",
@@ -27,7 +31,7 @@ export function ActiveJobCard({ initial }: { initial: ActiveJob }) {
 
   async function refresh() {
     setChecking(true);
-    const next = await fetchActiveJob(createClient()).catch(() => undefined);
+    const next = await fetchActiveJob(createClient(), { previews: JOB_PREVIEWS }).catch(() => undefined);
     // undefined = the read failed: keep the last known state rather than hiding the card.
     if (next) setJob(next);
     setChecking(false);
@@ -68,6 +72,21 @@ export function ActiveJobCard({ initial }: { initial: ActiveJob }) {
       </div>
 
       <ProgressLine value={job.count > 0 ? job.made / job.count : 0} label="Kemajuan batch" />
+
+      {job.previews && job.previews.length > 0 && (
+        <ul aria-label="Aset terbaru batch ini" className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {job.previews.map((p) => (
+            <li key={p.url} className="space-y-1">
+              <span className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-sm border">
+                {/* Shown through <img>, never inline, so scripts in an SVG can never run. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt="" className="size-full object-contain" loading="lazy" />
+              </span>
+              <QcBadge status={p.qcStatus} />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div role="status" className="space-y-1 text-sm">
         <p>

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatIdr } from "@/lib/budget";
 import type { Tables } from "@/lib/database.types";
 import { isImageStyle, AUTO_PROVIDERS, STYLES, formatBannedWords, formatPalettes, parseBannedWords, parsePalettes, toPalettes, toProviderOrder } from "@/lib/settings/schema";
-import { selectClass, tapTarget } from "@/lib/ui";
+import { pinnedBar, selectClass, tapTarget } from "@/lib/ui";
 import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { cn } from "@/lib/utils";
 import { simpanPengaturan, type SettingsField } from "./actions";
@@ -560,7 +560,9 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
       <div
         className={cn(
           "flex flex-wrap items-center justify-end gap-x-4 gap-y-2 rounded-md border p-3",
-          dirty || summary ? "sticky bottom-[calc(max(var(--tabbar-h),env(safe-area-inset-bottom))+1rem)] z-10 border-foreground/30 bg-card shadow-md" : "bg-card/70",
+          dirty || summary
+            ? cn("lg:sticky lg:bottom-[max(1rem,env(safe-area-inset-bottom))] lg:z-10 lg:border-foreground/30 lg:bg-card lg:shadow-md", pinnedBar)
+            : "bg-card/70",
         )}
       >
         <p className="mr-auto text-sm" role="status">

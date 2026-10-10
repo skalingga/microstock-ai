@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_AFTER_LOGIN, safeNextPath } from "@/lib/auth/next-path";
 import { DEADLINE_WINDOW_DAYS, acceptanceRate, pickDeadlines } from "@/lib/dashboard/summary";
+import { CHECKLIST_STEP_IDS, unfinishedUploads } from "@/lib/export/checklist";
 
 const NOW = Date.parse("2026-10-10T05:00:00Z");
 
@@ -35,6 +36,19 @@ describe("acceptanceRate", () => {
     expect(acceptanceRate(35, 7)).toBe(83);
     expect(acceptanceRate(0, 0)).toBeNull();
     expect(acceptanceRate(0, 4)).toBe(0);
+  });
+});
+
+describe("unfinishedUploads", () => {
+  it("counts exports with open steps and those still missing the AI label", () => {
+    const rows = [
+      { checklist_done: [...CHECKLIST_STEP_IDS] },
+      { checklist_done: ["zip", "upload", "ai"] },
+      { checklist_done: [] },
+      { checklist_done: null },
+    ];
+    expect(unfinishedUploads(rows)).toEqual({ unfinished: 3, missingAiLabel: 2 });
+    expect(unfinishedUploads([])).toEqual({ unfinished: 0, missingAiLabel: 0 });
   });
 });
 
