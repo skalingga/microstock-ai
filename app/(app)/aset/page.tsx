@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { InfoTip } from "@/components/info-tip";
 import { PageHeader } from "@/components/page-header";
-import { PenPath } from "@/components/pen-motif";
+import { Anchor, PenPath } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC } from "@/lib/assets";
@@ -13,6 +13,7 @@ import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
 import { AssetToolbar } from "./asset-toolbar";
+import { FilterSheet } from "./filter-sheet";
 import { applyGalleryFilter, FILTERS, KINDS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
 
 export const metadata: Metadata = { title: "Aset" };
@@ -102,7 +103,8 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
         title="Aset"
         description="Semua aset SVG dan foto beserta status QC."
         actions={
-          <Link href="/generate" className={buttonVariants({ size: "lg" })}>
+          // Phones reach Generate from the tab bar; the button would only push the gallery down.
+          <Link href="/generate" className={buttonVariants({ size: "lg", className: "max-sm:hidden" })}>
             <Spline />
             Generate baru
           </Link>
@@ -120,8 +122,22 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
 
       <AssetToolbar pending={pending} bannedWords={settings.data?.banned_words ?? []} job={job} />
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <nav aria-label="Filter status" className="flex flex-wrap gap-1 rounded-md border bg-card p-1 sm:inline-flex">
+      {adobeWaiting > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border bg-card px-4 py-3">
+          <Anchor filled />
+          <p className="min-w-0 flex-1">
+            <span className="block font-bold tabular-nums">{adobeWaiting} menunggu keputusan Adobe</span>
+            <span className="block text-sm text-muted-foreground">Sudah diekspor, belum dicatat. Satu aset sekali.</span>
+          </p>
+          <Link href={withQuery("/aset/tinjau", job ? `job=${job}` : "")} className={buttonVariants()}>
+            Tinjau
+          </Link>
+        </div>
+      )}
+
+      <div className="flex items-center gap-x-3 gap-y-2 sm:flex-wrap">
+        {/* Phones: one row that scrolls sideways instead of wrapping onto two. */}
+        <nav aria-label="Filter status" className="flex min-w-0 gap-1 rounded-md border bg-card p-1 max-sm:flex-1 max-sm:overflow-x-auto sm:inline-flex sm:flex-wrap">
           {FILTERS.map((f) => {
             const active = status === f.value;
             return (
@@ -130,7 +146,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
                 href={href({ status: f.value, page: 1 })}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-2 rounded-sm px-3.5 text-sm font-medium transition-colors duration-150",
+                  "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-sm px-3.5 text-sm font-medium transition-colors duration-150",
                   tapTarget,
                   active ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
@@ -148,73 +164,72 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
             );
           })}
         </nav>
-        <nav aria-label="Filter jenis" className="flex flex-wrap gap-1">
-          {KINDS.map((k) => {
-            const active = kind === k.value;
-            return (
-              <Link
-                key={k.value}
-                href={href({ kind: k.value, page: 1 })}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "inline-flex min-h-9 items-center rounded-md border px-3 text-sm",
-                  tapTarget,
-                  active ? "border-foreground bg-secondary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {k.label}
-              </Link>
-            );
-          })}
-        </nav>
         <InfoTip align="start" label="Arti status">
           Lolos: siap diekspor. Perlu cek: boleh diekspor setelah kamu periksa sendiri. Gagal: tidak bisa diekspor; jalankan QC ulang atau hapus.
           Menunggu: belum punya QC atau metadata.
         </InfoTip>
       </div>
 
-      <form action="/aset" method="get" role="search" className="flex flex-wrap gap-2">
-        {batches.length > 1 && (
-          <select name="job" defaultValue={job ?? ""} aria-label="Batch" className={cn(selectClass, "w-auto max-w-56")}>
-            <option value="">Semua batch</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.label}
-              </option>
-            ))}
-          </select>
-        )}
-        {batches.length <= 1 && job && <input type="hidden" name="job" value={job} />}
-        {status !== "semua" && <input type="hidden" name="status" value={status} />}
-        {kind !== "semua" && <input type="hidden" name="jenis" value={kind} />}
-        {adobePending && <input type="hidden" name="adobe" value="belum" />}
-        <Input type="search" name="q" defaultValue={q} maxLength={MAX_SEARCH_LENGTH} placeholder="Cari judul aset" aria-label="Cari judul aset" className="w-auto min-w-48 max-w-xs flex-1" />
-        <Button type="submit" variant="outline">
-          <Search />
-          Terapkan
-        </Button>
-      </form>
+      <FilterSheet activeCount={[kind !== "semua", Boolean(job), Boolean(q), adobePending].filter(Boolean).length}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-3">
+          <nav aria-label="Filter jenis" className="flex flex-wrap gap-1">
+            {KINDS.map((k) => {
+              const active = kind === k.value;
+              return (
+                <Link
+                  key={k.value}
+                  href={href({ kind: k.value, page: 1 })}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "inline-flex min-h-9 items-center rounded-md border px-3 text-sm",
+                    tapTarget,
+                    active ? "border-foreground bg-secondary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {k.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <form action="/aset" method="get" role="search" className="flex flex-wrap gap-2">
+            {batches.length > 1 && (
+              <select name="job" defaultValue={job ?? ""} aria-label="Batch" className={cn(selectClass, "w-auto max-w-56 max-sm:w-full max-sm:max-w-none")}>
+                <option value="">Semua batch</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {batches.length <= 1 && job && <input type="hidden" name="job" value={job} />}
+            {status !== "semua" && <input type="hidden" name="status" value={status} />}
+            {kind !== "semua" && <input type="hidden" name="jenis" value={kind} />}
+            {adobePending && <input type="hidden" name="adobe" value="belum" />}
+            <Input type="search" name="q" defaultValue={q} maxLength={MAX_SEARCH_LENGTH} placeholder="Cari judul aset" aria-label="Cari judul aset" className="w-auto min-w-48 max-w-xs flex-1 max-sm:w-full max-sm:max-w-none" />
+            <Button type="submit" variant="outline" className="max-sm:w-full">
+              <Search />
+              Terapkan
+            </Button>
+          </form>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <Link
-          href={href({ adobePending: !adobePending, page: 1 })}
-          aria-current={adobePending ? "true" : undefined}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-md border px-3",
-            tapTarget,
-            "min-h-9",
-            adobePending ? "border-foreground bg-secondary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-          )}
-        >
-          Diekspor, belum dicatat Adobe
-          <span className="rounded-sm bg-muted px-1.5 py-px text-xs text-muted-foreground tabular-nums">{adobeWaiting}</span>
-        </Link>
-        {adobeWaiting > 0 && (
-          <Link href={withQuery("/aset/tinjau", job ? `job=${job}` : "")} className={cn("font-semibold underline underline-offset-4 hover:decoration-2", tapTarget, "inline-flex items-center")}>
-            Tinjau satu per satu
-          </Link>
-        )}
-      </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <Link
+              href={href({ adobePending: !adobePending, page: 1 })}
+              aria-current={adobePending ? "true" : undefined}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-md border px-3",
+                tapTarget,
+                "min-h-9",
+                adobePending ? "border-foreground bg-secondary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              Diekspor, belum dicatat Adobe
+              <span className="rounded-sm bg-muted px-1.5 py-px text-xs text-muted-foreground tabular-nums">{adobeWaiting}</span>
+            </Link>
+          </div>
+        </div>
+      </FilterSheet>
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

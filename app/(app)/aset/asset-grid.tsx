@@ -127,6 +127,8 @@ export function AssetGrid({
   const pinned = picked.length > 0;
   // While pinned on a phone, secondary actions wait behind ⋯ so the bar stays one row wide; opened, they line up below the main row.
   const secondary = pinned ? (more ? "max-sm:order-1" : "max-sm:hidden") : undefined;
+  // "Pick the first 100" is rarely the first move on a phone: it waits until something is picked (then behind ⋯).
+  const filterPick = pinned ? secondary : "max-sm:hidden";
 
   return (
     <div className="space-y-4">
@@ -145,7 +147,9 @@ export function AssetGrid({
       >
         <div className="flex flex-wrap items-center gap-2">
           {picked.length === 0 ? (
-            <span className="px-1 text-muted-foreground">Centang aset untuk mengekspor, mencatat hasil Adobe, atau menghapus.</span>
+            <span className="px-1 text-muted-foreground">
+              Centang aset untuk mengekspor, mencatat hasil Adobe<span className="max-sm:hidden">, atau menghapus</span>.
+            </span>
           ) : (
             <span className="px-1 font-semibold tabular-nums">{picked.length} dipilih</span>
           )}
@@ -170,7 +174,7 @@ export function AssetGrid({
               type="button"
               size="sm"
               variant="ghost"
-              className={secondary}
+              className={filterPick}
               onClick={() => {
                 setSelected(new Set([...selected, ...filterFirst.map((a) => a.id)]));
                 setMode("pilih");
