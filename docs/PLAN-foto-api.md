@@ -4,6 +4,18 @@ Disusun 10 Okt 2026 atas permintaan pengguna (tidak punya waktu mengunggah foto 
 Pengganti agen yang login ke Flow: itu **tidak dikerjakan** (Flow tanpa API resmi, otomatisasi tampilan
 berisiko ke akun Google pengguna, lihat `docs/PLAN-mode-foto.md`). Tahap ini hanya rencana; belum ada kode.
 
+## Keputusan pengguna (10 Okt 2026)
+
+1. Batas bulanan **$10** disetujui.
+2. Model bawaan **Nano Banana Pro** (`gemini-3-pro-image-preview`, sekitar $0,134 per foto 2K).
+3. Memakai **kunci Gemini yang sekarang** (`GEMINI_API_KEY`), bukan project kedua. Konsekuensi yang harus dicek sebelum
+   membangun: API gambar butuh billing di project itu; billing dapat membuat panggilan teks Flash-Lite ikut berbayar
+   (murah, tapi tidak gratis lagi) dan bisa menghilangkan batas gratis. Mitigasi: pasang anggaran dan peringatan di
+   Google Cloud Billing, dan ukur biaya teks per hari setelah billing aktif. Bila ternyata teks jadi mahal, kembali ke
+   rencana kunci terpisah (`GEMINI_IMAGE_API_KEY`). Kode tetap membaca kunci gambar dari env var sendiri yang
+   bawaannya jatuh ke `GEMINI_API_KEY`, jadi pindah kunci tidak butuh perubahan kode.
+4. Kapan mulai: belum dijawab. Usulan tetap: setelah hasil Adobe mode manual tercatat.
+
 ## Syarat mulai (gerbang)
 
 Jangan dikerjakan sebelum Tahap 12 (mode manual) dicoba satu batch dan hasil Adobe-nya tercatat:
@@ -38,7 +50,7 @@ jangan dikunci di kode, simpan sebagai pengaturan seperti model Kenari.
 
 ## Keputusan desain penting
 
-1. **Kunci terpisah.** Gemini API gambar butuh billing aktif. Billing pada satu project Google dapat mengubah
+1. **Kunci terpisah (usulan awal; pengguna memilih memakai kunci yang ada, lihat Keputusan pengguna).** Gemini API gambar butuh billing aktif. Billing pada satu project Google dapat mengubah
    panggilan teks gratis (Flash-Lite, rantai provider sekarang) di project itu jadi berbayar. Karena itu: buat
    project Google Cloud/AI Studio **kedua** khusus gambar, dengan kunci `GEMINI_IMAGE_API_KEY`. Kunci teks
    (`GEMINI_API_KEY`) tetap di project gratis. Verifikasi perilaku ini di dokumentasi billing Google sebelum mengaktifkan.
@@ -96,7 +108,7 @@ jangan dikunci di kode, simpan sebagai pengaturan seperti model Kenari.
 ## Urutan kerja
 
 1. Cek fakta (di bawah) dan catat hasilnya di berkas ini.
-2. Pengguna membuat project Google kedua + kunci, mengaktifkan billing, menentukan batas bulanan.
+2. Pengguna mengaktifkan billing di project Gemini yang ada dan memasang anggaran/peringatan di Google Cloud Billing.
 3. Migrasi + tipe + harga + adapter + tes (tanpa UI).
 4. Route + guard anggaran + tes.
 5. UI tombol, estimasi, pengaturan.
@@ -116,7 +128,4 @@ jangan dikunci di kode, simpan sebagai pengaturan seperti model Kenari.
 
 ## Pertanyaan untuk pengguna
 
-1. Batas bulanan USD: $10 (usulan) atau lain?
-2. Model bawaan: Nano Banana Pro (kualitas, sekitar $0,134) atau Nano Banana 2 (sekitar $0,101)?
-3. Bersedia membuat project Google kedua khusus gambar dan mengaktifkan billing?
-4. Mulai setelah hasil Adobe mode manual tercatat (usulan), atau lebih awal?
+Tersisa satu: mulai setelah hasil Adobe mode manual tercatat (usulan), atau lebih awal?
