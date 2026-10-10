@@ -32,6 +32,8 @@ export async function fetchActiveJob(supabase: SupabaseClient<Database>, now = D
   const { data: job, error } = await supabase
     .from("generation_jobs")
     .select("id, count, status, style, created_at, themes(title)")
+    // Photo jobs only hold prompts for Google Flow; their uploads are not a queue to follow from another device.
+    .neq("style", "photo")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

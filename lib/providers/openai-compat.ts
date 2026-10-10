@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { extractJson, extractSvg } from "@/lib/svg/extract";
 import { ProviderError } from "./errors";
-import { conceptsPrompt, metadataPrompt, svgPrompt, themesPrompt } from "./prompts";
+import { PHOTO_PROBLEM_IDS, type PhotoProblem } from "@/lib/photo/config";
+import { conceptsPrompt, metadataPrompt, photoMetadataPrompt, photoPromptsPrompt, svgPrompt, themesPrompt } from "./prompts";
 import type {
   Concept,
   ConceptInput,
   MetadataInput,
+  PhotoMetadataInput,
+  PhotoPrompt,
+  PhotoPromptsInput,
   ProviderId,
   RateLimit,
   SvgInput,
@@ -56,6 +60,26 @@ const themesSchema = z.object({
     }),
   ),
 });
+
+const photoPromptsSchema = z.object({
+  prompts: z.array(
+    z.object({
+      subject: z.string().trim().min(1).max(200),
+      prompt: z.string().trim().min(20).max(1500),
+    }),
+  ),
+});
+
+const photoMetadataSchema = z.object({
+  title: z.string().trim().min(1),
+  keywords: z.union([z.array(z.string()), z.string()]),
+  category: z.string().trim().default(""),
+  has_people: z.boolean().optional().default(false),
+  problems: z.array(z.string()).optional().default([]),
+});
+
+/** Chat message content: plain text, or text plus an image (OpenAI vision format, base64 data URL). */
+type UserContent = string | ({ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } })[];
 
 /**
  * Shared body of every provider that speaks the OpenAI chat-completions protocol (Kenari, Gemini).
@@ -175,7 +199,52 @@ export abstract class OpenAiCompatProvider implements SvgProvider {
     return { themes, model: this.model, costIdr, rateLimit };
   }
 
-  private async chat(system: string, user: string, opts: { maxTokens: number; temperature: number }) {
+  async generatePhotoPrompts(input: PhotoPromptsInput) {
+    const { system, user } = photoPromptsPrompt(input);
+    const { content, rateLimit, costIdr } = await this.chat(system, user, { maxTokens: 8000, temperature: 0.9 });
+
+    const parsed = photoPromptsSchema.safeParse(extractJson(content));
+    if (!parsed.success) {
+      throw new ProviderError("bad_output", "Balasan model bukan daftar prompt foto yang valid.", { costIdr });
+    }
+    const prompts: PhotoPrompt[] = parsed.data.prompts.slice(0, input.count);
+    if (prompts.length === 0) {
+      throw new ProviderError("bad_output", "Model tidak menghasilkan prompt foto.", { costIdr });
+    }
+    return { prompts, model: this.model, costIdr, rateLimit };
+  }
+
+  async generatePhotoMetadata(input: PhotoMetadataInput) {
+    const { system, user } = photoMetadataPrompt(input);
+    const content: UserContent = [
+      { type: "text", text: user },
+      { type: "image_url", image_url: { url: input.image } },
+    ];
+    const reply = await this.chat(system, content, { maxTokens: 4000, temperature: 0.3 });
+
+    const parsed = photoMetadataSchema.safeParse(extractJson(reply.content));
+    if (!parsed.success) {
+      throw new ProviderError("bad_output", "Balasan model bukan metadata foto yang valid.", { costIdr: reply.costIdr });
+    }
+    const { title, keywords, category, has_people, problems } = parsed.data;
+    const known = new Set<string>(PHOTO_PROBLEM_IDS);
+    return {
+      metadata: {
+        title,
+        keywords: Array.isArray(keywords) ? keywords : keywords.split(","),
+        category,
+        // Fictional people need no release; a lookalike of a real person is reported as a problem instead.
+        needsRelease: false,
+        hasPeople: has_people,
+        problems: [...new Set(problems.map((p) => p.trim().toLowerCase()).filter((p) => known.has(p)))] as PhotoProblem[],
+      },
+      model: this.model,
+      costIdr: reply.costIdr,
+      rateLimit: reply.rateLimit,
+    };
+  }
+
+  private async chat(system: string, user: UserContent, opts: { maxTokens: number; temperature: number }) {
     if (!this.apiKey) {
       throw new ProviderError("auth", `${this.keyEnv} belum diisi di server.`);
     }

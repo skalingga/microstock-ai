@@ -70,4 +70,11 @@ describe("saveExport", () => {
     expect(calls).toContain("remove");
     expect(calls.some((c) => c.startsWith("update"))).toBe(false);
   });
+
+  it("tells which step failed and why", async () => {
+    const { client } = fakeClient({ insertFails: true });
+    let reason = "";
+    await saveExport(client, "user-1", result, undefined, (r) => (reason = r));
+    expect(reason).toBe("menulis baris Riwayat: boom");
+  });
 });

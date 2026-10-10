@@ -26,7 +26,7 @@ Versi 1 fokus pada satu pengguna, satu platform (Adobe Stock), dan satu jenis as
 **Tidak masuk versi 1**
 
 - Platform selain Adobe Stock
-- Foto/raster dan upscale (gambar raster hanya bahan antara untuk dikonversi ke SVG, tidak pernah diekspor)
+- Foto/raster yang dibuat aplikasi, dan upscale (gambar raster dari model gambar hanya bahan antara untuk dikonversi ke SVG). Pengecualian: Mode foto (Tahap 12, `docs/PLAN-mode-foto.md`, disetujui 10 Okt 2026): foto dibuat pengguna sendiri di Google Flow lalu diunggah; aplikasi menulis prompt, menjalankan QC, metadata, dan ekspor JPEG
 - Provider lain di luar Kenari, Gemini, dan Recraft
 - Kuota, paket langganan, dan pembayaran
 - Multi-user atau tim
@@ -245,6 +245,9 @@ Generate dan QC dikerjakan sebelum riset, karena tema bisa diketik manual dan ku
 7. **Gambar Kenari + konversi SVG:** gaya Siluet dan Line art, adapter model gambar (`gpt-image-2`), konversi dan pengolahan SVG di server, harga per gambar, batas biaya Kenari. (Menggantikan Recraft, yang menjadi opsional bila ada anggaran USD: adapter, tombol eksplisit, estimasi biaya, batas $10 per bulan.)
 8. **Riset tema:** kalender event, Google Trends, skor peluang, tombol generate dari tema.
 9. **Lanjutan (bila dijual):** kuota, langganan, pindah ke Vercel Pro.
+10. **Gaya baru:** lihat `docs/PLAN-tahap-10-13.md`.
+11. **Bundle:** lihat `docs/PLAN-tahap-10-13.md`.
+12. **Mode foto (Google Flow, setengah manual):** lihat `docs/PLAN-mode-foto.md`.
 
 ## Metrik dan keputusan tertunda
 

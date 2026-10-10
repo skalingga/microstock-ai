@@ -51,6 +51,16 @@ export function imageOrder(settingsModel: string, override?: ProviderEntry): Pro
 }
 
 /**
+ * Photo metadata needs a model that reads images. Only Gemini is known to (its OpenAI-compatible endpoint takes a
+ * base64 image_url, checked 10 Oct 2026); which Kenari models do is not known, so Kenari is left out. Uses the
+ * Gemini entry of the user's order, or the default Gemini model when the order has none.
+ */
+export function visionOrder(order: ProviderEntry[]): ProviderEntry[] {
+  const gemini = order.filter((entry) => entry.provider === "gemini");
+  return gemini.length > 0 ? gemini : [{ provider: "gemini", model: "" }];
+}
+
+/**
  * After the primary timed out, the browser retries with skipPrimary so the backup gets the whole
  * 60s window instead of the few seconds left over. A single provider is never dropped.
  */

@@ -22,6 +22,9 @@ export type Candidate = {
   status: "lolos" | "perlu_cek";
   exportedAt: string | null;
   needsRelease: boolean;
+  /** Stage 12: a JPEG from Google Flow; fictional = shows people or property that do not exist. */
+  photo?: boolean;
+  fictional?: boolean;
   thumbUrl: string | null;
   /** The generation job (batch) the asset came from; assets are grouped by it. */
   groupId: string;
@@ -45,6 +48,8 @@ type Result = {
   exportId: string | null | undefined;
   /** Whether the assets were marked exported; false offers a retry. */
   marked?: boolean;
+  /** Why saving to the history failed, when it did. */
+  saveError?: string;
 };
 
 const MAX_PER_EXPORT = 500;
@@ -161,11 +166,11 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       const supabase = createClient();
       const { data: rows, error: fetchError } = await supabase
         .from("assets")
-        .select("id, title, keywords, category, svg_path")
+        .select("id, title, keywords, category, svg_path, kind, image_path")
         .in("id", chosen.map((c) => c.id));
       if (fetchError || !rows) throw new Error("Data aset tidak bisa dimuat. Coba lagi.");
 
-      const assets = rows.flatMap((r) => (r.title && r.svg_path ? [{ ...r, title: r.title, svg_path: r.svg_path }] : []));
+      const assets = rows.flatMap((r) => (r.title && (r.svg_path || r.image_path) ? [{ ...r, title: r.title }] : []));
       const data = await buildExport(supabase, assets, (done, total) => setBuilding({ phase: "build", done, total }), controller.signal);
       const next: Result = { data, stamp: exportStamp(), exportId: undefined };
       if (data.included.length === 0) {
@@ -174,17 +179,14 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         return;
       }
 
-      // Files in hand first, then the server marks the assets exported.
-      downloadZip(next);
+      // Save to the history first, then download. On iOS Safari the download (link click) stopped the save that came
+      // right after it: the Supabase logs of 10 Oct 2026 show the photos fetched for the ZIP, then no upload request
+      // at all. The files are in memory either way, and a stored export can be downloaded again from the history.
       setResult(next);
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
-      const includedIds = new Set(data.included.map((i) => i.id));
-      const exported = candidates.filter((c) => includedIds.has(c.id));
-      const saved = await saveExport(supabase, userId, data, {
-        label: exportLabel(exported.map((c) => c.groupLabel)),
-        releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
-      });
-      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked });
+      const { saved, saveError } = await storeExport(data);
+      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
+      downloadZip(next);
       if (saved?.marked) {
         setSelected(new Set());
         setConfirmedCek("");
@@ -202,6 +204,42 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         resultHeading.current?.focus({ preventScroll: true });
       });
     }
+  }
+
+  /** Keeps the export in the history and marks its assets. Never throws: a failed save must not lose the files in hand. */
+  async function storeExport(data: ExportResult) {
+    const includedIds = new Set(data.included.map((i) => i.id));
+    const exported = candidates.filter((c) => includedIds.has(c.id));
+    let saveError: string | undefined;
+    let saved: Awaited<ReturnType<typeof saveExport>> = null;
+    try {
+      saved = await saveExport(
+        createClient(),
+        userId,
+        data,
+        {
+          label: exportLabel(exported.map((c) => c.groupLabel)),
+          releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
+          fictionalFiles: fictionalFilesOf(data.included, candidates),
+        },
+        (reason) => (saveError = reason),
+      );
+    } catch (err) {
+      saveError = err instanceof Error ? err.message : "kesalahan tak terduga";
+    }
+    return { saved, saveError };
+  }
+
+  async function retrySave() {
+    if (!result) return;
+    setResult({ ...result, exportId: undefined, saveError: undefined });
+    const { saved, saveError } = await storeExport(result.data);
+    setResult({ ...result, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
+    if (saved?.marked) {
+      setSelected(new Set());
+      setConfirmedCek("");
+    }
+    router.refresh();
   }
 
   async function retryMark() {
@@ -224,6 +262,9 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
   const releaseTitles = result
     ? candidates.filter((c) => c.needsRelease && included.some((i) => i.id === c.id)).map((c) => c.title)
     : undefined;
+  const fictionalFiles = result ? fictionalFilesOf(included, candidates) : undefined;
+  const photoCount = included.filter((i) => i.photo).length;
+  const svgCount = included.length - photoCount;
 
   return (
     <div className="space-y-8">
@@ -235,10 +276,27 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
             </h2>
             {included.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                ZIP sudah diunduh · {included.length} file SVG · CSV {included.length} baris · sisi terpanjang {ADOBE.artboard.maxSidePx} px
+                ZIP sudah diunduh ·{" "}
+                {[svgCount > 0 && `${svgCount} file SVG (sisi terpanjang ${ADOBE.artboard.maxSidePx} px)`, photoCount > 0 && `${photoCount} foto JPEG`]
+                  .filter(Boolean)
+                  .join(" · ")}
+                . CSV tidak ada di dalam ZIP: unduh terpisah di bawah.
               </p>
             )}
           </div>
+
+          {included.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => downloadCsv(result)}>
+                <Download />
+                Unduh CSV ({included.length} baris)
+              </Button>
+              <Button type="button" variant="outline" onClick={() => downloadZip(result)}>
+                <Download />
+                Unduh ZIP lagi
+              </Button>
+            </div>
+          )}
 
           {result.exportId === undefined && included.length > 0 && (
             <p className="text-sm" role="status">
@@ -265,7 +323,11 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
           {result.exportId === null && included.length > 0 && (
             <p role="alert" className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
               Riwayat gagal disimpan, jadi aset belum ditandai diekspor dan file ini tidak ada di Riwayat. Simpan ZIP dan CSV-nya
-              sekarang.
+              sekarang, atau coba simpan lagi.
+              {result.saveError && <span className="mt-1 block font-mono text-xs break-words">Sebab: {result.saveError}</span>}
+              <Button type="button" size="sm" className="mt-2" onClick={retrySave}>
+                Simpan ke Riwayat lagi
+              </Button>
             </p>
           )}
           {result.data.problems.map((p) => (
@@ -306,6 +368,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                 zipLabel="Unduh ZIP lagi"
                 csv={{ onClick: () => downloadCsv(result) }}
                 releaseTitles={releaseTitles}
+                fictionalFiles={fictionalFiles}
               />
               <details className="text-sm">
                 <summary className={cn("cursor-pointer font-semibold", tapTarget, "inline-flex items-center")}>
@@ -474,6 +537,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                                 <span className="mt-0.5 flex items-center gap-2">
                                   <QcBadge status={c.status} />
                                   {c.exportedAt && <span className="text-xs text-muted-foreground">Sudah diekspor</span>}
+                                  {c.photo && <span className="text-xs text-muted-foreground">Foto</span>}
                                   {c.needsRelease && <span className="text-xs font-semibold text-warning-foreground">Perlu Release</span>}
                                 </span>
                               </span>
@@ -524,8 +588,8 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold" aria-live="polite">
                   {building.phase === "build"
-                    ? `Menyiapkan ${building.done} dari ${building.total} SVG...`
-                    : "ZIP terunduh. Menyimpan ke Riwayat..."}
+                    ? `Menyiapkan ${building.done} dari ${building.total} berkas...`
+                    : "Menyimpan ke Riwayat. ZIP terunduh setelah ini..."}
                 </p>
                 {building.phase === "build" && (
                   <Button type="button" variant="outline" size="sm" onClick={() => abort.current?.abort()}>
@@ -547,7 +611,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                     {blockedReason}
                   </span>
                 ) : (
-                  <span>ZIP langsung terunduh; CSV ada di langkah unggah</span>
+                  <span>ZIP terunduh otomatis; CSV diunduh terpisah dari kartu hasil</span>
                 )}
                 <InfoTip align="start" label="Ukuran artboard">
                   Setiap SVG diberi ukuran artboard {ADOBE.artboard.maxSidePx} px (syarat Adobe: minimal {ADOBE.artboard.minMegapixels} MP).
@@ -577,4 +641,10 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       )}
     </div>
   );
+}
+
+/** File names of the exported photos that show fictional people (Adobe's "People and Property are fictional" box). */
+function fictionalFilesOf(included: { id: string; filename: string }[], candidates: Candidate[]): string[] {
+  const fictional = new Set(candidates.filter((c) => c.fictional).map((c) => c.id));
+  return included.filter((i) => fictional.has(i.id)).map((i) => i.filename);
 }

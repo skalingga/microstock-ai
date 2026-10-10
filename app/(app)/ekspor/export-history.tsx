@@ -19,6 +19,8 @@ export type HistoryRow = {
   filenames: string[];
   /** Assets that needed a release; undefined-safe for old rows (empty). */
   releaseTitles: string[];
+  /** Photo files that show fictional people (stage 12); empty for older rows. */
+  fictionalFiles: string[];
   thumbUrls: string[];
 };
 
@@ -89,6 +91,7 @@ function Row({ row, startOpen }: { row: HistoryRow; startOpen: boolean }) {
             csv={row.csvUrl ? { href: row.csvUrl } : undefined}
             onProgress={setDoneIds}
             releaseTitles={row.label || row.releaseTitles.length > 0 ? row.releaseTitles : undefined}
+            fictionalFiles={row.fictionalFiles}
           />
           {row.filenames.length > 0 && (
             <details className="mt-2 text-sm">

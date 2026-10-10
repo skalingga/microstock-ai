@@ -1,7 +1,8 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import { colorRangeFor, isIconStyle, isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
 import { SVG_EXAMPLES } from "./examples";
-import type { ConceptInput, MetadataInput, SvgInput, ThemesInput } from "./types";
+import { PHOTO_PROBLEM_IDS } from "@/lib/photo/config";
+import type { ConceptInput, MetadataInput, PhotoMetadataInput, PhotoPromptsInput, SvgInput, ThemesInput } from "./types";
 
 // Prompts to the AI are in English (CLAUDE.md).
 
@@ -274,5 +275,68 @@ export function themesPrompt(input: ThemesInput): { system: string; user: string
     ]
       .filter((line) => line !== "")
       .join("\n"),
+  };
+}
+
+// Stage 12: prompts for photos the user makes by hand in Google Flow (Nano Banana), and metadata for the uploads.
+// Photos may show people, but only fictional ones (Adobe: "People and Property are fictional").
+const PHOTO_RULES = [
+  "People, when present, are fictional ordinary adults of diverse backgrounds with natural expressions; never a real or famous person, never a lookalike. Keep hands relaxed or simply posed: avoid complex finger gestures and hands holding small objects close to the camera.",
+  "No text anywhere in the picture: no signs, labels, posters, screens with writing, book titles, packaging, logos, brand names, watermarks, or captions. Books have plain spines, packaging is plain and unbranded.",
+  "Never name or depict brands, trademarks, celebrities, artists, fictional characters, recognizable artworks, or private property that could need a release.",
+  "Never show or imply a real news event, disaster, protest, politics, or anything that looks like documentary coverage of a real event.",
+];
+
+export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  return {
+    system:
+      "You are a stock photography art director planning AI-generated photos for Adobe Stock. " +
+      "You write prompts for a photorealistic image model and answer with a single JSON object and nothing else.",
+    user: [
+      `Theme: ${input.theme}`,
+      `Aspect ratio of every photo: ${input.aspect}`,
+      "",
+      ...(input.variations
+        ? [
+            `Write exactly ${input.count} prompts that show ONE subject: the subject of the theme. Each prompt changes the setting, action, camera angle, time of day or people, so no two photos look alike.`,
+          ]
+        : [
+            `Write exactly ${input.count} prompts for clearly different photos about this theme. Vary the scene, the action, the setting, the camera angle and the lighting so no two photos look alike.`,
+          ]),
+      // Adobe refuses "similar content": the plain version of a common scene is already in its collection many times over.
+      "Every scene must be specific and commercially useful, never the most generic version of the theme. Give each one a concrete differentiator: a particular place, activity, season, age group, or an unusual but believable situation. No two prompts may share the same main scene.",
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
+      "Each prompt describes one photorealistic stock photo in 40 to 80 words of plain English: subject and action, setting, lighting, camera angle and lens feel, mood, and color palette. Natural, candid, high detail, sharp focus.",
+      "In about a third of the prompts, leave calm empty space on one side of the frame for buyers who add their own text.",
+      ...PHOTO_RULES,
+      "",
+      'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',
+      "- subject: what the photo shows, max 10 words.",
+      "- prompt: the full prompt for the image model. Never mention Adobe, stock, AI, or these instructions in it.",
+    ].join("\n"),
+  };
+}
+
+export function photoMetadataPrompt(input: Omit<PhotoMetadataInput, "image">): { system: string; user: string } {
+  return {
+    system:
+      "You write search metadata for Adobe Stock photos and check them for defects before upload. " +
+      "You look at the attached photo and answer with a single JSON object and nothing else.",
+    user: [
+      `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
+      ...(input.prompt ? [`Prompt the photo was made from (the photo may differ; describe the photo): ${input.prompt}`] : []),
+      "",
+      "Write the metadata a buyer would search for. Describe what the photo actually shows.",
+      `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters. Do not mention AI or how the photo was made.`,
+      "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
+      `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
+      "- has_people: true if any person or part of a person is visible, otherwise false.",
+      `- problems: the defects you see, as a list using only these ids: ${PHOTO_PROBLEM_IDS.join(", ")}. visible_text = any readable or garbled letters, numbers, signs, labels or book titles. logo_or_watermark = any logo, brand mark or watermark. deformed_people = extra, missing or merged fingers, distorted faces, impossible limbs. real_person_or_brand = looks like a celebrity, a branded product or a trademarked design. artifact = melted or impossible objects and other obvious AI glitches. Be strict and report anything you notice; use an empty list only when the photo is clean.`,
+      "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters in the metadata.",
+      "",
+      'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","has_people":false,"problems":[]}',
+    ].join("\n"),
   };
 }

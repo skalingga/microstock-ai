@@ -23,9 +23,14 @@ export type Database = {
           concept: string | null
           created_at: string
           exported_at: string | null
+          fictional_people: boolean
+          file_bytes: number | null
+          height: number | null
           id: string
+          image_path: string | null
           job_id: string
           keywords: string[]
+          kind: string
           model: string
           needs_release: boolean
           path_count: number | null
@@ -37,6 +42,7 @@ export type Database = {
           svg_path: string | null
           title: string | null
           user_id: string
+          width: number | null
         }
         Insert: {
           adobe_reason?: string | null
@@ -46,9 +52,14 @@ export type Database = {
           concept?: string | null
           created_at?: string
           exported_at?: string | null
+          fictional_people?: boolean
+          file_bytes?: number | null
+          height?: number | null
           id?: string
+          image_path?: string | null
           job_id: string
           keywords?: string[]
+          kind?: string
           model: string
           needs_release?: boolean
           path_count?: number | null
@@ -60,6 +71,7 @@ export type Database = {
           svg_path?: string | null
           title?: string | null
           user_id?: string
+          width?: number | null
         }
         Update: {
           adobe_reason?: string | null
@@ -69,9 +81,14 @@ export type Database = {
           concept?: string | null
           created_at?: string
           exported_at?: string | null
+          fictional_people?: boolean
+          file_bytes?: number | null
+          height?: number | null
           id?: string
+          image_path?: string | null
           job_id?: string
           keywords?: string[]
+          kind?: string
           model?: string
           needs_release?: boolean
           path_count?: number | null
@@ -83,6 +100,7 @@ export type Database = {
           svg_path?: string | null
           title?: string | null
           user_id?: string
+          width?: number | null
         }
         Relationships: [
           {
@@ -101,6 +119,7 @@ export type Database = {
           checklist_done: string[]
           created_at: string
           csv_path: string | null
+          fictional_files: string[]
           filenames: string[]
           id: string
           label: string
@@ -114,6 +133,7 @@ export type Database = {
           checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
+          fictional_files?: string[]
           filenames?: string[]
           id?: string
           label?: string
@@ -127,6 +147,7 @@ export type Database = {
           checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
+          fictional_files?: string[]
           filenames?: string[]
           id?: string
           label?: string
@@ -169,6 +190,7 @@ export type Database = {
           created_at: string
           id: string
           palette: Json
+          photo_prompts: Json | null
           status: string
           style: string
           theme_id: string | null
@@ -179,6 +201,7 @@ export type Database = {
           created_at?: string
           id?: string
           palette?: Json
+          photo_prompts?: Json | null
           status?: string
           style: string
           theme_id?: string | null
@@ -189,6 +212,7 @@ export type Database = {
           created_at?: string
           id?: string
           palette?: Json
+          photo_prompts?: Json | null
           status?: string
           style?: string
           theme_id?: string | null
@@ -394,6 +418,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      my_storage_bytes: { Args: never; Returns: number }
       provider_cost_since: {
         Args: { p_provider: string; p_since: string }
         Returns: number

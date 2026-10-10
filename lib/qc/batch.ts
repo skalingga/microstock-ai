@@ -10,11 +10,12 @@ type Client = SupabaseClient<Database>;
 
 export type BatchProgress = { done: number; total: number; message?: string };
 
-/** Assets that still need QC (created before QC existed) or metadata. */
+/** Vector assets that still need QC (created before QC existed) or metadata. Photos redo theirs on the detail page. */
 export async function countPending(supabase: Client, job?: string): Promise<number> {
   let q = supabase
     .from("assets")
     .select("id", { count: "exact", head: true })
+    .eq("kind", "vector")
     .or("phash.is.null,and(title.is.null,qc_status.neq.gagal)");
   if (job) q = q.eq("job_id", job);
   const { count } = await q;
@@ -37,6 +38,7 @@ export async function processPending(args: {
   let q = supabase
     .from("assets")
     .select("id, job_id, svg_path, qc_notes, qc_status, phash, title, keywords, category, needs_release, concept")
+    .eq("kind", "vector")
     .or("phash.is.null,and(title.is.null,qc_status.neq.gagal)")
     .order("created_at", { ascending: true })
     .limit(200);

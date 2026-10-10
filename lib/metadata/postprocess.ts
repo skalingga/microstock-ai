@@ -1,5 +1,5 @@
 import { ADOBE, DEFAULT_CATEGORY, normalizeCategory } from "@/lib/adobe/rules";
-import type { AssetMetadata } from "@/lib/providers/types";
+import type { AssetMetadata, PhotoMetadata } from "@/lib/providers/types";
 import { findBannedWords } from "@/lib/settings/banned";
 import { isIconStyle, type StyleId } from "@/lib/settings/schema";
 
@@ -129,3 +129,40 @@ export function normalizeMetadata(
 
   return { metadata: { title, keywords, category, needsRelease: raw.needsRelease }, notes };
 }
+
+export type CleanPhotoMetadata = CleanMetadata & { hasPeople: boolean; problems: PhotoMetadata["problems"] };
+
+// Words about how the photo was made. Adobe labels AI content with its own checkbox; in a title they only mislead.
+const AI_WORDS = /\b(ai|a\.i\.|generated|generative|artificial intelligence|midjourney|nano banana|render(ed)?|cgi)\b/i;
+
+/**
+ * Stage 12 photos: same title and keyword rules as vectors. Icon words are not stripped (a photo is never clipart),
+ * AI words are, and an unknown category stays empty for the user to pick instead of falling back to Graphic resources.
+ */
+export function normalizePhotoMetadata(
+  raw: PhotoMetadata,
+  bannedWords: string[],
+): { metadata: CleanPhotoMetadata; notes: string[] } {
+  const notes: string[] = [];
+
+  const cleaned = cleanTitle(raw.title);
+  const title = cleanTitle(cleaned.replace(new RegExp(AI_WORDS.source, "gi"), " ")) || cleaned;
+  if (cleaned !== raw.title.trim()) notes.push("judul dirapikan");
+  if (title !== cleaned) notes.push("kata AI dibuang dari judul");
+
+  const { keywords: kept, dropped } = cleanKeywords(raw.keywords, bannedWords, true);
+  const keywords = kept.filter((k) => !AI_WORDS.test(k));
+  if (dropped.banned > 0) notes.push(`${dropped.banned} keyword terlarang dibuang`);
+  if (dropped.invalid > 0) notes.push(`${dropped.invalid} keyword tidak valid dibuang`);
+  if (dropped.overLimit > 0) notes.push(`${dropped.overLimit} keyword melebihi batas dibuang`);
+  if (keywords.length < kept.length) notes.push(`${kept.length - keywords.length} keyword tentang AI dibuang`);
+
+  const category = normalizeCategory(raw.category) ?? "";
+  if (!category) notes.push(`kategori "${raw.category}" tidak dikenal, pilih sendiri`);
+
+  return {
+    metadata: { title, keywords, category, needsRelease: false, hasPeople: raw.hasPeople, problems: raw.problems },
+    notes,
+  };
+}
+

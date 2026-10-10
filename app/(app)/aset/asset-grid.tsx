@@ -16,6 +16,8 @@ export type GridAsset = {
   id: string;
   previewUrl?: string;
   label: string;
+  /** Stage 12: a photo from Google Flow instead of an SVG. */
+  photo?: boolean;
   qcStatus: string;
   exported: boolean;
   adobeStatus: string | null;
@@ -294,10 +296,10 @@ export function AssetGrid({
                 />
               </label>
               <Link href={withQuery(`/aset/${asset.id}`, detailQuery)} className="block" tabIndex={-1} aria-hidden>
-                <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-sm">
+                <div className={cn("flex aspect-square items-center justify-center overflow-hidden rounded-sm", asset.photo ? "bg-muted" : "bg-checker")}>
                   {asset.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={asset.previewUrl} alt={asset.label} className="size-full object-contain" loading="lazy" />
+                    <img src={asset.previewUrl} alt={asset.label} className={cn("size-full", asset.photo ? "object-cover" : "object-contain")} loading="lazy" />
                   ) : (
                     <span className="text-muted-foreground">Tanpa preview</span>
                   )}
@@ -311,6 +313,7 @@ export function AssetGrid({
               </Link>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 pb-1">
                 <QcBadge status={asset.qcStatus} />
+                {asset.photo && <span className="rounded-sm border px-1.5 text-muted-foreground">Foto</span>}
                 {asset.exported && <span className="text-muted-foreground">Diekspor</span>}
                 {asset.adobeStatus === "diterima" && <span className="font-medium text-success-foreground">Diterima Adobe</span>}
                 {asset.adobeStatus === "ditolak" && <span className="font-medium text-danger-foreground">Ditolak Adobe</span>}

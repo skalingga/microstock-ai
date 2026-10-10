@@ -22,6 +22,21 @@ export const ADOBE = {
   },
 } as const;
 
+// Photos (stage 12, docs/PLAN-mode-foto.md). Source, checked 10 Oct 2026:
+//   Photo technical specs  https://helpx.adobe.com/stock/contributor/submit-your-content/submit-photos/technical-legal-requirements-photo-submission.html
+// Filename, title and keyword limits are the same CSV rules as above.
+export const ADOBE_PHOTO = {
+  minMegapixels: 4,
+  maxMegapixels: 100,
+  maxFileBytes: 45 * 1024 * 1024,
+  /** JPEG with an sRGB profile, no watermark, timestamp, branding, border or text overlay. */
+  mimeType: "image/jpeg",
+  extension: ".jpg",
+} as const;
+
+/** Second box Adobe's portal asks for on AI content showing people or property that do not exist (no CSV column). */
+export const FICTIONAL_LABEL = "People and Property are fictional";
+
 // Official category list, in Adobe's order. The page does not show numbers; 1..21 follows that order
 // and matches community references, but is NOT confirmed by Adobe yet. Verify it against the
 // category dropdown in the Contributor Portal's CSV dialog (stage 6 upload test).

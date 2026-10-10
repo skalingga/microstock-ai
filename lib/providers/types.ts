@@ -1,3 +1,4 @@
+import type { PhotoAspect, PhotoProblem } from "@/lib/photo/config";
 import type { StyleId } from "@/lib/settings/schema";
 
 export type ProviderId = "kenari" | "gemini" | "recraft";
@@ -39,6 +40,26 @@ export type MetadataInput = { theme: string; style: StyleId; concept: string };
 /** Raw model output. lib/metadata/postprocess.ts cleans it before it is stored. */
 export type AssetMetadata = { title: string; keywords: string[]; category: string; needsRelease: boolean };
 
+// Stage 12: photos are made by hand in Google Flow; the AI only writes their prompts and their metadata.
+export type PhotoPromptsInput = {
+  theme: string;
+  count: number;
+  aspect: PhotoAspect;
+  avoid?: string[];
+  /** One subject shown many ways instead of a set of different scenes. */
+  variations?: boolean;
+};
+export type PhotoPrompt = { subject: string; prompt: string };
+
+export type PhotoMetadataInput = {
+  theme: string;
+  /** The prompt the photo was made from, when the user matched the file to one. */
+  prompt?: string;
+  /** Small JPEG copy of the photo as a data URL (data:image/jpeg;base64,...). */
+  image: string;
+};
+export type PhotoMetadata = AssetMetadata & { hasPeople: boolean; problems: PhotoProblem[] };
+
 export type ThemeEventInput = { name: string; date: string; weight: number };
 
 export type ThemesInput = {
@@ -74,4 +95,11 @@ export interface SvgProvider {
   generateThemes(
     input: ThemesInput,
   ): Promise<{ themes: ThemeIdea[]; model: string; costIdr?: number; rateLimit?: RateLimit }>;
+  generatePhotoPrompts(
+    input: PhotoPromptsInput,
+  ): Promise<{ prompts: PhotoPrompt[]; model: string; costIdr?: number; rateLimit?: RateLimit }>;
+  /** Needs a model that reads images (see visionOrder in lib/providers/index.ts). */
+  generatePhotoMetadata(
+    input: PhotoMetadataInput,
+  ): Promise<{ metadata: PhotoMetadata; model: string; costIdr?: number; rateLimit?: RateLimit }>;
 }
