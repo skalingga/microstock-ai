@@ -61,14 +61,14 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
   ] = await Promise.all([
     supabase
       .from("assets")
-      .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release")
+      .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release, kind, fictional_people")
       .not("title", "is", null)
       .in("qc_status", ["lolos", "perlu_cek"])
       .order("created_at", { ascending: false })
       .limit(500),
     supabase
       .from("exports")
-      .select("id, asset_count, created_at, zip_path, csv_path, checklist_done, label, asset_ids, filenames, release_titles")
+      .select("id, asset_count, created_at, zip_path, csv_path, checklist_done, label, asset_ids, filenames, release_titles, fictional_files")
       .order("created_at", { ascending: false })
       .limit(allHistory ? HISTORY_ALL : HISTORY_RECENT + 1),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("qc_status", "menunggu"),
@@ -94,7 +94,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
   const jobById = new Map((jobs ?? []).map((j) => [j.id, j]));
   const styleByJob = new Map((jobs ?? []).map((j) => [j.id, j.style]));
   // Short form for the group line: "Line art", not "Line art (gambar AI, berbayar)".
-  const styleLabel = (v: string) => (STYLES.find((st) => st.value === v)?.label ?? v).replace(/\s*\(.*\)$/, "");
+  const styleLabel = (v: string) => (v === "photo" ? "Foto" : (STYLES.find((st) => st.value === v)?.label ?? v).replace(/\s*\(.*\)$/, ""));
   const reviewedRows: ReviewedAsset[] = (reviewed ?? []).flatMap((r) =>
     r.adobe_status === "diterima" || r.adobe_status === "ditolak"
       ? [
@@ -149,6 +149,8 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
             status: a.qc_status,
             exportedAt: a.exported_at,
             needsRelease: a.needs_release,
+            photo: a.kind === "photo",
+            fictional: a.kind === "photo" && a.fictional_people,
             thumbUrl: a.preview_path ? (thumbByPath.get(a.preview_path) ?? null) : null,
             ...groupOf(a.job_id),
           },
@@ -201,6 +203,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
               label: h.label,
               filenames: h.filenames,
               releaseTitles: h.release_titles,
+              fictionalFiles: h.fictional_files,
               thumbUrls: h.asset_ids
                 .slice(0, HISTORY_THUMBS)
                 .flatMap((id) => {

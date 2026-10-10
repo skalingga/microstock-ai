@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
+import { ProgressLine } from "@/components/pen-motif";
+import { STORAGE_QUOTA_BYTES } from "@/lib/photo/config";
 import { startOfMonthWib, startOfNextMonthWib } from "@/lib/budget";
 import { parseCells, summarize } from "@/lib/generate/benchmark";
 import { fetchGeminiModels, GEMINI_FALLBACK_MODEL } from "@/lib/providers/gemini";
@@ -17,7 +19,7 @@ const monthFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "l
 
 export default async function HalamanPengaturan() {
   const supabase = await createClient();
-  const [{ data: settings, error }, { data: spent }, { data: benchmarks }, { data: svgCosts }, catalog, geminiModels] = await Promise.all([
+  const [{ data: settings, error }, { data: spent }, { data: benchmarks }, { data: svgCosts }, catalog, geminiModels, storageUse] = await Promise.all([
     supabase.from("user_settings").select("*").maybeSingle(),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
     supabase.from("model_benchmarks").select("results").order("created_at", { ascending: false }).limit(5),
@@ -25,7 +27,10 @@ export default async function HalamanPengaturan() {
     supabase.from("provider_usage").select("model, cost_idr").eq("kind", "svg").eq("provider", "kenari").gt("cost_idr", 0).order("created_at", { ascending: false }).limit(500),
     fetchModelCatalog().catch(() => []),
     fetchGeminiModels().catch(() => []),
+    supabase.rpc("my_storage_bytes"),
   ]);
+  const storageBytes = storageUse.error ? null : Number(storageUse.data ?? 0);
+  const gb = (bytes: number) => `${(bytes / 1024 / 1024 / 1024).toLocaleString("id-ID", { maximumFractionDigits: 2 })} GB`;
 
   // The latest benchmark run with results: its scores label the models it tested.
   const cells = (benchmarks ?? []).map((b) => parseCells(b.results)).find((c) => c.length > 0) ?? [];
@@ -80,6 +85,30 @@ export default async function HalamanPengaturan() {
           options={{ kenari: kenariOptions, gemini: geminiOptions }}
         />
       )}
+
+      <section aria-labelledby="storage-heading" className="space-y-2 border-t pt-5">
+        <h2 id="storage-heading" className="text-lg font-bold">
+          Penyimpanan
+        </h2>
+        {storageBytes === null ? (
+          <p role="alert" className="text-sm text-destructive">
+            Pemakaian penyimpanan tidak bisa dimuat.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm">
+              Terpakai <span className="font-semibold">{gb(storageBytes)}</span> dari {gb(STORAGE_QUOTA_BYTES)} (paket Free Supabase). Satu foto
+              sekitar 1 MB, satu SVG beberapa KB.
+            </p>
+            <ProgressLine value={Math.min(1, storageBytes / STORAGE_QUOTA_BYTES)} label="Pemakaian penyimpanan" />
+            {storageBytes > STORAGE_QUOTA_BYTES * 0.8 && (
+              <p className="text-sm font-medium text-warning-foreground">
+                Penyimpanan hampir penuh. Hapus aset yang ditolak Adobe, atau naikkan paket Supabase.
+              </p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

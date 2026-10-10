@@ -42,3 +42,9 @@ export const PHOTO_PROBLEMS = {
 } as const;
 export type PhotoProblem = keyof typeof PHOTO_PROBLEMS;
 export const PHOTO_PROBLEM_IDS = Object.keys(PHOTO_PROBLEMS) as PhotoProblem[];
+
+/**
+ * Storage of the Supabase Free plan (1 GB per common sources, 10 Oct 2026; check the Supabase dashboard when the plan
+ * changes). Settings shows the use against it, since photos are about 1 MB each.
+ */
+export const STORAGE_QUOTA_BYTES = 1024 * 1024 * 1024;

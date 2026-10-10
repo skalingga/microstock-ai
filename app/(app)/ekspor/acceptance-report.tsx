@@ -58,7 +58,7 @@ function GroupTable({ title, column, groups, label }: { title: string; column: s
 /** Stage 6: how often Adobe Stock accepted our assets, split by what we control. Folded: it tunes QC, it is not the export task. */
 export function AcceptanceReport({ rows, awaiting }: { rows: ReviewedAsset[]; awaiting: number }) {
   const report = buildReport(rows);
-  const styleLabel = (v: string) => STYLES.find((s) => s.value === v)?.label ?? v;
+  const styleLabel = (v: string) => (v === "photo" ? "Foto (Google Flow)" : (STYLES.find((s) => s.value === v)?.label ?? v));
   const { overall } = report;
   const anySmall = [report.byProvider, report.byStyle, report.byQc, report.byShapes].some((groups) =>
     groups.some((g) => g.accepted + g.rejected < SMALL_GROUP),

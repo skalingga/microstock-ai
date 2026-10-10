@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError, postJson, type MetadataResponse } from "@/lib/generate/client";
+import { PhotoReadError, visionCopy } from "@/lib/photo/process";
+import { photoContentNotes } from "@/lib/qc/photo";
 import { applyMetadata, fetchHashPool, rerunQc, type StoredAsset } from "@/lib/qc/store";
 import { parseNotes } from "@/lib/qc/types";
 import type { StyleId } from "@/lib/settings/schema";
@@ -15,6 +17,12 @@ type Props = {
   theme: string;
   concept: string;
   bannedWords: string[];
+  /** Stage 12: a photo is described by a vision model looking at the stored JPEG. */
+  photo?: { imagePath: string; prompt?: string };
+};
+
+type PhotoMetadataReply = Omit<MetadataResponse, "metadata"> & {
+  metadata: MetadataResponse["metadata"] & { hasPeople: boolean; problems: Parameters<typeof photoContentNotes>[0] };
 };
 
 /** Re-run QC on this asset. Sits under the QC notes. */
@@ -57,7 +65,7 @@ export function RerunQcButton({ asset, style, bannedWords }: Pick<Props, "asset"
 }
 
 /** Have the AI write the metadata again. Replacing an existing title asks first: hand edits would be lost. */
-export function RegenerateMetadataButton({ asset, style, theme, concept, bannedWords }: Props) {
+export function RegenerateMetadataButton({ asset, style, theme, concept, bannedWords, photo }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -68,17 +76,34 @@ export function RegenerateMetadataButton({ asset, style, theme, concept, bannedW
     setBusy(true);
     setMessage(null);
     try {
-      const res = await postJson<MetadataResponse>("/api/generate/metadata", {
-        theme: theme || "stock vector",
-        style,
-        concept: concept || "Stock vector asset.",
-      });
-      const visual = parseNotes(asset.qc_notes).filter((n) => n.check !== "metadata");
-      const verdict = await applyMetadata(createClient(), asset.id, visual, res.metadata, bannedWords);
+      const supabase = createClient();
+      let verdict;
+      if (photo) {
+        const file = await supabase.storage.from("assets").download(photo.imagePath);
+        if (file.error || !file.data) throw new ApiError("storage", "Foto tersimpan tidak bisa diambil. Coba lagi.");
+        const res = await postJson<PhotoMetadataReply>("/api/generate/photo-metadata", {
+          theme: theme || "stock photo",
+          ...(photo.prompt ? { prompt: photo.prompt } : {}),
+          image: await visionCopy(file.data),
+        });
+        const { hasPeople, problems, ...meta } = res.metadata;
+        // What the vision model saw is replaced too; size, file and similarity notes stay.
+        const kept = parseNotes(asset.qc_notes).filter((n) => !["metadata", "isi", "orang"].includes(n.check));
+        await supabase.from("assets").update({ fictional_people: hasPeople }).eq("id", asset.id);
+        verdict = await applyMetadata(supabase, asset.id, [...kept, ...photoContentNotes(problems, hasPeople)], meta, bannedWords);
+      } else {
+        const res = await postJson<MetadataResponse>("/api/generate/metadata", {
+          theme: theme || "stock vector",
+          style,
+          concept: concept || "Stock vector asset.",
+        });
+        const visual = parseNotes(asset.qc_notes).filter((n) => n.check !== "metadata");
+        verdict = await applyMetadata(supabase, asset.id, visual, res.metadata, bannedWords);
+      }
       setMessage(verdict ? { text: "Metadata baru dibuat. Periksa dan edit bila perlu." } : { text: "Metadata gagal disimpan. Coba lagi.", error: true });
       router.refresh();
     } catch (err) {
-      setMessage({ text: err instanceof ApiError ? err.message : "Metadata gagal dibuat. Coba lagi.", error: true });
+      setMessage({ text: err instanceof ApiError || err instanceof PhotoReadError ? err.message : "Metadata gagal dibuat. Coba lagi.", error: true });
     } finally {
       setBusy(false);
     }

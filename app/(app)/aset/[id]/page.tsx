@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { QcBadge } from "@/components/qc-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
+import { ADOBE_PHOTO } from "@/lib/adobe/rules";
 import { makeFilename } from "@/lib/export/slug";
+import { subjectOf } from "@/lib/subjects/saturation";
 import { parseNotes, type NoteStatus } from "@/lib/qc/types";
 import { STYLES, type StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +17,7 @@ import { AdobeResultForm } from "./adobe-result-form";
 import { RegenerateMetadataButton, RerunQcButton } from "./asset-actions";
 import { DeleteButton } from "./delete-button";
 import { DetailNav } from "./detail-nav";
+import { FictionalToggle } from "./fictional-toggle";
 import { MetadataForm } from "./metadata-form";
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {
@@ -80,16 +83,21 @@ export default async function HalamanDetailAset({
     ? await supabase.from("themes").select("title").eq("id", job.theme_id).maybeSingle()
     : { data: null };
 
+  const isPhoto = asset.kind === "photo";
   const style = (STYLES.find((s) => s.value === job?.style)?.value ?? "icon_set") as StyleId;
-  const styleLabel = STYLES.find((s) => s.value === style)?.label ?? style;
+  const styleLabel = isPhoto ? "Foto (Google Flow)" : (STYLES.find((s) => s.value === style)?.label ?? style);
 
   // Same file name the export would give it, so a manual upload matches the CSV.
-  const filename = asset.title ? makeFilename(asset.title, asset.id, new Set()) : `aset-${asset.id.slice(0, 8)}.svg`;
+  const extension = isPhoto ? ADOBE_PHOTO.extension : ".svg";
+  const filename = asset.title ? makeFilename(asset.title, asset.id, new Set(), extension) : `aset-${asset.id.slice(0, 8)}${extension}`;
+  const filePath = isPhoto ? asset.image_path : asset.svg_path;
   const storage = supabase.storage.from("assets");
   const [view, download] = await Promise.all([
-    asset.svg_path ? storage.createSignedUrl(asset.svg_path, SIGNED_URL_TTL_SEC) : null,
-    asset.svg_path ? storage.createSignedUrl(asset.svg_path, SIGNED_URL_TTL_SEC, { download: filename }) : null,
+    filePath ? storage.createSignedUrl(filePath, SIGNED_URL_TTL_SEC) : null,
+    filePath ? storage.createSignedUrl(filePath, SIGNED_URL_TTL_SEC, { download: filename }) : null,
   ]);
+  // assets.concept of a photo is "subject. prompt." (lib/photo/run.ts): the prompt part goes back to the vision model.
+  const photoPrompt = isPhoto && asset.concept ? asset.concept.slice(subjectOf(asset.concept).length).replace(/^[.\s]+/, "").trim() : "";
 
   const notes = parseNotes(asset.qc_notes).sort((a, b) => NOTE_ORDER[a.status] - NOTE_ORDER[b.status]);
   const problems = notes.filter((n) => n.status !== "ok");
@@ -99,7 +107,14 @@ export default async function HalamanDetailAset({
     ["Gaya", styleLabel],
     ["Provider", asset.provider],
     ["Model", <span key="m" className="font-mono text-xs">{asset.model}</span>],
-    ["Jumlah bentuk (path)", asset.path_count === null ? "-" : String(asset.path_count)],
+    isPhoto
+      ? [
+          "Ukuran",
+          asset.width && asset.height
+            ? `${asset.width}×${asset.height} (${((asset.width * asset.height) / 1_000_000).toLocaleString("id-ID", { maximumFractionDigits: 2 })} MP)${asset.file_bytes ? `, ${(asset.file_bytes / 1024 / 1024).toLocaleString("id-ID", { maximumFractionDigits: 1 })} MB` : ""}`
+            : "-",
+        ]
+      : ["Jumlah bentuk (path)", asset.path_count === null ? "-" : String(asset.path_count)],
     ["Dibuat", dateFormat.format(new Date(asset.created_at))],
     ["Diekspor", asset.exported_at ? dateFormat.format(new Date(asset.exported_at)) : "Belum"],
     ["Nama file", <span key="f" className="font-mono text-xs break-all">{filename}</span>],
@@ -144,17 +159,22 @@ export default async function HalamanDetailAset({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <div className="bg-checker flex aspect-square items-center justify-center overflow-hidden rounded-md border max-lg:max-h-[55vh] max-lg:w-auto">
+          <div
+            className={cn(
+              "flex items-center justify-center overflow-hidden rounded-md border max-lg:max-h-[55vh] max-lg:w-auto",
+              isPhoto ? "bg-muted" : "bg-checker aspect-square",
+            )}
+          >
             {svgUrl ? (
               // Shown through <img>, never inline, so scripts in an SVG can never run.
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={svgUrl} alt={asset.title ?? asset.concept ?? "Aset SVG"} className="size-full object-contain" />
+              <img src={svgUrl} alt={asset.title ?? asset.concept ?? (isPhoto ? "Foto" : "Aset SVG")} className="size-full object-contain" />
             ) : (
-              <span className="text-sm text-muted-foreground">File SVG tidak tersedia.</span>
+              <span className="text-sm text-muted-foreground">{isPhoto ? "File foto tidak tersedia." : "File SVG tidak tersedia."}</span>
             )}
           </div>
 
-          {style === "seamless_pattern" && svgUrl && (
+          {!isPhoto && style === "seamless_pattern" && svgUrl && (
             <div className="space-y-1.5">
               <p className="text-sm font-medium">Uji tile 2×2</p>
               <div
@@ -183,7 +203,7 @@ export default async function HalamanDetailAset({
               {download?.data?.signedUrl && (
                 <a href={download.data.signedUrl} className={buttonVariants({ variant: "outline" })}>
                   <Download />
-                  Unduh SVG
+                  {isPhoto ? "Unduh JPEG" : "Unduh SVG"}
                 </a>
               )}
               {next && (
@@ -214,7 +234,7 @@ export default async function HalamanDetailAset({
                 )}
               </>
             )}
-            <RerunQcButton asset={storedAsset} style={style} bannedWords={settings?.banned_words ?? []} />
+            {!isPhoto && <RerunQcButton asset={storedAsset} style={style} bannedWords={settings?.banned_words ?? []} />}
           </Section>
 
           <Section id="meta-heading" title="Metadata">
@@ -232,7 +252,9 @@ export default async function HalamanDetailAset({
               theme={theme?.title ?? ""}
               concept={asset.concept ?? ""}
               bannedWords={settings?.banned_words ?? []}
+              photo={isPhoto && asset.image_path ? { imagePath: asset.image_path, prompt: photoPrompt || undefined } : undefined}
             />
+            {isPhoto && <FictionalToggle key={String(asset.fictional_people)} id={asset.id} initial={asset.fictional_people} />}
           </Section>
 
           <Section id="adobe-heading" title="Hasil review Adobe">

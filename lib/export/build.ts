@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import JSZip from "jszip";
-import { categoryNumber } from "@/lib/adobe/rules";
+import { ADOBE_PHOTO, categoryNumber } from "@/lib/adobe/rules";
 import type { Database } from "@/lib/database.types";
 import { applyArtboard } from "./artboard";
 import { buildAdobeCsv, csvProblems, type CsvRow } from "./csv";
@@ -13,19 +13,22 @@ export type ExportAsset = {
   title: string;
   keywords: string[];
   category: string | null;
-  svg_path: string;
+  svg_path: string | null;
+  /** Stage 12: a photo exports its stored JPEG unchanged. */
+  kind?: string;
+  image_path?: string | null;
 };
 
 export type ExportResult = {
   zip: Blob;
   csv: string;
-  included: { id: string; filename: string }[];
+  included: { id: string; filename: string; photo?: boolean }[];
   skipped: { id: string; title: string; reason: string }[];
   problems: string[];
 };
 
 /**
- * Browser only. Downloads each SVG, gives it Adobe's artboard size, and packs the files into a ZIP plus the
+ * Browser only. Downloads each SVG, gives it Adobe's artboard size (photos: the JPEG as it is), and packs the files into a ZIP plus the
  * upload CSV. Assets that cannot be exported are skipped with a reason instead of failing the whole batch.
  */
 export async function buildExport(
@@ -45,8 +48,22 @@ export async function buildExport(
     signal?.throwIfAborted();
     onProgress?.(i, assets.length);
 
-    const file = await supabase.storage.from("assets").download(asset.svg_path);
-    if (file.error || !file.data) {
+    if (asset.kind === "photo") {
+      const photo = asset.image_path ? await supabase.storage.from("assets").download(asset.image_path) : null;
+      if (!photo || photo.error || !photo.data) {
+        skipped.push({ id: asset.id, title: asset.title, reason: "File foto tidak bisa diunduh dari penyimpanan." });
+        continue;
+      }
+      // The JPEG goes out exactly as uploaded: no artboard, no re-encoding.
+      const filename = makeFilename(asset.title, asset.id, used, ADOBE_PHOTO.extension);
+      zip.file(filename, photo.data);
+      included.push({ id: asset.id, filename, photo: true });
+      rows.push({ filename, title: asset.title, keywords: asset.keywords, categoryNumber: categoryNumber(asset.category) });
+      continue;
+    }
+
+    const file = asset.svg_path ? await supabase.storage.from("assets").download(asset.svg_path) : null;
+    if (!file || file.error || !file.data) {
       skipped.push({ id: asset.id, title: asset.title, reason: "File SVG tidak bisa diunduh dari penyimpanan." });
       continue;
     }
@@ -107,8 +124,8 @@ export async function markExported(supabase: Client, assetIds: string[]): Promis
   return !error;
 }
 
-/** What the history row records besides the files: how to name the export, and which assets need a release. */
-export type ExportSummary = { label: string; releaseTitles: string[] };
+/** What the history row records besides the files: how to name the export, which assets need a release, and which photos show fictional people. */
+export type ExportSummary = { label: string; releaseTitles: string[]; fictionalFiles?: string[] };
 
 /** Keeps the files for the export history and marks the assets as exported. Returns null when the history could not be saved. */
 export async function saveExport(
@@ -141,6 +158,7 @@ export async function saveExport(
       filenames: result.included.map((i) => i.filename),
       label: summary.label,
       release_titles: summary.releaseTitles,
+      fictional_files: summary.fictionalFiles ?? [],
     });
   if (insert.error) {
     await storage.remove([zipPath, csvPath]);

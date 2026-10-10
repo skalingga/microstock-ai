@@ -4,7 +4,7 @@ import { Download, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Anchor } from "@/components/pen-motif";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { AI_LABEL_REMINDER } from "@/lib/adobe/rules";
+import { AI_LABEL_REMINDER, FICTIONAL_LABEL } from "@/lib/adobe/rules";
 import { createClient } from "@/lib/supabase/client";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,8 @@ type Props = {
   zipLabel?: string;
   /** Titles in this export that show real people or property. */
   releaseTitles?: string[];
+  /** Stage 12: photo file names in this export that show fictional people or property. */
+  fictionalFiles?: string[];
   /** The ticked step ids after each change. */
   onProgress?: (done: string[]) => void;
 };
@@ -69,7 +71,17 @@ function FileButton({ action, label, primary }: { action: FileAction; label: str
 }
 
 /** The manual steps on Adobe's side, next to the files they need. */
-export function UploadChecklist({ storageId, persist, initialDone, zip, csv, zipLabel = "Unduh ZIP (SVG)", releaseTitles, onProgress }: Props) {
+export function UploadChecklist({
+  storageId,
+  persist,
+  initialDone,
+  zip,
+  csv,
+  zipLabel = "Unduh ZIP",
+  releaseTitles,
+  fictionalFiles,
+  onProgress,
+}: Props) {
   const [done, setDone] = useState<Set<string>>(() => new Set(initialDone ?? []));
   const [syncError, setSyncError] = useState(false);
   const interactive = Boolean(storageId);
@@ -106,12 +118,12 @@ export function UploadChecklist({ storageId, persist, initialDone, zip, csv, zip
   const steps: { id: StepId; text: React.ReactNode; required?: boolean; action?: React.ReactNode }[] = [
     {
       id: "zip",
-      text: "Unduh ZIP, lalu ekstrak. Adobe tidak menerima ZIP untuk vektor, jadi yang diunggah file SVG-nya.",
+      text: "Unduh ZIP, lalu ekstrak. Adobe tidak menerima ZIP, jadi yang diunggah file SVG atau JPEG-nya.",
       action: zip && <FileButton action={zip} label={zipLabel} primary />,
     },
     {
       id: "upload",
-      text: "Buka Contributor Portal, pilih Unggah, lalu pilih semua file SVG.",
+      text: "Buka Contributor Portal, pilih Unggah, lalu pilih semua file SVG dan JPEG.",
       action: (
         <a href={PORTAL_URL} target="_blank" rel="noreferrer" className={linkClass}>
           Buka Contributor Portal
@@ -125,6 +137,13 @@ export function UploadChecklist({ storageId, persist, initialDone, zip, csv, zip
       text: (
         <>
           Centang <strong>&ldquo;{AI_LABEL_REMINDER}&rdquo;</strong> di setiap aset. Wajib: tanpa label ini aset bisa ditolak.
+          {fictionalFiles && fictionalFiles.length > 0 && (
+            <>
+              {" "}
+              Untuk foto berorang, centang juga <strong>&ldquo;{FICTIONAL_LABEL}&rdquo;</strong>:{" "}
+              <span className="font-mono text-xs break-all">{fictionalFiles.join(", ")}</span>.
+            </>
+          )}
         </>
       ),
       required: true,

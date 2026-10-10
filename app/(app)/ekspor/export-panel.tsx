@@ -22,6 +22,9 @@ export type Candidate = {
   status: "lolos" | "perlu_cek";
   exportedAt: string | null;
   needsRelease: boolean;
+  /** Stage 12: a JPEG from Google Flow; fictional = shows people or property that do not exist. */
+  photo?: boolean;
+  fictional?: boolean;
   thumbUrl: string | null;
   /** The generation job (batch) the asset came from; assets are grouped by it. */
   groupId: string;
@@ -161,11 +164,11 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       const supabase = createClient();
       const { data: rows, error: fetchError } = await supabase
         .from("assets")
-        .select("id, title, keywords, category, svg_path")
+        .select("id, title, keywords, category, svg_path, kind, image_path")
         .in("id", chosen.map((c) => c.id));
       if (fetchError || !rows) throw new Error("Data aset tidak bisa dimuat. Coba lagi.");
 
-      const assets = rows.flatMap((r) => (r.title && r.svg_path ? [{ ...r, title: r.title, svg_path: r.svg_path }] : []));
+      const assets = rows.flatMap((r) => (r.title && (r.svg_path || r.image_path) ? [{ ...r, title: r.title }] : []));
       const data = await buildExport(supabase, assets, (done, total) => setBuilding({ phase: "build", done, total }), controller.signal);
       const next: Result = { data, stamp: exportStamp(), exportId: undefined };
       if (data.included.length === 0) {
@@ -183,6 +186,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       const saved = await saveExport(supabase, userId, data, {
         label: exportLabel(exported.map((c) => c.groupLabel)),
         releaseTitles: exported.filter((c) => c.needsRelease).map((c) => c.title),
+        fictionalFiles: fictionalFilesOf(data.included, candidates),
       });
       setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked });
       if (saved?.marked) {
@@ -224,6 +228,9 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
   const releaseTitles = result
     ? candidates.filter((c) => c.needsRelease && included.some((i) => i.id === c.id)).map((c) => c.title)
     : undefined;
+  const fictionalFiles = result ? fictionalFilesOf(included, candidates) : undefined;
+  const photoCount = included.filter((i) => i.photo).length;
+  const svgCount = included.length - photoCount;
 
   return (
     <div className="space-y-8">
@@ -235,7 +242,11 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
             </h2>
             {included.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                ZIP sudah diunduh · {included.length} file SVG · CSV {included.length} baris · sisi terpanjang {ADOBE.artboard.maxSidePx} px
+                ZIP sudah diunduh ·{" "}
+                {[svgCount > 0 && `${svgCount} file SVG (sisi terpanjang ${ADOBE.artboard.maxSidePx} px)`, photoCount > 0 && `${photoCount} foto JPEG`]
+                  .filter(Boolean)
+                  .join(" · ")}{" "}
+                · CSV {included.length} baris
               </p>
             )}
           </div>
@@ -306,6 +317,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                 zipLabel="Unduh ZIP lagi"
                 csv={{ onClick: () => downloadCsv(result) }}
                 releaseTitles={releaseTitles}
+                fictionalFiles={fictionalFiles}
               />
               <details className="text-sm">
                 <summary className={cn("cursor-pointer font-semibold", tapTarget, "inline-flex items-center")}>
@@ -474,6 +486,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                                 <span className="mt-0.5 flex items-center gap-2">
                                   <QcBadge status={c.status} />
                                   {c.exportedAt && <span className="text-xs text-muted-foreground">Sudah diekspor</span>}
+                                  {c.photo && <span className="text-xs text-muted-foreground">Foto</span>}
                                   {c.needsRelease && <span className="text-xs font-semibold text-warning-foreground">Perlu Release</span>}
                                 </span>
                               </span>
@@ -577,4 +590,10 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       )}
     </div>
   );
+}
+
+/** File names of the exported photos that show fictional people (Adobe's "People and Property are fictional" box). */
+function fictionalFilesOf(included: { id: string; filename: string }[], candidates: Candidate[]): string[] {
+  const fictional = new Set(candidates.filter((c) => c.fictional).map((c) => c.id));
+  return included.filter((i) => fictional.has(i.id)).map((i) => i.filename);
 }

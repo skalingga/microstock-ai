@@ -119,6 +119,7 @@ export type Database = {
           checklist_done: string[]
           created_at: string
           csv_path: string | null
+          fictional_files: string[]
           filenames: string[]
           id: string
           label: string
@@ -132,6 +133,7 @@ export type Database = {
           checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
+          fictional_files?: string[]
           filenames?: string[]
           id?: string
           label?: string
@@ -145,6 +147,7 @@ export type Database = {
           checklist_done?: string[]
           created_at?: string
           csv_path?: string | null
+          fictional_files?: string[]
           filenames?: string[]
           id?: string
           label?: string

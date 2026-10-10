@@ -162,3 +162,20 @@ describe("parsePhotoJob", () => {
     expect(parsePhotoJob([])).toBeNull();
   });
 });
+
+describe("photo file names and gallery filter", () => {
+  it("names photos .jpg within Adobe's 30 characters", async () => {
+    const { makeFilename } = await import("@/lib/export/slug");
+    const name = makeFilename("Two hikers walking through a misty old growth forest", "0f8fad5b-d9cb-469f-a165-70867728950e", new Set(), ".jpg");
+    expect(name.endsWith(".jpg")).toBe(true);
+    expect(name.length).toBeLessThanOrEqual(30);
+  });
+
+  it("carries the kind filter in the query and back", async () => {
+    const { galleryQuery, parseGalleryFilter } = await import("@/app/(app)/aset/filters");
+    const filter = parseGalleryFilter({ jenis: "foto" });
+    expect(filter.kind).toBe("foto");
+    expect(galleryQuery(filter)).toBe("jenis=foto");
+    expect(parseGalleryFilter({ jenis: "video" }).kind).toBe("semua");
+  });
+});

@@ -94,3 +94,19 @@ export async function readPhoto(file: File): Promise<ReadPhoto> {
     bitmap.close();
   }
 }
+
+/** The small JPEG copy for the vision model, from a stored photo (detail page: write the metadata again). */
+export async function visionCopy(image: Blob): Promise<string> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(image);
+  } catch {
+    throw new PhotoReadError("Foto tersimpan tidak bisa dibaca.");
+  }
+  try {
+    const v = fit(bitmap.width, bitmap.height, VISION_MAX_SIDE);
+    return draw(bitmap, v.w, v.h).toDataURL("image/jpeg", VISION_JPEG_QUALITY);
+  } finally {
+    bitmap.close();
+  }
+}

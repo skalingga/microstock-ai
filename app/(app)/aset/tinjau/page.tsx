@@ -19,7 +19,7 @@ export default async function HalamanTinjauAdobe({ searchParams }: { searchParam
   const supabase = await createClient();
   let query = supabase
     .from("assets")
-    .select("id, title, concept, keywords, svg_path, exported_at", { count: "exact" })
+    .select("id, title, concept, keywords, svg_path, kind, preview_path, exported_at", { count: "exact" })
     .not("exported_at", "is", null)
     .is("adobe_status", null)
     // Oldest export first: Adobe reviews in upload order.
@@ -29,7 +29,12 @@ export default async function HalamanTinjauAdobe({ searchParams }: { searchParam
   if (job) query = query.eq("job_id", job);
   const { data: rows, count, error } = await query;
 
-  const paths = (rows ?? []).flatMap((r) => (r.svg_path ? [r.svg_path] : []));
+  // A photo is shown through its preview JPEG: the full file is several MB.
+  const fileOf = (r: { kind: string; svg_path: string | null; preview_path: string | null }) => (r.kind === "photo" ? r.preview_path : r.svg_path);
+  const paths = (rows ?? []).flatMap((r) => {
+    const path = fileOf(r);
+    return path ? [path] : [];
+  });
   const signed = paths.length > 0 ? await supabase.storage.from("assets").createSignedUrls(paths, SIGNED_URL_TTL_SEC) : null;
   const urlByPath = new Map((signed?.data ?? []).map((s) => [s.path, s.signedUrl]));
 
@@ -37,7 +42,7 @@ export default async function HalamanTinjauAdobe({ searchParams }: { searchParam
     id: r.id,
     title: r.title ?? r.concept ?? "Aset tanpa judul",
     keywordCount: r.keywords.length,
-    svgUrl: (r.svg_path && urlByPath.get(r.svg_path)) || null,
+    svgUrl: (fileOf(r) && urlByPath.get(fileOf(r)!)) || null,
     exportedLabel: r.exported_at ? dayFormat.format(new Date(r.exported_at)) : "",
   }));
   const backHref = job ? `/aset?adobe=belum&job=${job}` : "/aset?adobe=belum";

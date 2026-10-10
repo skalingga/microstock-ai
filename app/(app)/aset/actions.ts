@@ -23,10 +23,10 @@ export async function hapusAset(id: string, query = ""): Promise<DeleteResult> {
 
   const supabase = await createClient();
   // Row Level Security means this only finds the caller's own asset.
-  const { data: asset } = await supabase.from("assets").select("svg_path, preview_path").eq("id", id).maybeSingle();
+  const { data: asset } = await supabase.from("assets").select("svg_path, preview_path, image_path").eq("id", id).maybeSingle();
   if (!asset) return { ok: false, error: "Aset tidak ditemukan." };
 
-  const files = [asset.svg_path, asset.preview_path].filter((p): p is string => Boolean(p));
+  const files = [asset.svg_path, asset.preview_path, asset.image_path].filter((p): p is string => Boolean(p));
   if (files.length > 0) {
     const removed = await supabase.storage.from("assets").remove(files);
     if (removed.error) return { ok: false, error: "Gagal menghapus file aset. Coba lagi." };
@@ -55,10 +55,10 @@ export async function hapusBanyakAset(ids: string[]): Promise<BulkDeleteResult> 
     .from("assets")
     .delete()
     .in("id", unique)
-    .select("svg_path, preview_path");
+    .select("svg_path, preview_path, image_path");
   if (error) return { ok: false, error: "Gagal menghapus data aset. Coba lagi." };
 
-  const files = (deleted ?? []).flatMap((a) => [a.svg_path, a.preview_path]).filter((p): p is string => Boolean(p));
+  const files = (deleted ?? []).flatMap((a) => [a.svg_path, a.preview_path, a.image_path]).filter((p): p is string => Boolean(p));
   let warning: string | undefined;
   if (files.length > 0) {
     const removed = await supabase.storage.from("assets").remove(files);
@@ -181,4 +181,14 @@ export async function simpanHasilAdobeBanyak(ids: string[], input: unknown): Pro
   revalidatePath("/aset");
   revalidatePath("/ekspor");
   return { ok: true, saved: data?.length ?? 0 };
+}
+
+/** Stage 12: whether a photo shows people or property that do not exist (Adobe's "People and Property are fictional"). */
+export async function ubahOrangFiktif(id: string, value: boolean): Promise<AdobeResult> {
+  if (!UUID_RE.test(id)) return { ok: false, error: "ID aset tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("assets").update({ fictional_people: value }).eq("id", id).eq("kind", "photo");
+  if (error) return { ok: false, error: "Gagal menyimpan. Coba lagi." };
+  revalidatePath(`/aset/${id}`);
+  return { ok: true };
 }
