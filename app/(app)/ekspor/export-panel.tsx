@@ -245,11 +245,24 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                 ZIP sudah diunduh ·{" "}
                 {[svgCount > 0 && `${svgCount} file SVG (sisi terpanjang ${ADOBE.artboard.maxSidePx} px)`, photoCount > 0 && `${photoCount} foto JPEG`]
                   .filter(Boolean)
-                  .join(" · ")}{" "}
-                · CSV {included.length} baris
+                  .join(" · ")}
+                . CSV tidak ada di dalam ZIP: unduh terpisah di bawah.
               </p>
             )}
           </div>
+
+          {included.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => downloadCsv(result)}>
+                <Download />
+                Unduh CSV ({included.length} baris)
+              </Button>
+              <Button type="button" variant="outline" onClick={() => downloadZip(result)}>
+                <Download />
+                Unduh ZIP lagi
+              </Button>
+            </div>
+          )}
 
           {result.exportId === undefined && included.length > 0 && (
             <p className="text-sm" role="status">
