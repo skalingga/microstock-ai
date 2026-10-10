@@ -174,6 +174,12 @@ Tetap satu tabel `assets` agar galeri, tinjau Adobe, statistik penerimaan, dan e
 
 ## Urutan kerja (satu commit per langkah)
 
+Status 10 Okt 2026: langkah 1-7 selesai di branch `dev`; langkah 8 (uji ujung ke ujung) menunggu pengguna.
+Penyimpangan dari rencana: foto di bawah 4 MP atau di atas 45 MB ditolak sebelum disimpan (bukan disimpan sebagai
+Gagal), supaya Storage tidak terisi file yang pasti ditolak; metadata foto hanya lewat Gemini; `user_settings.photo_model_label`
+tidak dibuat (model Flow dipilih saat unggah); pengingat orang fiktif disimpan di `exports.fictional_files`.
+
+
 1. Cek fakta 1-6 dan catat hasilnya di bagian Keputusan dan di `lib/adobe/rules.ts`.
 2. Migrasi `photo_assets` + tipe database + bucket.
 3. Adapter: `generatePhotoPrompts`, `generatePhotoMetadata` (Gemini dulu), route, tes prompt dan
