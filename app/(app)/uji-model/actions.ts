@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Json } from "@/lib/database.types";
+import { imagePriceIdr } from "@/lib/providers/kenari-image-pricing";
 import { providerOrderSchema, toProviderOrder, type ProviderEntry } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
 
@@ -48,4 +49,33 @@ export async function kembalikanRantai(input: unknown): Promise<ChainResult> {
   const parsed = z.array(entrySchema).min(1).max(2).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Rantai lama tidak valid." };
   return writeChain(parsed.data);
+}
+
+export type ImageModelResult = { ok: true; before: string } | { ok: false; error: string };
+
+/**
+ * Puts the suggested image model (Siluet / Line art) into Settings. `before` is the old value for "Urungkan"; an
+ * empty string means the default. Only models with a known price are accepted, so the monthly budget stays right.
+ */
+export async function pakaiModelGambar(model: unknown): Promise<ImageModelResult> {
+  const parsed = z.string().trim().max(120).safeParse(model);
+  if (!parsed.success || (parsed.data !== "" && imagePriceIdr(parsed.data) === undefined)) {
+    return { ok: false, error: "Model gambar tidak dikenal." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+  const { data: settings, error: loadError } = await supabase.from("user_settings").select("kenari_image_model").maybeSingle();
+  if (loadError || !settings) return { ok: false, error: "Pengaturan tidak bisa dimuat. Coba lagi." };
+
+  const { error } = await supabase.from("user_settings").update({ kenari_image_model: parsed.data }).eq("user_id", user.id);
+  if (error) return { ok: false, error: "Gagal menyimpan pengaturan. Coba lagi." };
+
+  revalidatePath("/uji-model");
+  revalidatePath("/pengaturan");
+  revalidatePath("/generate");
+  return { ok: true, before: settings.kenari_image_model };
 }

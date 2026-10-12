@@ -3,7 +3,8 @@ import type { Database, Json } from "@/lib/database.types";
 import type { Concept } from "@/lib/providers/types";
 import { fetchHashPool } from "@/lib/qc/store";
 import type { QcNote, QcStatus } from "@/lib/qc/types";
-import type { StyleId } from "@/lib/settings/schema";
+import { imagePriceIdr } from "@/lib/providers/kenari-image-pricing";
+import { isImageStyle, type StyleId } from "@/lib/settings/schema";
 import { ApiError, isFatal, postJson, type ConceptsResponse } from "./client";
 import { RateGate, callWithRetry } from "./queue";
 import { draftSvg, storeDraft } from "./run-job";
@@ -11,6 +12,8 @@ import { draftSvg, storeDraft } from "./run-job";
 // Stage 4: draw the same concepts with several SVG models and compare them. Runs in the browser like a normal job,
 // one SVG call at a time (CLAUDE.md rule 2). Concepts come from the text model in Settings, once per theme, so every
 // model gets exactly the same input. No metadata is made: it does not depend on the SVG model.
+// Siluet and Line art are drawn by Kenari image models and traced on the server; text models draw the other styles.
+// Each model only gets the themes of its own kind, and the two kinds are suggested separately.
 
 export type BenchModel = { provider: "kenari" | "gemini"; model: string };
 export type BenchTheme = { theme: string; style: StyleId; jobId?: string };
@@ -52,6 +55,16 @@ export function visualStatus(notes: QcNote[]): QcStatus {
   return "lolos";
 }
 
+/** A Kenari image model (priced per picture), which only draws the traced styles. */
+export function isImageModel(m: { provider: string; model: string }): boolean {
+  return m.provider === "kenari" && imagePriceIdr(m.model) !== undefined;
+}
+
+/** Whether a model can draw a theme's style: image models the traced styles, text models the rest. */
+export function fitsStyle(m: BenchModel, style: StyleId): boolean {
+  return isImageModel(m) === isImageStyle(style);
+}
+
 /** Free Kenari models share one account-wide quota; every other model has its own. */
 export function quotaGroup(m: BenchModel): string {
   return m.provider === "kenari" && m.model.endsWith(":free") ? "kenari:free" : `${m.provider}:${m.model}`;
@@ -60,6 +73,8 @@ export function quotaGroup(m: BenchModel): string {
 export type ModelSummary = {
   provider: BenchModel["provider"];
   model: string;
+  /** Image model for Siluet / Line art, suggested apart from the text models. */
+  image: boolean;
   total: number;
   made: number;
   lolos: number;
@@ -101,6 +116,7 @@ export function summarize(cells: BenchCell[]): ModelSummary[] {
     rows.push({
       provider: group[0].provider,
       model: group[0].model,
+      image: isImageModel(group[0]),
       total: group.length,
       made: made.length,
       lolos,
@@ -121,11 +137,18 @@ export function summarize(cells: BenchCell[]): ModelSummary[] {
  * different providers, and a separate provider also has its own quota when the primary hits its limit.
  */
 export function suggest(rows: ModelSummary[]): { primary?: ModelSummary; backup?: ModelSummary } {
-  const usable = rows.filter((r) => r.score > 0);
+  const usable = rows.filter((r) => r.score > 0 && !r.image);
   const primary = usable[0];
   if (!primary) return {};
   const backup = usable.find((r) => r.provider !== primary.provider);
   return { primary, backup };
+}
+
+/** The image model for Siluet and Line art: best score, then the cheaper one, then the faster one. */
+export function suggestImage(rows: ModelSummary[]): ModelSummary | undefined {
+  return rows
+    .filter((r) => r.image && r.score > 0)
+    .sort((a, b) => b.score - a.score || a.costIdr / a.total - b.costIdr / b.total || (a.medianMs ?? Infinity) - (b.medianMs ?? Infinity))[0];
 }
 
 /** Below this many attempts per model a score is mostly noise. */
@@ -340,6 +363,12 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
     const skipped: string[] = [];
     for (const [i, t] of p.setup.themes.entries()) {
       if (p.signal.aborted) break;
+      const fitting = p.setup.models.filter((m) => fitsStyle(m, t.style));
+      // No concept call (and no cost) for a theme no picked model can draw.
+      if (fitting.length === 0) {
+        skipped.push(`${t.theme} (${isImageStyle(t.style) ? "tidak ada model gambar dipilih" : "tidak ada model teks dipilih"})`);
+        continue;
+      }
       emit({ phase: "konsep", message: `Menyusun konsep tema ${i + 1}/${p.setup.themes.length}: ${t.theme}` });
       let res: ConceptsResponse;
       try {
@@ -374,7 +403,7 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
           theme_id: theme.data.id,
           style: t.style,
           palette: [],
-          count: res.concepts.length * p.setup.models.length,
+          count: res.concepts.length * fitting.length,
           status: "berjalan",
         })
         .select("id")
@@ -383,7 +412,7 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
 
       themes.push({ ...t, jobId: job.data.id });
       for (const concept of res.concepts) {
-        for (const m of p.setup.models) {
+        for (const m of fitting) {
           // The whole concept is kept, so a continued run draws exactly the same input.
           cells.push({
             theme: t.theme,
@@ -399,7 +428,7 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
     }
     if (themes.length === 0) throw new ApiError("bad_output", `Konsep tidak bisa dibuat untuk tema mana pun: ${skipped.join("; ")}`);
     emit({
-      message: skipped.length > 0 ? `Dilewati karena konsep gagal: ${skipped.join("; ")}` : undefined,
+      message: skipped.length > 0 ? `Dilewati: ${skipped.join("; ")}` : undefined,
       setup: { ...p.setup, themes },
       cells,
     });

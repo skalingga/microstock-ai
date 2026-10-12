@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellsToRedo, confidence, estimateRemainingMs, parseCells, quotaGroup, suggest, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
+import { cellsToRedo, confidence, estimateRemainingMs, fitsStyle, isImageModel, parseCells, quotaGroup, suggest, suggestImage, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
 
 const cell = (model: string, patch: Partial<BenchCell> = {}): BenchCell => ({
   theme: "autumn",
@@ -127,5 +127,28 @@ describe("confidence", () => {
     const cells = [cell("a"), cell("a"), cell("b"), cell("b", { status: "menunggu" })];
     const rows = summarize(cells);
     expect(confidence(cells, rows)).toEqual({ waiting: 1, total: 4, minAttempts: 1 });
+  });
+});
+
+describe("image models", () => {
+  it("knows image models by their per-picture price and pairs them with the traced styles only", () => {
+    expect(isImageModel({ provider: "kenari", model: "gpt-image-2" })).toBe(true);
+    expect(isImageModel({ provider: "kenari", model: "deepseek-v4-flash" })).toBe(false);
+    expect(fitsStyle({ provider: "kenari", model: "gpt-image-2" }, "silhouette")).toBe(true);
+    expect(fitsStyle({ provider: "kenari", model: "gpt-image-2" }, "icon_set")).toBe(false);
+    expect(fitsStyle({ provider: "gemini", model: "gemini-3.5-flash-lite" }, "line_art")).toBe(false);
+    expect(fitsStyle({ provider: "gemini", model: "gemini-3.5-flash-lite" }, "geometric_tile")).toBe(true);
+  });
+
+  it("keeps image models out of the text pair and suggests the best, then cheapest, image model apart", () => {
+    const rows = summarize([
+      cell("gpt-image-2", { style: "silhouette", costIdr: 125 }),
+      cell("nano-banana-2-lite", { style: "silhouette", costIdr: 150 }),
+      cell("deepseek-v4-flash", { qc: "perlu_cek" }),
+      cell("gemini-3.5-flash-lite", { qc: "perlu_cek" }),
+    ]);
+    expect(suggest(rows).primary?.model).not.toBe("gpt-image-2");
+    expect(suggest(rows).primary?.image).toBe(false);
+    expect(suggestImage(rows)?.model).toBe("gpt-image-2");
   });
 });
