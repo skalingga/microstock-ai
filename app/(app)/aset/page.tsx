@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { countPending } from "@/lib/qc/batch";
 import { createClient } from "@/lib/supabase/server";
-import { selectClass, tapTarget } from "@/lib/ui";
+import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AssetGrid } from "./asset-grid";
+import { BatchPicker } from "./batch-picker";
 import { AssetToolbar } from "./asset-toolbar";
 import { FilterSheet } from "./filter-sheet";
 import { applyGalleryFilter, FILTERS, KINDS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
@@ -19,7 +20,6 @@ import { applyGalleryFilter, FILTERS, KINDS, galleryQuery, MAX_SEARCH_LENGTH, pa
 export const metadata: Metadata = { title: "Aset" };
 
 const PAGE_SIZE = 24;
-const BATCH_CHOICES = 50;
 const dayFormat = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
 
 export default async function HalamanAset({ searchParams }: { searchParams: Promise<GalleryParams> }) {
@@ -62,18 +62,13 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
     countPending(supabase, job),
     applyGalleryFilter(supabase.from("assets").select("id", { count: "exact", head: true }), { ...filter, status: "semua", adobePending: true }),
     supabase.from("user_settings").select("banned_words").maybeSingle(),
-    job ? supabase.from("generation_jobs").select("themes(title)").eq("id", job).maybeSingle() : null,
+    job ? supabase.from("generation_jobs").select("created_at, themes(title)").eq("id", job).maybeSingle() : null,
     firstQuery,
   ]);
 
-  // Batches to pick from: the newest ones, plus the current one even when it is older.
-  const { data: jobRows } = await supabase
-    .from("generation_jobs")
-    .select("id, created_at, themes(title)")
-    .order("created_at", { ascending: false })
-    .limit(BATCH_CHOICES);
-  const batches = (jobRows ?? []).map((j) => ({ id: j.id, label: `${j.themes?.title ?? "Tanpa tema"} · ${dayFormat.format(new Date(j.created_at))}` }));
-  if (job && !batches.some((b) => b.id === job)) batches.push({ id: job, label: `${jobInfo?.data?.themes?.title ?? "Tanpa tema"} (batch ini)` });
+  const batchLabel = jobInfo?.data
+    ? `${jobInfo.data.themes?.title ?? "Tanpa tema"} · ${dayFormat.format(new Date(jobInfo.data.created_at))}`
+    : "batch ini";
   const counts: Record<FilterValue, number> = {
     semua: all.count ?? 0,
     menunggu: menunggu.count ?? 0,
@@ -192,18 +187,9 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
               );
             })}
           </nav>
+          <BatchPicker job={job} currentLabel={batchLabel} baseQuery={galleryQuery(filter, { job: undefined, page: 1 })} />
           <form action="/aset" method="get" role="search" className="flex flex-wrap gap-2">
-            {batches.length > 1 && (
-              <select name="job" defaultValue={job ?? ""} aria-label="Batch" className={cn(selectClass, "w-auto max-w-56 max-sm:w-full max-sm:max-w-none")}>
-                <option value="">Semua batch</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            {batches.length <= 1 && job && <input type="hidden" name="job" value={job} />}
+            {job && <input type="hidden" name="job" value={job} />}
             {status !== "semua" && <input type="hidden" name="status" value={status} />}
             {kind !== "semua" && <input type="hidden" name="jenis" value={kind} />}
             {adobePending && <input type="hidden" name="adobe" value="belum" />}
