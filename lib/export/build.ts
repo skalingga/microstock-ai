@@ -116,7 +116,14 @@ export type SavedExport = {
   exportId: string;
   /** False when the history was saved but the assets could not be marked exported (retry with markExported). */
   marked: boolean;
+  /** False when the ZIP was not kept in the history (too big or upload failed); the user has the downloaded copy. */
+  zipStored: boolean;
+  /** Why the ZIP was not kept, when zipStored is false. */
+  zipError?: string;
 };
+
+/** Per-file limit of the "assets" bucket (migration 20261006133220_export_files_bucket.sql). A bigger ZIP is rejected. */
+export const STORAGE_FILE_LIMIT_BYTES = 20 * 1024 * 1024;
 
 /** Marks assets as exported. Returns false when the update failed, so the caller can say so and offer a retry. */
 export async function markExported(supabase: Client, assetIds: string[]): Promise<boolean> {
@@ -141,15 +148,21 @@ export async function saveExport(
   const csvPath = `${userId}/exports/${exportId}.csv`;
   const storage = supabase.storage.from("assets");
 
-  const zipUpload = await storage.upload(zipPath, result.zip, { contentType: "application/zip" });
-  if (zipUpload.error) {
-    onError?.(`unggah ZIP ke penyimpanan: ${zipUpload.error.message}`);
-    return null;
+  // The ZIP is only a convenience copy: the user already has it, and photo exports easily pass the bucket limit.
+  // A ZIP that cannot be kept must not stop the history row and the "exported" mark (12 Oct 2026: a ZIP over 20 MB
+  // was rejected with 413 and the whole export went unrecorded).
+  let zipError: string | undefined;
+  if (result.zip.size > STORAGE_FILE_LIMIT_BYTES) {
+    zipError = `ZIP ${formatMb(result.zip.size)} melebihi batas penyimpanan ${formatMb(STORAGE_FILE_LIMIT_BYTES)}`;
+  } else {
+    const zipUpload = await storage.upload(zipPath, result.zip, { contentType: "application/zip" });
+    if (zipUpload.error) zipError = `unggah ZIP ke penyimpanan: ${zipUpload.error.message}`;
   }
+  const zipStored = !zipError;
   const csvUpload = await storage.upload(csvPath, new Blob([result.csv], { type: "text/csv" }), { contentType: "text/csv" });
   if (csvUpload.error) {
     onError?.(`unggah CSV ke penyimpanan: ${csvUpload.error.message}`);
-    await storage.remove([zipPath]);
+    if (zipStored) await storage.remove([zipPath]);
     return null;
   }
 
@@ -157,7 +170,7 @@ export async function saveExport(
     .from("exports")
     .insert({
       id: exportId,
-      zip_path: zipPath,
+      zip_path: zipStored ? zipPath : null,
       csv_path: csvPath,
       asset_count: result.included.length,
       asset_ids: result.included.map((i) => i.id),
@@ -168,7 +181,7 @@ export async function saveExport(
     });
   if (insert.error) {
     onError?.(`menulis baris Riwayat: ${insert.error.message}`);
-    await storage.remove([zipPath, csvPath]);
+    await storage.remove(zipStored ? [zipPath, csvPath] : [csvPath]);
     return null;
   }
 
@@ -177,5 +190,9 @@ export async function saveExport(
     supabase,
     result.included.map((i) => i.id),
   );
-  return { exportId, marked };
+  return { exportId, marked, zipStored, zipError };
+}
+
+function formatMb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 }

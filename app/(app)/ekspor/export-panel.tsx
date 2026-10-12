@@ -50,6 +50,8 @@ type Result = {
   marked?: boolean;
   /** Why saving to the history failed, when it did. */
   saveError?: string;
+  /** Why the ZIP is missing from the history although the export was saved. */
+  zipError?: string;
 };
 
 const MAX_PER_EXPORT = 500;
@@ -185,7 +187,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       setResult(next);
       setBuilding({ phase: "save", done: data.included.length, total: data.included.length });
       const { saved, saveError } = await storeExport(data);
-      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
+      setResult({ ...next, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError, zipError: saved?.zipError });
       downloadZip(next);
       if (saved?.marked) {
         setSelected(new Set());
@@ -232,9 +234,9 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
 
   async function retrySave() {
     if (!result) return;
-    setResult({ ...result, exportId: undefined, saveError: undefined });
+    setResult({ ...result, exportId: undefined, saveError: undefined, zipError: undefined });
     const { saved, saveError } = await storeExport(result.data);
-    setResult({ ...result, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError });
+    setResult({ ...result, exportId: saved?.exportId ?? null, marked: saved?.marked, saveError, zipError: saved?.zipError });
     if (saved?.marked) {
       setSelected(new Set());
       setConfirmedCek("");
@@ -307,6 +309,12 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
             <p className="text-sm" role="status">
               {included.length} aset ditandai sudah diekspor, jadi tidak muncul lagi di daftar &ldquo;belum diekspor&rdquo;. File dan
               checklist ini tersimpan di Riwayat ekspor.
+            </p>
+          )}
+          {typeof result.exportId === "string" && result.zipError && (
+            <p role="status" className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
+              ZIP tidak ikut tersimpan di Riwayat ({result.zipError}). Riwayat hanya menyimpan CSV-nya, jadi simpan ZIP yang sudah
+              terunduh sampai selesai diunggah ke Adobe.
             </p>
           )}
           {typeof result.exportId === "string" && result.marked === false && (
