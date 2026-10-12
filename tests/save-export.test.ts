@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { saveExport, type ExportResult } from "@/lib/export/build";
+import { saveExport, STORAGE_FILE_LIMIT_BYTES, type ExportResult } from "@/lib/export/build";
 
 type Outcome = { error: { message: string } | null };
 
 /** Just enough of the Supabase client for saveExport: two uploads, the history row, and the "exported" mark. */
-function fakeClient(opts: { markFails?: boolean; insertFails?: boolean } = {}) {
+function fakeClient(opts: { markFails?: boolean; insertFails?: boolean; zipFails?: boolean } = {}) {
   const calls: string[] = [];
   const ok: Outcome = { error: null };
   const failed: Outcome = { error: { message: "boom" } };
@@ -13,7 +13,7 @@ function fakeClient(opts: { markFails?: boolean; insertFails?: boolean } = {}) {
       from: () => ({
         upload: async (path: string) => {
           calls.push(`upload ${path.split("/").pop()}`);
-          return ok;
+          return opts.zipFails && path.endsWith(".zip") ? failed : ok;
         },
         remove: async () => {
           calls.push("remove");
@@ -22,8 +22,8 @@ function fakeClient(opts: { markFails?: boolean; insertFails?: boolean } = {}) {
       }),
     },
     from: (table: string) => ({
-      insert: async () => {
-        calls.push(`insert ${table}`);
+      insert: async (row: { zip_path?: string | null }) => {
+        calls.push(`insert ${table} zip=${row.zip_path ? "yes" : "no"}`);
         return opts.insertFails ? failed : ok;
       },
       update: () => ({
@@ -76,5 +76,23 @@ describe("saveExport", () => {
     let reason = "";
     await saveExport(client, "user-1", result, undefined, (r) => (reason = r));
     expect(reason).toBe("menulis baris Riwayat: boom");
+  });
+
+  it("still records the export and marks the assets when the ZIP is rejected", async () => {
+    const { client, calls } = fakeClient({ zipFails: true });
+    const saved = await saveExport(client, "user-1", result);
+    expect(saved?.marked).toBe(true);
+    expect(saved?.zipStored).toBe(false);
+    expect(saved?.zipError).toContain("boom");
+    expect(calls).toContain("insert exports zip=no");
+  });
+
+  it("does not try to upload a ZIP over the storage limit", async () => {
+    const { client, calls } = fakeClient();
+    const big = { ...result, zip: new Blob([new Uint8Array(STORAGE_FILE_LIMIT_BYTES + 1)]) };
+    const saved = await saveExport(client, "user-1", big);
+    expect(saved?.marked).toBe(true);
+    expect(saved?.zipError).toMatch(/melebihi batas/);
+    expect(calls.some((c) => c.endsWith(".zip"))).toBe(false);
   });
 });
