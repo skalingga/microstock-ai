@@ -789,7 +789,7 @@ function ApplyImageModel({ model, current, attempts }: { model: string; current:
 function Verdict({ rows, cells, current }: { rows: ModelSummary[]; cells: BenchCell[]; current?: Current }) {
   const { primary, backup } = suggest(rows);
   const image = suggestImage(rows);
-  const { waiting, total, minAttempts } = confidence(cells, rows);
+  const { waiting, total } = confidence(cells, rows);
   const textAttempts = Math.min(...rows.filter((r) => !r.image).map((r) => r.total), Infinity);
   const imageAttempts = Math.min(...rows.filter((r) => r.image).map((r) => r.total), Infinity);
   if (!primary && !image) return <p className="text-sm text-muted-foreground">Belum ada model yang menghasilkan SVG yang bisa dipakai di uji ini.</p>;
@@ -818,11 +818,11 @@ function Verdict({ rows, cells, current }: { rows: ModelSummary[]; cells: BenchC
 
   return (
     <div className="divide-y rounded-md border bg-card px-4">
-      {(waiting > 0 || minAttempts < SMALL_SAMPLE) && (
+      {(waiting > 0 || (primary && textAttempts < SMALL_SAMPLE)) && (
         <p className="py-3 text-sm text-warning-foreground">
           {waiting > 0
             ? `Belum lengkap: ${total - waiting} dari ${total} SVG. Saran ini bisa berubah setelah uji dilanjutkan.`
-            : `Sampel kecil: tiap model baru dicoba ${minAttempts} kali. Ulangi uji atau tambah konsep per tema sebelum mengganti model utama.`}
+            : `Sampel kecil: tiap model teks baru dicoba ${textAttempts} kali. Ulangi uji atau tambah konsep per tema sebelum mengganti model utama.`}
         </p>
       )}
       {primary && line("utama", primary)}
@@ -839,6 +839,11 @@ function Verdict({ rows, cells, current }: { rows: ModelSummary[]; cells: BenchC
         <ApplySuggestion primary={primary} backup={backup} current={current} minAttempts={textAttempts} />
       )}
       {image && line("model gambar", image)}
+      {image && waiting === 0 && imageAttempts < SMALL_SAMPLE && (
+        <p className="py-3 text-sm text-warning-foreground">
+          Sampel kecil: tiap model gambar baru dicoba {imageAttempts} kali. Tambah tema Siluet atau Line art sebelum mengganti model gambar.
+        </p>
+      )}
       {image && current && waiting === 0 && <ApplyImageModel model={image.model} current={current.image} attempts={imageAttempts} />}
       <p className="flex items-start gap-1 py-2 text-xs text-muted-foreground">
         Skor = (Lolos + ½ Perlu cek) ÷ percobaan. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya di bawah. Model gambar
