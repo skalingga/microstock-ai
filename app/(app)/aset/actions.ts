@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { normalizeCategory } from "@/lib/adobe/rules";
-import { MAX_BULK_DELETE, UUID_RE } from "@/lib/assets";
+import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { galleryQuery, parseGalleryFilter, withQuery } from "./filters";
 import type { Json } from "@/lib/database.types";
 import { parseKeywordText } from "@/lib/metadata/keywords";
@@ -191,4 +191,44 @@ export async function ubahOrangFiktif(id: string, value: boolean): Promise<Adobe
   if (error) return { ok: false, error: "Gagal menyimpan. Coba lagi." };
   revalidatePath(`/aset/${id}`);
   return { ok: true };
+}
+
+export type BatchChoice = { id: string; title: string; createdAt: string; total: number; lolos: number; thumbUrl?: string };
+export type BatchListResult = { ok: true; batches: BatchChoice[] } | { ok: false; error: string };
+
+const BATCH_LIST_LIMIT = 300;
+
+/**
+ * Batches for the gallery's batch picker, newest first. Only batches that still hold assets: deleting every asset
+ * keeps the generation_jobs row (its usage history stays), but an empty batch has nothing to filter to.
+ */
+export async function daftarBatch(): Promise<BatchListResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("generation_jobs")
+    .select("id, created_at, themes(title), total:assets(count), lolos:assets(count), thumb:assets(preview_path)")
+    .eq("lolos.qc_status", "lolos")
+    .not("thumb.preview_path", "is", null)
+    .order("created_at", { referencedTable: "thumb", ascending: false })
+    .limit(1, { referencedTable: "thumb" })
+    .order("created_at", { ascending: false })
+    .limit(BATCH_LIST_LIMIT);
+  if (error) return { ok: false, error: "Daftar batch tidak bisa dimuat. Coba lagi." };
+
+  const rows = (data ?? []).filter((j) => (j.total[0]?.count ?? 0) > 0);
+  const paths = rows.flatMap((j) => (j.thumb[0]?.preview_path ? [j.thumb[0].preview_path] : []));
+  const signed = paths.length > 0 ? await supabase.storage.from("assets").createSignedUrls(paths, SIGNED_URL_TTL_SEC) : null;
+  const urlByPath = new Map((signed?.data ?? []).map((s) => [s.path, s.signedUrl]));
+
+  return {
+    ok: true,
+    batches: rows.map((j) => ({
+      id: j.id,
+      title: j.themes?.title ?? "Tanpa tema",
+      createdAt: j.created_at,
+      total: j.total[0]?.count ?? 0,
+      lolos: j.lolos[0]?.count ?? 0,
+      thumbUrl: (j.thumb[0]?.preview_path && urlByPath.get(j.thumb[0].preview_path)) || undefined,
+    })),
+  };
 }

@@ -17,8 +17,11 @@ import {
   confidence,
   continueBenchmark,
   estimateRemainingMs,
+  fitsStyle,
+  isImageModel,
   runBenchmark,
   suggest,
+  suggestImage,
   summarize,
   type BenchCell,
   type BenchModel,
@@ -26,38 +29,49 @@ import {
   type BenchState,
   type ModelSummary,
 } from "@/lib/generate/benchmark";
+import { KENARI_IMAGE_PRICES_IDR, imagePriceIdr } from "@/lib/providers/kenari-image-pricing";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { STYLES, isImageStyle, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
 import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { kembalikanRantai, pakaiSaran } from "./actions";
+import { kembalikanRantai, pakaiModelGambar, pakaiSaran } from "./actions";
 
-const TEXT_STYLES = STYLES.filter((s) => !isImageStyle(s.value));
-const MAX_THEMES = 8;
+const MAX_THEMES = 12;
 
-// One theme per text style, so every model is tried on every kind of asset.
+// One theme per style, so every model is tried on every kind of asset it can draw. Fresh subjects, not ones the
+// gallery already holds many of, so the similarity check does not mark every model down alike.
 const DEFAULT_THEMES: { theme: string; style: StyleId }[] = [
-  { theme: "halloween pumpkin icons", style: "icon_set" },
-  { theme: "autumn leaves", style: "seamless_pattern" },
-  { theme: "cozy coffee shop", style: "flat_illustration" },
-  { theme: "summer camping", style: "badge_label" },
-  { theme: "soft geometric waves", style: "abstract_background" },
+  { theme: "kitchen baking tools", style: "icon_set" },
+  { theme: "home office workspace", style: "line_icon" },
+  { theme: "weather forecast symbols", style: "glyph_icon" },
+  { theme: "tropical monstera leaves", style: "seamless_pattern" },
+  { theme: "moroccan star tiles", style: "geometric_tile" },
+  { theme: "rooftop garden in the city", style: "flat_illustration" },
+  { theme: "artisan bakery emblem", style: "badge_label" },
+  { theme: "flowing liquid shapes", style: "abstract_background" },
+  { theme: "wild birds in flight", style: "silhouette" },
+  { theme: "wildflower bouquet", style: "line_art" },
 ];
 
-// From the Stage 4 run (2026-10-07): the models that made at least one usable SVG. hy3:free and qwen3-8-27b:free
-// made none (all timeouts) and are left out; add them back with "Tambah model" to re-check.
+// Text models: the current chain (deepseek-v4-flash, gemini-3.5-flash-lite) and the free Kenari models that made
+// usable SVGs on 7 and 9 Oct 2026. Image models: the current default and two cheap alternatives (prices in
+// kenari-image-pricing.ts); they only draw the Siluet and Line art themes.
 const DEFAULT_MODELS: BenchModel[] = [
-  { provider: "gemini", model: "gemini-3.5-flash-lite" },
-  { provider: "kenari", model: "agnes-2-0-flash:free" },
   { provider: "kenari", model: "deepseek-v4-flash" },
+  { provider: "gemini", model: "gemini-3.5-flash-lite" },
   { provider: "kenari", model: "muse-spark-1-3-contributor:free" },
-  { provider: "kenari", model: "nemotron-3-super-120b-a12b:free" },
-  { provider: "kenari", model: "agnes-3-0-flash:free" },
+  { provider: "kenari", model: "agnes-2-0-flash:free" },
+  { provider: "kenari", model: "gpt-image-2" },
+  { provider: "kenari", model: "nano-banana-2-lite" },
+  { provider: "kenari", model: "hunyuan-image-v2.0" },
 ];
 
 /** Before a run, for a model never tested: free models took 4-70s per SVG in the first check, plus quota waits. */
 const FALLBACK_MS_PER_SVG = 30_000;
+/** Image models draw and the server traces the picture: up to the 120s route budget. */
+const FALLBACK_MS_PER_IMAGE = 60_000;
+const IMAGE_MODELS = Object.keys(KENARI_IMAGE_PRICES_IDR);
 
 const key = (m: { provider: string; model: string }) => `${m.provider}|${m.model}`;
 const isPaid = (m: BenchModel) => m.provider === "kenari" && !m.model.endsWith(":free");
@@ -167,13 +181,21 @@ export function BenchmarkRunner({
 
   const picked = models.filter((m) => checked.has(key(m)));
   const validThemes = themes.filter((t) => t.theme.trim().length >= 2);
-  const perModel = validThemes.length * variations;
-  const cellCount = perModel * picked.length;
-  const paid = picked.filter(isPaid);
-  const knownCost = paid.filter((m) => costPerSvg[m.model] !== undefined);
-  const costEstimate = knownCost.reduce((sum, m) => sum + costPerSvg[m.model] * perModel, 0);
+  // Each model draws only the themes of its own kind (image models: Siluet and Line art).
+  const countFor = (m: BenchModel) => validThemes.filter((t) => fitsStyle(m, t.style)).length * variations;
+  const cellCount = picked.reduce((sum, m) => sum + countFor(m), 0);
+  const paid = picked.filter((m) => isPaid(m) && countFor(m) > 0);
+  const priceOf = (m: BenchModel) => (isImageModel(m) ? imagePriceIdr(m.model) : costPerSvg[m.model]);
+  const knownCost = paid.filter((m) => priceOf(m) !== undefined);
+  const costEstimate = knownCost.reduce((sum, m) => sum + priceOf(m)! * countFor(m), 0);
   const unknownPaid = paid.length - knownCost.length;
-  const timeEstimateMs = picked.reduce((sum, m) => sum + (msPerSvg[key(m)] ?? FALLBACK_MS_PER_SVG) * perModel, 0);
+  const paidCount = paid.reduce((sum, m) => sum + countFor(m), 0);
+  const timeEstimateMs = picked.reduce(
+    (sum, m) => sum + (msPerSvg[key(m)] ?? (isImageModel(m) ? FALLBACK_MS_PER_IMAGE : FALLBACK_MS_PER_SVG)) * countFor(m),
+    0,
+  );
+  const hasImageTheme = validThemes.some((t) => isImageStyle(t.style));
+  const idleModels = picked.filter((m) => countFor(m) === 0);
   const overBudget = paid.length > 0 && costEstimate > budgetLeftIdr;
   const [overBudgetOk, setOverBudgetOk] = useState(false);
 
@@ -324,8 +346,9 @@ export function BenchmarkRunner({
             <p className="flex items-start gap-1 text-sm text-muted-foreground">
               Konsep dibuat sekali per tema, lalu tiap model menggambar konsep yang sama satu kali tanpa coba-ulang.
               <InfoTip align="start">
-                Konsep memakai model teks dari Pengaturan. Timeout atau balasan rusak dihitung gagal. Siluet dan Line art tidak diuji di
-                sini. Model gratis Kenari berbagi satu kuota per menit, jadi antrean kadang menunggu.
+                Konsep memakai model teks dari Pengaturan. Timeout atau balasan rusak dihitung gagal. Tema Siluet dan Line art hanya digambar
+                model gambar (berbayar per gambar, lalu dijadikan SVG di server); gaya lain hanya oleh model teks. Model gratis Kenari berbagi
+                satu kuota per menit, jadi antrean kadang menunggu.
               </InfoTip>
             </p>
 
@@ -346,7 +369,7 @@ export function BenchmarkRunner({
                     onChange={(e) => setThemes(themes.map((x, j) => (j === i ? { ...x, style: e.target.value as StyleId } : x)))}
                     className={cn(selectClass, "max-sm:col-span-1 max-sm:row-start-2")}
                   >
-                    {TEXT_STYLES.map((s) => (
+                    {STYLES.map((s) => (
                       <option key={s.value} value={s.value}>
                         {s.label}
                       </option>
@@ -392,7 +415,13 @@ export function BenchmarkRunner({
                       />
                       <span className="truncate font-mono text-xs">{m.model}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {m.provider === "gemini" ? "Gemini, gratis" : m.model.endsWith(":free") ? "Kenari, gratis" : "Kenari, berbayar"}
+                        {m.provider === "gemini"
+                          ? "Gemini, gratis"
+                          : isImageModel(m)
+                            ? `gambar, ${formatIdr(imagePriceIdr(m.model)!)}/gambar`
+                            : m.model.endsWith(":free")
+                              ? "Kenari, gratis"
+                              : "Kenari, berbayar"}
                       </span>
                     </label>
                     {!DEFAULT_MODELS.some((d) => key(d) === key(m)) && (
@@ -429,12 +458,19 @@ export function BenchmarkRunner({
                     </optgroup>
                     <optgroup label="Kenari berbayar">
                       {catalog
-                        .filter((m) => !m.free)
+                        .filter((m) => !m.free && !IMAGE_MODELS.includes(m.id))
                         .map((m) => (
                           <option key={m.id} value={`kenari|${m.id}`}>
                             {m.id}
                           </option>
                         ))}
+                    </optgroup>
+                    <optgroup label="Kenari gambar (Siluet, Line art)">
+                      {IMAGE_MODELS.map((id) => (
+                        <option key={id} value={`kenari|${id}`}>
+                          {id} · {formatIdr(KENARI_IMAGE_PRICES_IDR[id])}/gambar
+                        </option>
+                      ))}
                     </optgroup>
                     {geminiModels.length > 0 && (
                       <optgroup label="Gemini (free tier)">
@@ -450,6 +486,14 @@ export function BenchmarkRunner({
                     Tambah
                   </Button>
                 </div>
+              )}
+              {idleModels.length > 0 && (
+                <p className="text-xs text-warning-foreground">
+                  Tidak ikut menggambar: {idleModels.map((m) => m.model).join(", ")}.{" "}
+                  {idleModels.some(isImageModel) && !hasImageTheme
+                    ? "Model gambar butuh tema bergaya Siluet atau Line art."
+                    : "Model teks butuh tema bergaya selain Siluet dan Line art."}
+                </p>
               )}
             </fieldset>
 
@@ -489,7 +533,7 @@ export function BenchmarkRunner({
               {paid.length > 0 && (
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-warning-soft px-3 py-1.5 text-xs font-medium text-warning-foreground">
                   <Wallet className="size-3.5" />
-                  {paid.length * perModel} SVG berbayar
+                  {paidCount} SVG berbayar
                   {knownCost.length > 0 && ` ≈ ${formatIdr(costEstimate)}`}
                   {unknownPaid > 0 && ` (${unknownPaid} model belum punya harga)`}
                   {` · sisa anggaran ${formatIdr(budgetLeftIdr)}`}
@@ -561,12 +605,20 @@ function Change({ label, from, to }: { label: string; from: ProviderEntry | null
 }
 
 /** The provider chain in Settings today, with empty model fields resolved to their defaults. */
-export type Current = { primary: ProviderEntry | null; backup: ProviderEntry | null };
+export type Current = { primary: ProviderEntry | null; backup: ProviderEntry | null; image: string };
 
 function CurrentTag({ row, current }: { row: ModelSummary; current?: Current }) {
   if (!current) return null;
   const k = key(row);
-  const tag = current.primary && k === key(current.primary) ? "utama sekarang" : current.backup && k === key(current.backup) ? "cadangan sekarang" : null;
+  const tag = row.image
+    ? row.model === current.image
+      ? "model gambar sekarang"
+      : null
+    : current.primary && k === key(current.primary)
+      ? "utama sekarang"
+      : current.backup && k === key(current.backup)
+        ? "cadangan sekarang"
+        : null;
   return tag ? <span className="rounded-sm bg-secondary px-1.5 py-px font-sans text-xs font-semibold text-secondary-foreground">{tag}</span> : null;
 }
 
@@ -671,12 +723,78 @@ function ApplySuggestion({
   );
 }
 
+/** "Pakai untuk Siluet & Line art": the winning image model into Settings, with an undo. */
+function ApplyImageModel({ model, current, attempts }: { model: string; current: string; attempts: number }) {
+  const [pending, startTransition] = useTransition();
+  const [before, setBefore] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const running = useRunning();
+
+  if (model === current && before === null) {
+    return <p className="py-3 text-sm text-muted-foreground">Model gambar di Pengaturan sudah {model}.</p>;
+  }
+  if (attempts < MIN_ATTEMPTS_TO_APPLY && before === null) {
+    return (
+      <p className="py-3 text-sm text-muted-foreground">
+        Terlalu sedikit gambar ({attempts} per model) untuk dijadikan pengaturan. Tambah tema Siluet atau Line art, atau konsep per tema.
+      </p>
+    );
+  }
+
+  const run = (value: string, after: (prev: string) => void) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await pakaiModelGambar(value);
+      if (result.ok) after(result.before);
+      else setError(result.error);
+    });
+  };
+
+  return (
+    <div className="space-y-2 py-3">
+      {before !== null ? (
+        <div role="status" className="space-y-2 text-sm">
+          <p>
+            Dipakai di Pengaturan: model gambar {before || "bawaan"} → <strong>{model}</strong>. Berlaku untuk batch Siluet dan Line art berikutnya.
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={() => run(before, () => setBefore(null))} disabled={pending}>
+            <RotateCcw />
+            {pending ? "Mengembalikan..." : "Urungkan"}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Akan mengubah model gambar: {current} → <strong className="text-foreground">{model}</strong>
+          </p>
+          <Button
+            type="button"
+            variant={attempts < SMALL_SAMPLE ? "outline" : "default"}
+            onClick={() => run(model, (prev) => setBefore(prev))}
+            disabled={pending || running}
+          >
+            {pending ? "Menyimpan..." : "Pakai untuk Siluet & Line art"}
+          </Button>
+        </>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Verdict({ rows, cells, current }: { rows: ModelSummary[]; cells: BenchCell[]; current?: Current }) {
   const { primary, backup } = suggest(rows);
-  const { waiting, total, minAttempts } = confidence(cells, rows);
-  if (!primary) return <p className="text-sm text-muted-foreground">Belum ada model yang menghasilkan SVG yang bisa dipakai di uji ini.</p>;
+  const image = suggestImage(rows);
+  const { waiting, total } = confidence(cells, rows);
+  const textAttempts = Math.min(...rows.filter((r) => !r.image).map((r) => r.total), Infinity);
+  const imageAttempts = Math.min(...rows.filter((r) => r.image).map((r) => r.total), Infinity);
+  if (!primary && !image) return <p className="text-sm text-muted-foreground">Belum ada model yang menghasilkan SVG yang bisa dipakai di uji ini.</p>;
 
-  const line = (label: "utama" | "cadangan", r: ModelSummary) => (
+  const line = (label: "utama" | "cadangan" | "model gambar", r: ModelSummary) => (
     <div className="flex items-start gap-2 py-3">
       <Anchor filled={label === "utama"} className="mt-1.5" />
       <span className="min-w-0">
@@ -700,25 +818,36 @@ function Verdict({ rows, cells, current }: { rows: ModelSummary[]; cells: BenchC
 
   return (
     <div className="divide-y rounded-md border bg-card px-4">
-      {(waiting > 0 || minAttempts < SMALL_SAMPLE) && (
+      {(waiting > 0 || (primary && textAttempts < SMALL_SAMPLE)) && (
         <p className="py-3 text-sm text-warning-foreground">
           {waiting > 0
             ? `Belum lengkap: ${total - waiting} dari ${total} SVG. Saran ini bisa berubah setelah uji dilanjutkan.`
-            : `Sampel kecil: tiap model baru dicoba ${minAttempts} kali. Ulangi uji atau tambah konsep per tema sebelum mengganti model utama.`}
+            : `Sampel kecil: tiap model teks baru dicoba ${textAttempts} kali. Ulangi uji atau tambah konsep per tema sebelum mengganti model utama.`}
         </p>
       )}
-      {line("utama", primary)}
-      {backup ? (
-        line("cadangan", backup)
-      ) : (
-        <p className="py-3 text-sm text-muted-foreground">
-          Tidak ada saran cadangan: belum ada model dari provider {primary.provider === "gemini" ? "Kenari" : "Gemini"} yang menghasilkan SVG
-          yang bisa dipakai.
+      {primary && line("utama", primary)}
+      {primary &&
+        (backup ? (
+          line("cadangan", backup)
+        ) : (
+          <p className="py-3 text-sm text-muted-foreground">
+            Tidak ada saran cadangan: belum ada model dari provider {primary.provider === "gemini" ? "Kenari" : "Gemini"} yang menghasilkan SVG
+            yang bisa dipakai.
+          </p>
+        ))}
+      {primary && current && waiting === 0 && (
+        <ApplySuggestion primary={primary} backup={backup} current={current} minAttempts={textAttempts} />
+      )}
+      {image && line("model gambar", image)}
+      {image && waiting === 0 && imageAttempts < SMALL_SAMPLE && (
+        <p className="py-3 text-sm text-warning-foreground">
+          Sampel kecil: tiap model gambar baru dicoba {imageAttempts} kali. Tambah tema Siluet atau Line art sebelum mengganti model gambar.
         </p>
       )}
-      {current && waiting === 0 && <ApplySuggestion primary={primary} backup={backup} current={current} minAttempts={minAttempts} />}
+      {image && current && waiting === 0 && <ApplyImageModel model={image.model} current={current.image} attempts={imageAttempts} />}
       <p className="flex items-start gap-1 py-2 text-xs text-muted-foreground">
-        Skor = (Lolos + ½ Perlu cek) ÷ percobaan. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya di bawah.
+        Skor = (Lolos + ½ Perlu cek) ÷ percobaan. Skor tidak menilai bagus-jeleknya desain: lihat juga gambarnya di bawah. Model gambar
+        (Siluet, Line art) dinilai terpisah; seri dimenangkan yang lebih murah.
         <InfoTip align="end">
           Dari QC visual saja; seri diurutkan dari yang tercepat. Cadangan diambil dari provider lain, karena Pengaturan memakai dua provider
           berbeda dan provider lain punya kuota sendiri saat utama kena limit.

@@ -6,6 +6,7 @@ import { PenPath } from "@/components/pen-motif";
 import { SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { startOfMonthWib } from "@/lib/budget";
 import { parseCells, suggest, summarize, type BenchSetup } from "@/lib/generate/benchmark";
+import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { toProviderOrder } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +34,7 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
   if (!user) redirect("/login");
 
   const [{ data: settings }, { data: runs, error: runsError }, { data: spent }, { data: svgCosts }] = await Promise.all([
-    supabase.from("user_settings").select("banned_words, provider_order, kenari_monthly_budget_idr").maybeSingle(),
+    supabase.from("user_settings").select("banned_words, provider_order, kenari_monthly_budget_idr, kenari_image_model").maybeSingle(),
     supabase.from("model_benchmarks").select("id, status, setup, results, created_at").order("created_at", { ascending: false }).limit(10),
     supabase.rpc("provider_cost_since", { p_provider: "kenari", p_since: startOfMonthWib() }),
     // What paid SVG calls really cost, per model: the estimate shown before a run.
@@ -48,7 +49,11 @@ export default async function HalamanUjiModel({ searchParams }: { searchParams: 
 
   // The chain as it runs today, with empty model fields resolved to their defaults.
   const chain = withEnvDefaults(settings ? toProviderOrder(settings.provider_order) : []);
-  const current: Current = { primary: chain[0] ?? null, backup: chain[1] ?? null };
+  const current: Current = {
+    primary: chain[0] ?? null,
+    backup: chain[1] ?? null,
+    image: settings?.kenari_image_model.trim() || process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL,
+  };
 
   // Median time per SVG per model, newest run first: the estimate shown before the next run.
   const msPerSvg: Record<string, number> = {};

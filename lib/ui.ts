@@ -1,6 +1,6 @@
 // Shared class for native <select> elements so they match the shadcn <Input>: 16px on phones so iOS Safari does not zoom on focus.
 export const selectClass =
-  "h-9 w-full rounded-lg border border-input bg-card px-3 text-base outline-none md:text-sm transition-colors max-sm:h-11 pointer-coarse:h-11 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30";
+  "h-9 w-full rounded-lg border border-input bg-card px-3 text-base outline-none md:text-sm transition-colors max-sm:h-11 pointer-coarse:h-11 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground";
 
 // Every action bar pinned above the phone tab bar looks the same below lg: a flat full-width band with a top rule.
 // Pages that keep their bar pinned on PC add their own lg: classes (a floating card there, with no tab bar).
