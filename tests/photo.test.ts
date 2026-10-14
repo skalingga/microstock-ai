@@ -179,3 +179,67 @@ describe("photo file names and gallery filter", () => {
     expect(parseGalleryFilter({ jenis: "video" }).kind).toBe("semua");
   });
 });
+
+describe("background variant", () => {
+  const base = { theme: "technology background", count: 6, aspect: "16:9" as const };
+
+  it("writes subject-less, specific, text-free background prompts", () => {
+    const { system, user } = photoPromptsPrompt({ ...base, variant: "background", avoid: ["blue abstract gradient"] });
+    expect(system).toContain("background images");
+    expect(user).toContain("exactly 6 prompts");
+    expect(user).toContain("16:9");
+    expect(user).toMatch(/No people, no animals/);
+    expect(user).toMatch(/No text anywhere/);
+    expect(user).toMatch(/calm and uncluttered/);
+    expect(user).toContain("blue abstract gradient");
+    expect(user).not.toMatch(/fictional ordinary adults/);
+  });
+
+  it("keeps one design direction for variations", () => {
+    const { user } = photoPromptsPrompt({ ...base, variant: "background", variations: true });
+    expect(user).toContain("ONE design direction");
+  });
+
+  it("leaves the photo prompt untouched by default", () => {
+    const { user } = photoPromptsPrompt(base);
+    expect(user).toMatch(/fictional/);
+    expect(user).not.toMatch(/design direction/);
+  });
+
+  it("asks for background search words in the metadata", () => {
+    const { user } = photoMetadataPrompt({ theme: "tech", variant: "background" });
+    expect(user).toContain("copy space");
+    expect(user).toContain("backdrop");
+    expect(photoMetadataPrompt({ theme: "tech" }).user).not.toContain("backdrop");
+  });
+
+  it("accepts the variant in requests and defaults to photo", () => {
+    expect(photoPromptsRequestSchema.parse({ theme: "forest", count: 5, aspect: "16:9" }).variant).toBe("photo");
+    expect(photoPromptsRequestSchema.parse({ theme: "forest", count: 5, aspect: "16:9", variant: "background" }).variant).toBe("background");
+    expect(photoPromptsRequestSchema.safeParse({ theme: "forest", count: 5, aspect: "16:9", variant: "video" }).success).toBe(false);
+    expect(photoMetadataRequestSchema.parse({ theme: "forest", image: IMAGE }).variant).toBe("photo");
+  });
+
+  it("stores the variant in the job and treats old jobs as photos", async () => {
+    const { parsePhotoJob } = await import("@/lib/photo/run");
+    const row = { aspect: "16:9", model: "m", provider: "gemini", prompts: [{ subject: "a", prompt: "b" }] };
+    expect(parsePhotoJob({ ...row, variant: "background" })?.variant).toBe("background");
+    expect(parsePhotoJob(row)?.variant).toBe("photo");
+    expect(parsePhotoJob({ ...row, variant: "other" })?.variant).toBe("photo");
+  });
+
+  it("is looser about similarity, and flags people in a background", async () => {
+    const { photoTechNotes, photoContentNotes } = await import("@/lib/qc/photo");
+    const facts = { width: 2752, height: 1536, bytes: 1_000_000, converted: false };
+    // 4 bits apart out of 40 set bits: "alike" for a photo (limit 8), but ordinary for two smooth backgrounds (limit 3).
+    const a = "ffffffffff000000";
+    const b = "ffffffffc3000000";
+    const pool = [{ id: "other", phash: b }];
+    const status = (variant: "photo" | "background") =>
+      photoTechNotes(facts, a, pool, "self", variant).find((n) => n.check === "kemiripan")?.status;
+    expect(status("photo")).toBe("cek");
+    expect(status("background")).toBe("ok");
+    const people = photoContentNotes([], true, "background");
+    expect(people.find((n) => n.check === "orang")?.status).toBe("cek");
+  });
+});

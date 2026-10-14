@@ -1,6 +1,7 @@
 import { ADOBE_PHOTO, FICTIONAL_LABEL } from "@/lib/adobe/rules";
-import { PHOTO_PROBLEMS, type PhotoProblem } from "@/lib/photo/config";
+import { PHOTO_PROBLEMS, type PhotoProblem, type PhotoVariant } from "@/lib/photo/config";
 import { checkSimilarity } from "./checks";
+import { QC } from "./config";
 import type { HashPoolEntry, QcNote } from "./types";
 
 // Stage 12: QC for photos uploaded from Google Flow. Pure functions; reading the file happens in lib/photo/process.ts.
@@ -29,7 +30,13 @@ export function photoRejection(f: Pick<PhotoFacts, "width" | "height" | "bytes">
 }
 
 /** Notes for a photo that passed photoRejection: size and format, then similarity with the user's other photos. */
-export function photoTechNotes(f: PhotoFacts, phash: string, pool: HashPoolEntry[], selfId?: string): QcNote[] {
+export function photoTechNotes(
+  f: PhotoFacts,
+  phash: string,
+  pool: HashPoolEntry[],
+  selfId?: string,
+  variant: PhotoVariant = "photo",
+): QcNote[] {
   return [
     { check: "resolusi", status: "ok", message: `${f.width}×${f.height} = ${mp(f.width * f.height)} (Adobe: ${ADOBE_PHOTO.minMegapixels}–${ADOBE_PHOTO.maxMegapixels} MP).` },
     {
@@ -37,17 +44,23 @@ export function photoTechNotes(f: PhotoFacts, phash: string, pool: HashPoolEntry
       status: "ok",
       message: f.converted ? `Diubah ke JPEG, ${mb(f.bytes)}.` : `JPEG asli dari Flow, ${mb(f.bytes)}, tidak diubah.`,
     },
-    checkSimilarity(phash, pool, selfId),
+    checkSimilarity(phash, pool, selfId, undefined, variant === "background" ? QC.similarity.maxHammingBackground : QC.similarity.maxHamming),
   ];
 }
 
 /** What the vision model saw: each defect needs a human look; people are a reminder for the Adobe portal. */
-export function photoContentNotes(problems: PhotoProblem[], hasPeople: boolean): QcNote[] {
+export function photoContentNotes(problems: PhotoProblem[], hasPeople: boolean, variant: PhotoVariant = "photo"): QcNote[] {
+  const clean =
+    variant === "background"
+      ? "AI tidak melihat teks, logo, atau cacat. Tetap periksa sendiri bagian tepi dan pola yang berulang."
+      : "AI tidak melihat teks, logo, atau cacat. Tetap periksa wajah dan tangan sendiri.";
   const notes: QcNote[] =
     problems.length > 0
       ? problems.map((p) => ({ check: "isi" as const, status: "cek" as const, message: PHOTO_PROBLEMS[p] }))
-      : [{ check: "isi", status: "ok", message: "AI tidak melihat teks, logo, atau cacat. Tetap periksa wajah dan tangan sendiri." }];
-  if (hasPeople) {
+      : [{ check: "isi", status: "ok", message: clean }];
+  if (hasPeople && variant === "background") {
+    notes.push({ check: "orang", status: "cek", message: "Ada orang di gambar yang seharusnya background tanpa subjek. Ganti, atau pastikan tidak mirip orang sungguhan." });
+  } else if (hasPeople) {
     notes.push({ check: "orang", status: "ok", message: `Ada orang: centang "${FICTIONAL_LABEL}" saat unggah ke Adobe.` });
   }
   return notes;

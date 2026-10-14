@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_PHOTO_PROMPTS, PHOTO_ASPECTS, VISION_MAX_DATA_URL } from "@/lib/photo/config";
+import { MAX_PHOTO_PROMPTS, PHOTO_ASPECTS, PHOTO_VARIANTS, VISION_MAX_DATA_URL } from "@/lib/photo/config";
 import { STYLES } from "@/lib/settings/schema";
 
 export const MAX_VARIATIONS = 30;
@@ -61,10 +61,12 @@ export const photoPromptsRequestSchema = z.object({
   aspect: z.enum(PHOTO_ASPECTS),
   avoid: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
   variations: z.boolean().default(false),
+  variant: z.enum(PHOTO_VARIANTS).default("photo"),
 });
 
 export const photoMetadataRequestSchema = z.object({
   theme,
+  variant: z.enum(PHOTO_VARIANTS).default("photo"),
   prompt: z.string().trim().max(1500, "Prompt terlalu panjang.").optional(),
   image: z
     .string()

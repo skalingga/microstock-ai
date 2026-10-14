@@ -130,7 +130,7 @@ export default async function HalamanGenerate({
       <nav aria-label="Jenis aset" className="flex gap-1">
         {[
           { label: "Vektor (SVG)", href: `/generate${tema ? `?tema=${encodeURIComponent(tema)}` : ""}`, active: !photo },
-          { label: "Foto (Google Flow)", href: `/generate?jenis=foto${tema ? `&tema=${encodeURIComponent(tema)}` : ""}`, active: photo },
+          { label: "Foto dan background (Flow)", href: `/generate?jenis=foto${tema ? `&tema=${encodeURIComponent(tema)}` : ""}`, active: photo },
         ].map((tab) => (
           <Link
             key={tab.label}
@@ -239,7 +239,7 @@ async function loadPhotoJobs(
   }
 
   return {
-    recentJobs: rows.map((r) => ({ id: r.id, theme: r.theme, createdAt: r.createdAt, prompts: r.data?.prompts.length ?? 0, uploaded: r.uploaded })),
+    recentJobs: rows.map((r) => ({ id: r.id, theme: r.theme, createdAt: r.createdAt, prompts: r.data?.prompts.length ?? 0, uploaded: r.uploaded, variant: r.data?.variant ?? "photo" })),
     openJob: open?.data ? { id: open.id, theme: open.theme, data: open.data, uploaded: open.uploaded } : null,
     error: jobId && !open?.data ? "Prompt foto itu tidak ditemukan." : undefined,
   };

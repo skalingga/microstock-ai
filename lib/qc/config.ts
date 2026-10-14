@@ -29,6 +29,8 @@ export const QC = {
     maxHamming: 8,
     /** Same, between assets of one "one subject, many variations" batch: they are alike on purpose, so only near copies count. */
     maxHammingVariations: 3,
+    /** Backgrounds (smooth gradients, bokeh, textures) have little structure, so unrelated ones hash close: only near copies count. */
+    maxHammingBackground: 3,
     /**
      * Differing bits as a share of the bits set in either hash. A small object on an empty canvas sets only 10 to 25 of
      * the 64 bits, so unrelated pictures sit 4 to 8 bits apart (15 Oct 2026: an isometric solar farm "matched" a

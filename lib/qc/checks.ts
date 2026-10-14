@@ -170,12 +170,19 @@ export function checkOutline(stats: { shapeCount: number; filledShapes: number }
  * Nearest look-alike in the pool. Entries made in the batch that is running count only when they are closer than
  * `batchMaxHamming` (variations batches); everything else uses the normal limit.
  */
-export function checkSimilarity(phash: string, pool: HashPoolEntry[], selfId?: string, batchMaxHamming?: number): QcNote {
+export function checkSimilarity(
+  phash: string,
+  pool: HashPoolEntry[],
+  selfId?: string,
+  batchMaxHamming?: number,
+  /** Replaces the default limit for every entry (backgrounds). */
+  maxHamming: number = QC.similarity.maxHamming,
+): QcNote {
   let nearest: { id: string; distance: number } | null = null;
   for (const entry of pool) {
     if (!entry.phash || entry.id === selfId) continue;
     const distance = hammingHex(phash, entry.phash);
-    const limit = entry.batch && batchMaxHamming !== undefined ? batchMaxHamming : QC.similarity.maxHamming;
+    const limit = entry.batch && batchMaxHamming !== undefined ? Math.min(batchMaxHamming, maxHamming) : maxHamming;
     if (distance > limit) continue;
     // Sparse pictures (few set bits) are often a few bits apart by chance: only a difference that is small next to
     // the information the two hashes hold counts as "looks the same".

@@ -329,7 +329,48 @@ const PHOTO_RULES = [
   "Never show or imply a real news event, disaster, protest, politics, or anything that looks like documentary coverage of a real event.",
 ];
 
+// Backgrounds (abstract, technology, gradient, texture) have no subject: buyers lay text, UI or objects over them.
+// The category is the most crowded on Adobe Stock, so the prompts must be specific about technique and color.
+const BACKGROUND_RULES = [
+  "No people, no animals, no faces, no recognizable objects, no landmarks. The picture is a surface or an atmosphere, never a scene with a main subject.",
+  "No text anywhere: no letters, numbers, symbols, code, interface, charts, screens with writing, logos, brand names, or watermarks. For technology themes use only abstract forms: light trails, glowing lines, particles, grids, glass, circuit-like patterns without readable parts.",
+  "Never name or imitate brands, trademarks, artists, characters, or recognizable artworks.",
+];
+
+function backgroundPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  return {
+    system:
+      "You are a stock art director planning AI-generated background images for Adobe Stock. " +
+      "You write prompts for an image model and answer with a single JSON object and nothing else.",
+    user: [
+      `Theme: ${input.theme}`,
+      `Aspect ratio of every image: ${input.aspect}`,
+      "",
+      ...(input.variations
+        ? [
+            `Write exactly ${input.count} prompts for ONE design direction: the look of the theme. Each prompt keeps the same technique and mood but changes the color pair, the light direction, the scale of the pattern or where the calm area sits, so the set is cohesive yet no two images look alike.`,
+          ]
+        : [
+            `Write exactly ${input.count} prompts for clearly different backgrounds about this theme. Vary the technique, the color pair, the light and the composition so no two images look alike.`,
+          ]),
+      // Adobe refuses "similar content"; "blue abstract gradient" is already in its collection many times over.
+      "Backgrounds are the most crowded category: never write the plain version (a blue gradient, generic bokeh, generic waves). Give every prompt a distinct technique AND a named color pair AND a mood or use. Techniques to draw from: blurred gradient mesh, soft bokeh light, flowing glass or liquid waves, frosted glass layers, low-poly facets, layered paper cut, halftone dots, fine grain or film texture, brushed metal, marble or ink swirls, light rays, glowing line grids, particle fields, fabric folds, watercolor wash. No two prompts may share the same technique and color pair.",
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
+      "Each prompt describes ONE image in 40 to 80 words of plain English: the technique or material, 2 to 4 specific colors, the light and depth, the composition, and the mood. Smooth, high resolution, clean and sharp, no noise artifacts.",
+      "In at least half of the prompts, keep one side or the center calm and uncluttered for buyers who add text or a product, and say where it is.",
+      ...BACKGROUND_RULES,
+      "",
+      'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',
+      "- subject: the look in a few words, max 10 words (technique + colors), for example: frosted glass waves in teal and amber.",
+      "- prompt: the full prompt for the image model. Never mention Adobe, stock, AI, or these instructions in it.",
+    ].join("\n"),
+  };
+}
+
 export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  if (input.variant === "background") return backgroundPromptsPrompt(input);
   return {
     system:
       "You are a stock photography art director planning AI-generated photos for Adobe Stock. " +
@@ -362,20 +403,24 @@ export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; 
 }
 
 export function photoMetadataPrompt(input: Omit<PhotoMetadataInput, "image">): { system: string; user: string } {
+  const background = input.variant === "background";
+  const noun = background ? "picture" : "photo";
   return {
     system:
-      "You write search metadata for Adobe Stock photos and check them for defects before upload. " +
-      "You look at the attached photo and answer with a single JSON object and nothing else.",
+      `You write search metadata for Adobe Stock ${background ? "background images" : "photos"} and check them for defects before upload. ` +
+      `You look at the attached ${noun} and answer with a single JSON object and nothing else.`,
     user: [
       `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
-      ...(input.prompt ? [`Prompt the photo was made from (the photo may differ; describe the photo): ${input.prompt}`] : []),
+      ...(input.prompt ? [`Prompt the ${noun} was made from (the ${noun} may differ; describe the ${noun}): ${input.prompt}`] : []),
       "",
-      "Write the metadata a buyer would search for. Describe what the photo actually shows.",
-      `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters. Do not mention AI or how the photo was made.`,
-      "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
+      `Write the metadata a buyer would search for. Describe what the ${noun} actually shows.`,
+      `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters. Do not mention AI or how the ${noun} was made.`,
+      background
+        ? '- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. This is a background with no subject: include "background", "backdrop" or "wallpaper" as fitting, the style or technique (gradient, bokeh, glass, texture, geometric...), the dominant colors, the mood, the uses (presentation, website banner, social media, technology, business...), and "copy space" when an area is left empty. No brand, artist, character, or celebrity names, and no words about AI.'
+        : "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
       `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
       "- has_people: true if any person or part of a person is visible, otherwise false.",
-      `- problems: the defects you see, as a list using only these ids: ${PHOTO_PROBLEM_IDS.join(", ")}. visible_text = any readable or garbled letters, numbers, signs, labels or book titles. logo_or_watermark = any logo, brand mark or watermark. deformed_people = extra, missing or merged fingers, distorted faces, impossible limbs. real_person_or_brand = looks like a celebrity, a branded product or a trademarked design. artifact = melted or impossible objects and other obvious AI glitches. Be strict and report anything you notice; use an empty list only when the photo is clean.`,
+      `- problems: the defects you see, as a list using only these ids: ${PHOTO_PROBLEM_IDS.join(", ")}. visible_text = any readable or garbled letters, numbers, signs, labels or book titles. logo_or_watermark = any logo, brand mark or watermark. deformed_people = extra, missing or merged fingers, distorted faces, impossible limbs. real_person_or_brand = looks like a celebrity, a branded product or a trademarked design. artifact = melted or impossible objects and other obvious AI glitches. Be strict and report anything you notice; use an empty list only when the ${noun} is clean.`,
       "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters in the metadata.",
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","has_people":false,"problems":[]}',

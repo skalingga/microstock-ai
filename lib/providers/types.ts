@@ -1,4 +1,4 @@
-import type { PhotoAspect, PhotoProblem } from "@/lib/photo/config";
+import type { PhotoAspect, PhotoProblem, PhotoVariant } from "@/lib/photo/config";
 import type { StyleId } from "@/lib/settings/schema";
 
 export type ProviderId = "kenari" | "gemini" | "recraft";
@@ -54,6 +54,8 @@ export type PhotoPromptsInput = {
   avoid?: string[];
   /** One subject shown many ways instead of a set of different scenes. */
   variations?: boolean;
+  /** "background": subject-less backgrounds and textures instead of photographed scenes. Default "photo". */
+  variant?: PhotoVariant;
 };
 export type PhotoPrompt = { subject: string; prompt: string };
 
@@ -61,6 +63,8 @@ export type PhotoMetadataInput = {
   theme: string;
   /** The prompt the photo was made from, when the user matched the file to one. */
   prompt?: string;
+  /** Backgrounds get background search words and are never "a photo of people". Default "photo". */
+  variant?: PhotoVariant;
   /** Small JPEG copy of the photo as a data URL (data:image/jpeg;base64,...). */
   image: string;
 };
