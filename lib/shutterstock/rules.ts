@@ -57,7 +57,8 @@ const FROM_ADOBE: Record<AdobeCategory, ShutterstockCategory> = {
   Business: "Business/Finance",
   Drinks: "Food and drink",
   "The environment": "Nature",
-  "States of mind": "Abstract",
+  // Mood and wellbeing photos, not abstract art.
+  "States of mind": "Miscellaneous",
   Food: "Food and drink",
   "Graphic resources": "Backgrounds/Textures",
   "Hobbies and leisure": "Sports/Recreation",
