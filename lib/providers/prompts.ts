@@ -1,6 +1,6 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import { colorRangeFor, isIconStyle, isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
-import { SVG_EXAMPLES } from "./examples";
+import { SVG_EXAMPLES, SVG_EXAMPLE_NOTES } from "./examples";
 import { PHOTO_PROBLEM_IDS } from "@/lib/photo/config";
 import type { ConceptInput, MetadataInput, PhotoMetadataInput, PhotoPromptsInput, SvgInput, ThemesInput } from "./types";
 
@@ -216,7 +216,7 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       ...SAFETY_RULES.map((rule) => `- ${rule}`),
       "",
       ...(example
-        ? ["", "Reference for structure only (how shapes crossing an edge are repeated on the opposite edge). Do NOT copy its subject; draw the concept above:", example]
+        ? ["", `Reference for structure only (${SVG_EXAMPLE_NOTES[input.style]}). Do NOT copy its subject; draw the concept above:`, example]
         : []),
       ...(input.feedback
         ? ["", `Your previous attempt was rejected by the quality check: ${input.feedback} Fix this in the new version.`]
