@@ -201,13 +201,12 @@ export function freshThemes(themes: BenchTheme[], recent: string[] = [], random:
   return out;
 }
 
-// Text models: the incumbents (gemini-3.5-flash-lite, muse-spark) plus the upgrades Kenari and Gemini listed on
-// 14 Oct 2026 (deepseek-v4-1-flash is about a tenth of v4-flash's price). Image models: the default, its cheap
+// Text models: the incumbents (gemini-3.5-flash-lite, muse-spark) plus the upgrades Kenari listed on 14 Oct 2026
+// (deepseek-v4-1-flash is about a tenth of v4-flash's price). Tested 15 Oct 2026 and left out: gemini-3.7-flash (503 on
+// all 16 calls) and gemini-4-argon (never finished a call on the free tier). Both stay in the "add model" list. Image models: the default, its cheap
 // sibling, a free one, and a cheap newcomer; they only draw the Siluet and Line art themes.
 export const DEFAULT_MODELS: BenchModel[] = [
   { provider: "gemini", model: "gemini-3.5-flash-lite" },
-  { provider: "gemini", model: "gemini-3.7-flash" },
-  { provider: "gemini", model: "gemini-4-argon" },
   { provider: "kenari", model: "muse-spark-1-3-contributor:free" },
   { provider: "kenari", model: "agnes-3-0-flash:free" },
   { provider: "kenari", model: "deepseek-v4-1-flash" },
@@ -218,7 +217,7 @@ export const DEFAULT_MODELS: BenchModel[] = [
 ];
 
 /** Bump when DEFAULT_MODELS changes meaningfully: saved lists from an older version are dropped for the new defaults. */
-export const MODEL_PREFS_VERSION = 1;
+export const MODEL_PREFS_VERSION = 2;
 export const MODEL_PREFS_KEY = "uji-model:models";
 export const RECENT_THEMES_KEY = "uji-model:recent-themes";
 export const RECENT_THEMES_MAX = 40;
