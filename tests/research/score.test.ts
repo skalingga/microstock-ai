@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { competitionFromCount, daysUntil, deadlineStatus, demandFromRatio, provenanceOf, scoreTheme, timingFactor } from "@/lib/research/score";
+import { UPLOAD_LEAD_DAYS } from "@/lib/research/calendar";
+import {
+  LAST_CHANCE_LEAD_DAYS,
+  LATE_GRACE_DAYS,
+  competitionFromCount,
+  daysUntil,
+  deadlineStatus,
+  demandFromRatio,
+  lastChanceDate,
+  provenanceOf,
+  scoreTheme,
+  timingFactor,
+} from "@/lib/research/score";
 
 describe("competitionFromCount", () => {
   it("is 0 for small niches and 100 for huge ones", () => {
@@ -50,7 +62,9 @@ describe("deadline timing", () => {
     expect(daysUntil("2026-10-11", now)).toBe(5);
   });
   it("classifies the deadline", () => {
-    expect(deadlineStatus(-1)).toBe("terlewat");
+    expect(deadlineStatus(-1)).toBe("telat");
+    expect(deadlineStatus(-LATE_GRACE_DAYS)).toBe("telat");
+    expect(deadlineStatus(-LATE_GRACE_DAYS - 1)).toBe("terlewat");
     expect(deadlineStatus(5)).toBe("mendesak");
     expect(deadlineStatus(30)).toBe("cukup");
     expect(deadlineStatus(null)).toBeNull();
@@ -60,6 +74,16 @@ describe("deadline timing", () => {
     const missed = scoreTheme({ trendScore: 80, adobeResultCount: 5_000, daysLeft: -10 });
     expect(missed.opportunity).toBe(Math.round(open.opportunity * timingFactor(-10)));
     expect(missed.opportunity).toBeLessThan(open.opportunity);
+  });
+  it("cuts late themes less than missed ones", () => {
+    expect(timingFactor(-10)).toBeGreaterThan(timingFactor(-LATE_GRACE_DAYS - 1));
+    expect(timingFactor(-10)).toBeLessThan(timingFactor(5));
+  });
+  it("puts the last chance one month before the event", () => {
+    // Ideal deadline is 75 days before the event; the last chance is 30 days before it.
+    expect(LATE_GRACE_DAYS).toBe(UPLOAD_LEAD_DAYS - LAST_CHANCE_LEAD_DAYS);
+    expect(LAST_CHANCE_LEAD_DAYS).toBe(30);
+    expect(lastChanceDate("2026-10-11")).toBe("2026-11-25");
   });
   it("leaves evergreen themes alone", () => expect(timingFactor(null)).toBe(1));
 });

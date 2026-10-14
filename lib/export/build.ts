@@ -3,7 +3,8 @@ import JSZip from "jszip";
 import { ADOBE_PHOTO, categoryNumber } from "@/lib/adobe/rules";
 import type { Database } from "@/lib/database.types";
 import { applyArtboard } from "./artboard";
-import { buildAdobeCsv, csvProblems, type CsvRow } from "./csv";
+import { shutterstockCategories } from "@/lib/shutterstock/rules";
+import { buildAdobeCsv, buildShutterstockCsv, csvProblems, shutterstockProblems, type CsvRow, type ShutterstockRow } from "./csv";
 import { makeFilename } from "./slug";
 
 type Client = SupabaseClient<Database>;
@@ -17,7 +18,12 @@ export type ExportAsset = {
   /** Stage 12: a photo exports its stored JPEG unchanged. */
   kind?: string;
   image_path?: string | null;
+  /** Photo shows fictional people; adds Shutterstock's "People" category. */
+  fictional_people?: boolean | null;
 };
+
+/** Where the export goes. Shutterstock takes photos only (vectors must be EPS). */
+export type Agency = "adobe" | "shutterstock";
 
 export type ExportResult = {
   zip: Blob;
@@ -37,10 +43,12 @@ export async function buildExport(
   onProgress?: (done: number, total: number) => void,
   /** Aborting stops between files; nothing is saved or marked. */
   signal?: AbortSignal,
+  agency: Agency = "adobe",
 ): Promise<ExportResult> {
   const zip = new JSZip();
   const used = new Set<string>();
   const rows: CsvRow[] = [];
+  const ssRows: ShutterstockRow[] = [];
   const included: ExportResult["included"] = [];
   const skipped: ExportResult["skipped"] = [];
 
@@ -59,6 +67,17 @@ export async function buildExport(
       zip.file(filename, photo.data);
       included.push({ id: asset.id, filename, photo: true });
       rows.push({ filename, title: asset.title, keywords: asset.keywords, categoryNumber: categoryNumber(asset.category) });
+      ssRows.push({
+        filename,
+        description: asset.title,
+        keywords: asset.keywords,
+        categories: shutterstockCategories(asset.category, !!asset.fictional_people),
+      });
+      continue;
+    }
+
+    if (agency === "shutterstock") {
+      skipped.push({ id: asset.id, title: asset.title, reason: "Shutterstock hanya menerima vektor EPS; aplikasi baru bisa SVG." });
       continue;
     }
 
@@ -85,13 +104,13 @@ export async function buildExport(
   }
   onProgress?.(assets.length, assets.length);
 
-  const csv = buildAdobeCsv(rows);
+  const csv = agency === "shutterstock" ? buildShutterstockCsv(ssRows) : buildAdobeCsv(rows);
   return {
     zip: await zip.generateAsync({ type: "blob", compression: "DEFLATE" }),
     csv,
     included,
     skipped,
-    problems: csvProblems(csv, rows.length),
+    problems: agency === "shutterstock" ? shutterstockProblems(ssRows) : csvProblems(csv, rows.length),
   };
 }
 

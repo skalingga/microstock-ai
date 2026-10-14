@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { unfinishedUploads } from "@/lib/export/checklist";
-import { daysUntil, deadlineStatus, type DeadlineStatus } from "@/lib/research/score";
+import { LATE_GRACE_DAYS, daysUntil, deadlineStatus, type DeadlineStatus } from "@/lib/research/score";
 
 // What the Meja page (/meja) shows: the work waiting for the user, counted straight from the assets table.
 
@@ -21,11 +21,15 @@ export function pickDeadlines(themes: { title: string; upload_by: string | null 
       if (!t.upload_by) return [];
       const daysLeft = daysUntil(t.upload_by, now);
       const status = deadlineStatus(daysLeft);
-      if (!status || status === "terlewat" || daysLeft > DEADLINE_WINDOW_DAYS) return [];
-      return [{ title: t.title, uploadBy: t.upload_by, daysLeft, status }];
+      if (!status || status === "terlewat") return [];
+      // A late theme runs on its last chance, not the ideal date it already missed.
+      const daysToAct = status === "telat" ? daysLeft + LATE_GRACE_DAYS : daysLeft;
+      if (daysToAct > DEADLINE_WINDOW_DAYS) return [];
+      return [{ title: t.title, uploadBy: t.upload_by, daysLeft, status, daysToAct }];
     })
-    .sort((a, b) => a.daysLeft - b.daysLeft || a.title.localeCompare(b.title))
-    .slice(0, MAX_DEADLINES);
+    .sort((a, b) => a.daysToAct - b.daysToAct || a.title.localeCompare(b.title))
+    .slice(0, MAX_DEADLINES)
+    .map((d): Deadline => ({ title: d.title, uploadBy: d.uploadBy, daysLeft: d.daysLeft, status: d.status }));
 }
 
 /** Share of recorded Adobe decisions that were accepted, as a whole percent; null before any decision. */

@@ -1,4 +1,5 @@
 import { ADOBE } from "@/lib/adobe/rules";
+import { SHUTTERSTOCK } from "@/lib/shutterstock/rules";
 
 export type CsvRow = {
   filename: string;
@@ -31,6 +32,40 @@ export function buildAdobeCsv(rows: CsvRow[]): string {
     );
   }
   return lines.join("\n") + "\n";
+}
+
+export type ShutterstockRow = {
+  filename: string;
+  /** Shutterstock calls the title "Description". */
+  description: string;
+  keywords: string[];
+  categories: string[];
+};
+
+/** Shutterstock upload CSV (photos only): header from their sample, flags always "No". */
+export function buildShutterstockCsv(rows: ShutterstockRow[]): string {
+  const lines: string[] = [SHUTTERSTOCK.csvHeader.join(",")];
+  for (const row of rows) {
+    lines.push(
+      [
+        csvField(row.filename),
+        csvField(row.description),
+        csvField(row.keywords.join(", ")),
+        csvField(row.categories.slice(0, SHUTTERSTOCK.categoriesMax).join(",")),
+        "No",
+        "No",
+        "No",
+      ].join(","),
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+
+/** Rows Shutterstock would refuse for their keyword count. */
+export function shutterstockProblems(rows: ShutterstockRow[]): string[] {
+  return rows
+    .filter((r) => r.keywords.length < SHUTTERSTOCK.keywordsMin || r.keywords.length > SHUTTERSTOCK.keywordsMax)
+    .map((r) => `${r.filename}: ${r.keywords.length} keyword (Shutterstock meminta ${SHUTTERSTOCK.keywordsMin} sampai ${SHUTTERSTOCK.keywordsMax}).`);
 }
 
 /** Adobe's file limits for a CSV upload. */

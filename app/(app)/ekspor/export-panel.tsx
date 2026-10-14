@@ -10,7 +10,7 @@ import { QcBadge } from "@/components/qc-badge";
 import { Button } from "@/components/ui/button";
 import { ADOBE } from "@/lib/adobe/rules";
 import { exportLabel } from "@/lib/export/label";
-import { buildExport, downloadBlob, exportStamp, markExported, saveExport, type ExportResult } from "@/lib/export/build";
+import { buildExport, downloadBlob, exportStamp, markExported, saveExport, type Agency, type ExportResult } from "@/lib/export/build";
 import { createClient } from "@/lib/supabase/client";
 import { pinnedBar, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -44,6 +44,7 @@ type Group = { id: string; label: string; detail: string; items: Candidate[] };
 type Result = {
   data: ExportResult;
   stamp: string;
+  agency: Agency;
   /** undefined while saving, null when saving failed, else the stored export's id. */
   exportId: string | null | undefined;
   /** Whether the assets were marked exported; false offers a retry. */
@@ -62,8 +63,12 @@ const CEK_NAMES_SHOWN = 3;
 
 const linkClass = cn("inline-flex items-center font-semibold underline underline-offset-4 hover:decoration-2", tapTarget);
 
-export function ExportPanel({ userId, candidates, preselect }: Props) {
+export function ExportPanel({ userId, candidates: allCandidates, preselect }: Props) {
   const router = useRouter();
+  const [agency, setAgency] = useState<Agency>("adobe");
+  const isShutterstock = agency === "shutterstock";
+  // Shutterstock takes photos only (vectors must be EPS); the rest of this panel works on this list.
+  const candidates = useMemo(() => (isShutterstock ? allCandidates.filter((c) => c.photo) : allCandidates), [isShutterstock, allCandidates]);
   const fromGallery = useMemo(() => (preselect ? candidates.filter((c) => preselect.includes(c.id)) : null), [candidates, preselect]);
   // Exported assets picked in the gallery stay visible: the user asked for them.
   const [onlyNew, setOnlyNew] = useState(() => !fromGallery?.some((c) => c.exportedAt));
@@ -91,7 +96,11 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const abort = useRef<AbortController | null>(null);
 
-  const visible = useMemo(() => (onlyNew ? candidates.filter((c) => !c.exportedAt) : candidates), [candidates, onlyNew]);
+  // "Sudah diekspor" marks the Adobe export, so it does not hide photos from a Shutterstock export.
+  const visible = useMemo(
+    () => (onlyNew && !isShutterstock ? candidates.filter((c) => !c.exportedAt) : candidates),
+    [candidates, onlyNew, isShutterstock],
+  );
   const groups = useMemo(() => {
     const byId = new Map<string, Group>();
     for (const c of visible) {
@@ -150,11 +159,22 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
   }
 
   function downloadZip(r: Result) {
-    downloadBlob(r.data.zip, `microstock_${r.stamp}.zip`);
+    downloadBlob(r.data.zip, `${filePrefix(r.agency)}_${r.stamp}.zip`);
   }
 
   function downloadCsv(r: Result) {
-    downloadBlob(new Blob([r.data.csv], { type: "text/csv;charset=utf-8" }), `microstock_${r.stamp}.csv`);
+    downloadBlob(new Blob([r.data.csv], { type: "text/csv;charset=utf-8" }), `${filePrefix(r.agency)}_${r.stamp}.csv`);
+  }
+
+  function switchAgency(next: Agency) {
+    if (next === agency || building) return;
+    setAgency(next);
+    setResult(null);
+    setError(null);
+    setCleared(null);
+    setConfirmedCek("");
+    const pool = next === "shutterstock" ? allCandidates.filter((c) => c.photo) : allCandidates;
+    setSelected(new Set(pool.filter((c) => c.status === "lolos" && (next === "shutterstock" || !c.exportedAt)).map((c) => c.id)));
   }
 
   async function startExport() {
@@ -168,16 +188,29 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       const supabase = createClient();
       const { data: rows, error: fetchError } = await supabase
         .from("assets")
-        .select("id, title, keywords, category, svg_path, kind, image_path")
+        .select("id, title, keywords, category, svg_path, kind, image_path, fictional_people")
         .in("id", chosen.map((c) => c.id));
       if (fetchError || !rows) throw new Error("Data aset tidak bisa dimuat. Coba lagi.");
 
       const assets = rows.flatMap((r) => (r.title && (r.svg_path || r.image_path) ? [{ ...r, title: r.title }] : []));
-      const data = await buildExport(supabase, assets, (done, total) => setBuilding({ phase: "build", done, total }), controller.signal);
-      const next: Result = { data, stamp: exportStamp(), exportId: undefined };
+      const data = await buildExport(
+        supabase,
+        assets,
+        (done, total) => setBuilding({ phase: "build", done, total }),
+        controller.signal,
+        agency,
+      );
+      const next: Result = { data, stamp: exportStamp(), agency, exportId: undefined };
       if (data.included.length === 0) {
         setError("Tidak ada aset yang bisa diekspor. Alasannya ada di kartu hasil.");
         setResult({ ...next, exportId: null });
+        return;
+      }
+
+      // Shutterstock is a trial: download only. The history row and the "exported" mark belong to the Adobe flow.
+      if (agency === "shutterstock") {
+        setResult({ ...next, exportId: null });
+        downloadZip(next);
         return;
       }
 
@@ -300,7 +333,13 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
             </div>
           )}
 
-          {result.exportId === undefined && included.length > 0 && (
+          {result.agency === "shutterstock" && included.length > 0 && (
+            <p className="text-sm" role="status">
+              Ekspor Shutterstock tidak disimpan di Riwayat dan tidak menandai aset &ldquo;sudah diekspor&rdquo;. Simpan ZIP dan CSV-nya
+              sampai selesai diunggah.
+            </p>
+          )}
+          {result.agency === "adobe" && result.exportId === undefined && included.length > 0 && (
             <p className="text-sm" role="status">
               Menyimpan ke Riwayat...
             </p>
@@ -328,7 +367,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
               </Button>
             </div>
           )}
-          {result.exportId === null && included.length > 0 && (
+          {result.agency === "adobe" && result.exportId === null && included.length > 0 && (
             <p role="alert" className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
               Riwayat gagal disimpan, jadi aset belum ditandai diekspor dan file ini tidak ada di Riwayat. Simpan ZIP dan CSV-nya
               sekarang, atau coba simpan lagi.
@@ -359,7 +398,14 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
             </div>
           )}
 
-          {included.length > 0 && (
+          {included.length > 0 && result.agency === "shutterstock" && (
+            <div className="space-y-2 border-t pt-4">
+              <h3 className="font-bold">Unggah ke Shutterstock</h3>
+              <ShutterstockSteps />
+            </div>
+          )}
+
+          {included.length > 0 && result.agency === "adobe" && (
             <div className="space-y-2 border-t pt-4">
               <h3 className="flex items-center gap-1 font-bold">
                 Unggah ke Adobe Stock
@@ -396,12 +442,40 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       )}
 
       <section aria-labelledby="pilih-heading" className="space-y-4">
+        <div className="space-y-2">
+          <p id="agensi-label" className="text-sm font-semibold">
+            Agensi tujuan
+          </p>
+          <div className="inline-flex flex-wrap gap-1 rounded-md border p-1" role="radiogroup" aria-labelledby="agensi-label">
+            {AGENCIES.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                role="radio"
+                aria-checked={agency === a.id}
+                onClick={() => switchAgency(a.id)}
+                disabled={!!building}
+                className={cn("rounded-sm px-3 text-sm font-semibold", tapTarget, agency === a.id ? "bg-foreground text-background" : "hover:bg-muted")}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+          {isShutterstock && (
+            <p className="rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
+              Uji coba. Shutterstock tidak menerima konten buatan AI dari kontributor, jadi kiriman ini bisa ditolak. Hanya foto JPEG
+              yang ikut, karena vektor Shutterstock harus EPS. Kategori dipetakan otomatis dari kategori Adobe: cocokkan dulu dengan
+              pilihan kategori di portal Shutterstock sebelum unggah CSV pertama.
+            </p>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 id="pilih-heading" className="text-lg font-bold">
             {result ? "Ekspor lagi" : "Pilih aset"}
           </h2>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            <label className={cn("flex cursor-pointer items-center gap-2", tapTarget)}>
+            <label className={cn("flex cursor-pointer items-center gap-2", tapTarget, isShutterstock && "hidden")}>
               <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} className="size-4 accent-foreground" />
               Hanya yang belum diekspor
             </label>
@@ -459,8 +533,18 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
         {visible.length === 0 ? (
           <div className="space-y-3 rounded-md border border-dashed p-6 text-center text-sm">
             <PenPath className="mx-auto max-w-56" />
-            <p className="font-semibold">{onlyNew && candidates.length > 0 ? "Semua aset sudah diekspor." : "Belum ada aset yang siap diekspor."}</p>
-            <p className="text-muted-foreground">Aset perlu metadata dan status Lolos atau Perlu cek.</p>
+            <p className="font-semibold">
+              {isShutterstock
+                ? "Belum ada foto yang siap diekspor."
+                : onlyNew && candidates.length > 0
+                  ? "Semua aset sudah diekspor."
+                  : "Belum ada aset yang siap diekspor."}
+            </p>
+            <p className="text-muted-foreground">
+              {isShutterstock
+                ? "Shutterstock hanya untuk foto dari Mode foto, dengan metadata dan status Lolos atau Perlu cek."
+                : "Aset perlu metadata dan status Lolos atau Perlu cek."}
+            </p>
             <p className="flex flex-wrap justify-center gap-x-4">
               <Link href="/aset?status=menunggu" className={linkClass}>
                 Proses aset yang menunggu
@@ -589,7 +673,7 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
           )}
           {releaseChosen.length > 0 && !building && (
             <p className="text-sm text-warning-foreground" role="status">
-              <strong>{releaseChosen.length} aset Perlu Release</strong> (orang atau properti nyata): siapkan file release sebelum mengunggah ke Adobe.{" "}
+              <strong>{releaseChosen.length} aset Perlu Release</strong> (orang atau properti nyata): siapkan file release sebelum mengunggah ke {isShutterstock ? "Shutterstock" : "Adobe"}.{" "}
               {releaseChosen
                 .slice(0, CEK_NAMES_SHOWN)
                 .map((c) => c.title)
@@ -627,10 +711,12 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
                 ) : (
                   <span>ZIP terunduh otomatis; CSV diunduh terpisah dari kartu hasil</span>
                 )}
-                <InfoTip align="start" label="Ukuran artboard">
-                  Setiap SVG diberi ukuran artboard {ADOBE.artboard.maxSidePx} px (syarat Adobe: minimal {ADOBE.artboard.minMegapixels} MP).
-                  Gambarnya tidak berubah.
-                </InfoTip>
+                {!isShutterstock && (
+                  <InfoTip align="start" label="Ukuran artboard">
+                    Setiap SVG diberi ukuran artboard {ADOBE.artboard.maxSidePx} px (syarat Adobe: minimal {ADOBE.artboard.minMegapixels} MP).
+                    Gambarnya tidak berubah.
+                  </InfoTip>
+                )}
               </span>
             </div>
           )}
@@ -645,15 +731,38 @@ export function ExportPanel({ userId, candidates, preselect }: Props) {
       {!result && (
         <details className="group rounded-md border bg-card">
           <summary className={cn("flex cursor-pointer list-none items-center justify-between gap-2 px-5 font-bold", tapTarget, "min-h-13")}>
-            Cara unggah ke Adobe Stock
+            {isShutterstock ? "Cara unggah ke Shutterstock" : "Cara unggah ke Adobe Stock"}
             <ChevronDown aria-hidden className="size-4 transition-transform duration-150 group-open:rotate-180" />
           </summary>
-          <div className="px-5 pb-5">
-            <UploadChecklist />
-          </div>
+          <div className="px-5 pb-5">{isShutterstock ? <ShutterstockSteps /> : <UploadChecklist />}</div>
         </details>
       )}
     </div>
+  );
+}
+
+const AGENCIES: { id: Agency; label: string }[] = [
+  { id: "adobe", label: "Adobe Stock" },
+  { id: "shutterstock", label: "Shutterstock (foto, uji coba)" },
+];
+
+function filePrefix(agency: Agency): string {
+  return agency === "shutterstock" ? "shutterstock" : "microstock";
+}
+
+/** Upload order from Shutterstock's CSV help page: files first, then the CSV through the "CSV" button on the Submit page. */
+function ShutterstockSteps() {
+  return (
+    <ol className="list-decimal space-y-1 pl-5 text-sm">
+      <li>Ekstrak ZIP, lalu unggah semua foto JPEG lewat halaman Upload di portal kontributor Shutterstock.</li>
+      <li>Tunggu sampai semua foto muncul di halaman Submit.</li>
+      <li>
+        Klik tombol <strong>CSV</strong> di bagian atas halaman Submit, lalu pilih file CSV dari aplikasi. Jangan unggah CSV lewat
+        halaman Upload atau FTPS.
+      </li>
+      <li>Periksa judul, keyword, dan kategori tiap foto. Bila ada kategori yang ditolak, catat nama yang benar dari pilihan di portal.</li>
+      <li>Klik Submit sekali, lalu tunggu sampai prosesnya selesai.</li>
+    </ol>
   );
 }
 

@@ -1,6 +1,8 @@
 // Scores for one theme. All inputs are optional because each signal can be missing
 // (Trends blocked, competition not entered yet); the result says which parts were real.
 
+import { UPLOAD_LEAD_DAYS } from "./calendar";
+
 export type ScoreInput = {
   /** Event weight from the calendar, 1 to 3. */
   eventWeight?: 1 | 2 | 3;
@@ -34,19 +36,33 @@ export function provenanceOf(s: Scores): Provenance {
   return s.demandKnown || s.competitionKnown ? "sebagian" : "perkiraan";
 }
 
-/** Opportunity multiplier by time left: a missed deadline halves it, a tight one trims it. */
+/** Last useful upload, in days before the event. The user's experience (14 Oct 2026): one month ahead still sells. */
+export const LAST_CHANCE_LEAD_DAYS = 30;
+
+/** Days after the ideal deadline (UPLOAD_LEAD_DAYS before the event) during which an upload is late but still worth it. */
+export const LATE_GRACE_DAYS = UPLOAD_LEAD_DAYS - LAST_CHANCE_LEAD_DAYS;
+
+/** The last-chance date for an ideal upload deadline, as an ISO date. */
+export function lastChanceDate(uploadBy: string): string {
+  return new Date(Date.parse(`${uploadBy}T00:00:00Z`) + LATE_GRACE_DAYS * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Opportunity multiplier by time left: past the last chance halves it, late trims it more than tight. */
 export function timingFactor(daysLeft: number | null | undefined): number {
   if (daysLeft === null || daysLeft === undefined) return 1;
-  if (daysLeft < 0) return 0.5;
+  if (daysLeft < -LATE_GRACE_DAYS) return 0.5;
+  if (daysLeft < 0) return 0.7;
   if (daysLeft < 14) return 0.85;
   return 1;
 }
 
-export type DeadlineStatus = "terlewat" | "mendesak" | "cukup";
+/** "telat": past the ideal deadline but not yet the last chance (one month before the event). */
+export type DeadlineStatus = "terlewat" | "telat" | "mendesak" | "cukup";
 
 export function deadlineStatus(daysLeft: number | null | undefined): DeadlineStatus | null {
   if (daysLeft === null || daysLeft === undefined) return null;
-  if (daysLeft < 0) return "terlewat";
+  if (daysLeft < -LATE_GRACE_DAYS) return "terlewat";
+  if (daysLeft < 0) return "telat";
   return daysLeft < 14 ? "mendesak" : "cukup";
 }
 

@@ -165,7 +165,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Ekspor" description="ZIP berisi SVG dan CSV metadata untuk Adobe Stock.">
+      <PageHeader title="Ekspor" description="ZIP berisi file aset dan CSV metadata untuk Adobe Stock atau Shutterstock (foto).">
         <p className="flex flex-wrap items-center gap-x-4 text-sm text-muted-foreground">
           <span>
             <strong className="text-foreground tabular-nums">{assetsError ? "–" : readyCount}</strong> Lolos belum diekspor
