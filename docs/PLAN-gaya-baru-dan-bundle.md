@@ -1,7 +1,7 @@
 # Rencana Tahap 14 (gaya baru) dan Tahap 11 (bundle)
 
 Disusun 15 Okt 2026 atas permintaan pengguna: gaya bawaan sekarang "tidak menjual dan kurang bervariasi".
-**Status: menunggu persetujuan.** Belum ada kode. Aturan kerja seperti tahap lain: rencana → persetujuan → kode kecil
+**Status: disetujui 15 Okt 2026** (lihat "Keputusan pengguna" di bawah). Gelombang 1 sudah dikodekan (`d52309c`); bundle dan gelombang 2 belum. Aturan kerja seperti tahap lain: rencana → persetujuan → kode kecil
 per langkah → `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build` → commit + push → perbarui PROGRESS.md.
 
 ## Latar
@@ -97,29 +97,36 @@ Tujuan: 16 aset Lolos dari satu tema dan satu gaya digabung jadi **satu SVG grid
 
 ### Keputusan desain (usulan)
 
-- **Ukuran grid:** 4 × 4 (16) sebagai bawaan; pilihan 3 × 3, 5 × 5, dan 6 × 4 (lebar × tinggi, rasio 3:2).
+- **Ukuran grid:** **5 × 5 (25) sebagai bawaan** (keputusan pengguna); pilihan 3 × 3, 4 × 4, dan 6 × 4 (lebar × tinggi, rasio 3:2). Jumlah anggota harus sama dengan jumlah sel; kalau aset Lolos kurang dari itu, pilih grid yang lebih kecil.
   Rasio 1:1 dan 3:2 lolos aturan artboard Adobe (15–65 MP, sisi terpanjang 4800 px).
-- **Data:** perluas `assets.kind` dengan `'bundle'`, kolom baru `bundle_of uuid[]`, dan `assets.provider` dengan `'local'`
-  (disusun di browser, tanpa panggilan AI). Aset bundle memakai `job_id` anggota pertama. RLS tidak berubah.
+- **Data:** perluas `assets.kind` dengan `'bundle'`, kolom baru `bundle_of uuid[]` (di aset bundle) dan `bundled_in uuid`
+  (di anggota, menunjuk bundle-nya; `on delete set null`), dan `assets.provider` dengan `'local'` (disusun di browser,
+  tanpa panggilan AI). Aset bundle memakai `job_id` anggota pertama. RLS tidak berubah.
 - **Penggabungan di browser**, tanpa server: `lib/bundle/compose.ts`, fungsi murni yang dites.
 
 ### Pekerjaan teknis
 
 | # | Berkas | Perubahan |
 |---|---|---|
-| 1 | `supabase/migrations/2026101x_bundle.sql` | `kind` memuat `'bundle'`, kolom `bundle_of uuid[] not null default '{}'`, `provider` memuat `'local'`. |
+| 1 | `supabase/migrations/2026101x_bundle.sql` | `kind` memuat `'bundle'`, kolom `bundle_of uuid[] not null default '{}'`, `bundled_in uuid references assets(id) on delete set null`, `provider` memuat `'local'`. |
 | 2 | `lib/bundle/compose.ts` (baru) | Tiap SVG anggota masuk satu `<g transform>` pada selnya; viewBox dinormalisasi; **semua `id` diberi awalan** supaya gradien dan `clipPath` tidak bentrok; satu viewBox akar; jarak seragam; latar transparan; jalankan sanitasi + SVGO lagi. |
 | 3 | `app/(app)/aset/` (toolbar dan modal) | Tombol "Buat bundle" bila ≥ 4 aset Lolos satu gaya terpilih; modal pilih ukuran grid dan jarak, pratinjau, lalu simpan. |
 | 4 | Simpan | Unggah SVG ke Storage (pola path yang sama), baris `assets` (`kind='bundle'`, `provider='local'`, `model='grid-4x4'`, `bundle_of=[...]`, `qc_status='menunggu'`). |
 | 5 | Metadata | Prompt bundle ("Set of N …"): judul ≤ 70 karakter, keyword gabungan maks 49 berisi kata set/collection, lewat adapter seperti biasa. |
 | 6 | `lib/qc/config.ts`, `lib/qc/batch.ts` | Batas kerumitan bundle lebih longgar; uji kemiripan melewati anggotanya sendiri. |
-| 7 | `lib/export/build.ts`, halaman Ekspor | Bundle diekspor seperti vektor (`svg_path`); nama file ≤ 30 karakter; **peringatan**: bundle dan ikon satuan yang sama berisiko dianggap konten serupa. |
+| 7 | `lib/export/build.ts`, halaman Ekspor (`page.tsx`) | Bundle diekspor seperti vektor (`svg_path`); nama file ≤ 30 karakter; daftar kandidat Ekspor menyaring `bundled_in is null`; peringatan hanya bila anggota dilepas. |
+| 7b | `app/(app)/aset/` | Lencana "Dalam bundle", aksi "Lepas dari bundle", filter galeri. |
 | 8 | `tests/` | Komposisi (posisi sel, awalan id, jumlah, viewBox), QC bundle, ekspor. |
 
-### Aturan terhadap anggota
+### Aturan terhadap anggota (keputusan pengguna: ditahan otomatis)
 
-Usulan: anggota bundle **tidak otomatis disembunyikan**. Halaman Ekspor menampilkan peringatan dan pengguna memilih:
-unggah bundle saja, satuan saja, atau keduanya. Uji dulu satu tema (data Tahap 6) sebelum membuat kebiasaan.
+- Begitu bundle dibuat, semua anggotanya **ditahan**: `bundled_in` diisi, mereka tidak muncul di daftar Ekspor dan tidak
+  ikut "Pilih semua yang Lolos". Di galeri tampil lencana "Dalam bundle".
+- Bisa dibalik: "Lepas dari bundle" di galeri (satu anggota atau semuanya). Menghapus aset bundle otomatis
+  melepas semua anggotanya (`on delete set null`).
+- Anggota yang **sudah diekspor** (`exported_at` terisi) tidak ikut ditahan diam-diam: modal pembuatan bundle
+  memperingatkan dan meminta konfirmasi, karena satuannya mungkin sudah ada di Adobe (risiko "similar content").
+- Halaman Ekspor tidak lagi perlu peringatan duplikat bundle + satuan untuk kasus normal, hanya bila pengguna melepas anggota.
 
 ## Urutan kerja dan perkiraan
 
@@ -140,9 +147,9 @@ unggah bundle saja, satuan saja, atau keduanya. Uji dulu satu tema (data Tahap 6
 | Bundle + satuan dianggap "similar" | Peringatan di Ekspor, uji satu tema dulu |
 | Gaya baru tetap tidak laku | Data Adobe (Tahap 6) per gaya; berhenti menambah gaya sebelum ada data |
 
-## Pertanyaan terbuka untuk pengguna
+## Keputusan pengguna (15 Okt 2026)
 
-1. Setuju lima gaya di atas dan urutan dua gelombang? Ada gaya yang mau diganti atau ditambah?
-2. Ukuran grid bawaan bundle: 16 (4 × 4) cukup?
-3. Palet bawaan: mau saya siapkan 3 palet baru (retro 70-an, boho tanah, stiker cerah) di Pengaturan?
-4. Anggota bundle: boleh tetap bisa diekspor satuan (usulan), atau ditahan otomatis?
+1. **Gaya:** lima gaya dan dua gelombang disetujui tanpa perubahan.
+2. **Ukuran grid bundle:** bawaan **25 (5 × 5)**.
+3. **Palet:** tiga palet baru ditambahkan ke Pengaturan: "Retro 70-an", "Boho tanah", "Stiker cerah" (selesai, lewat SQL ke `user_settings.palettes`).
+4. **Anggota bundle:** **ditahan otomatis** setelah bundle dibuat (bisa dilepas lagi; lihat "Aturan terhadap anggota").
