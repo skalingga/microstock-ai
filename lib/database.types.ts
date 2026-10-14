@@ -19,6 +19,8 @@ export type Database = {
           adobe_reason: string | null
           adobe_reviewed_at: string | null
           adobe_status: string | null
+          bundle_of: string[]
+          bundled_in: string | null
           category: string | null
           concept: string | null
           created_at: string
@@ -48,6 +50,8 @@ export type Database = {
           adobe_reason?: string | null
           adobe_reviewed_at?: string | null
           adobe_status?: string | null
+          bundle_of?: string[]
+          bundled_in?: string | null
           category?: string | null
           concept?: string | null
           created_at?: string
@@ -77,6 +81,8 @@ export type Database = {
           adobe_reason?: string | null
           adobe_reviewed_at?: string | null
           adobe_status?: string | null
+          bundle_of?: string[]
+          bundled_in?: string | null
           category?: string | null
           concept?: string | null
           created_at?: string

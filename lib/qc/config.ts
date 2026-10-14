@@ -29,6 +29,12 @@ export const QC = {
     maxHamming: 8,
     /** Same, between assets of one "one subject, many variations" batch: they are alike on purpose, so only near copies count. */
     maxHammingVariations: 3,
+    /**
+     * Differing bits as a share of the bits set in either hash. A small object on an empty canvas sets only 10 to 25 of
+     * the 64 bits, so unrelated pictures sit 4 to 8 bits apart (15 Oct 2026: an isometric solar farm "matched" a
+     * retro car). Those are 0.25 to 0.5 of the set bits; a real near copy is well under 0.2.
+     */
+    maxRelative: 0.2,
   },
   outline: {
     /** Share of shapes that may carry a fill on an outline icon (an eye or a dot) before it needs a look. */
@@ -92,6 +98,17 @@ const COMPLEXITY_OVERRIDES: Partial<Record<StyleId, Partial<ComplexityLimits>>> 
 
 export function complexityFor(style: StyleId): ComplexityLimits {
   return { ...QC.complexity, ...COMPLEXITY_OVERRIDES[style] };
+}
+
+/** A bundle holds many assets in one file: every limit grows with the number of members. */
+export function scaleLimits(limits: ComplexityLimits, members: number): ComplexityLimits {
+  const n = Math.max(1, members);
+  return {
+    minShapes: limits.minShapes * n,
+    warnShapes: limits.warnShapes * n,
+    failShapes: limits.failShapes * n,
+    warnPoints: limits.warnPoints * n,
+  };
 }
 
 // Titles must not imply a real news event (Adobe clarification). The AI is told too; this is the safety net.

@@ -1,14 +1,17 @@
 "use client";
 
-import { Download, Ellipsis, Trash2 } from "lucide-react";
+import { Download, Ellipsis, Package, Trash2, Unlink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { SelectionHandles } from "@/components/pen-motif";
 import { QcBadge } from "@/components/qc-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { releaseMembers } from "@/lib/bundle/make";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { hapusBanyakAset, simpanHasilAdobeBanyak } from "./actions";
+import { BundlePanel } from "./bundle-panel";
 import { AdobeDecision, type AdobeDecisionValue } from "./adobe-decision";
 import { withQuery } from "./filters";
 
@@ -23,12 +26,16 @@ export type GridAsset = {
   adobeStatus: string | null;
   /** Has metadata and is Lolos or Perlu cek, so the export page can take it. */
   exportable: boolean;
+  /** "vector", "photo" or "bundle". */
+  kind?: string;
+  /** The bundle that holds this asset back from export. */
+  heldBy?: string | null;
 };
 
-type Mode = "pilih" | "adobe" | "hapus" | "hapus-catatan";
+type Mode = "pilih" | "adobe" | "hapus" | "hapus-catatan" | "bundle";
 
 /** What bulk actions need to know about an asset, including those not on the current page. */
-export type PickableAsset = Pick<GridAsset, "id" | "exported" | "adobeStatus" | "exportable">;
+export type PickableAsset = Pick<GridAsset, "id" | "exported" | "adobeStatus" | "exportable" | "kind" | "qcStatus" | "heldBy">;
 
 /** The gallery grid. Ticking assets opens a bar to export them, record Adobe's decision, or delete them together. */
 export function AssetGrid({
@@ -36,7 +43,9 @@ export function AssetGrid({
   detailQuery,
   filterTotal,
   filterFirst,
+  bannedWords,
 }: {
+  bannedWords: string[];
   assets: GridAsset[];
   /** Gallery filter, carried into the detail page. */
   detailQuery: string;
@@ -78,6 +87,9 @@ export function AssetGrid({
   const exportable = picked.filter((a) => a.exportable);
   const notExported = picked.filter((a) => !a.exported).length;
   const exportedBefore = exportable.filter((a) => a.exported).length;
+  // Bundles take Lolos vectors that are not held by another bundle; the rest of the pick is reported, not silently dropped.
+  const bundleReady = picked.filter((a) => a.kind === "vector" && a.qcStatus === "lolos" && !a.heldBy);
+  const held = picked.filter((a) => a.heldBy);
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -102,6 +114,22 @@ export function AssetGrid({
       setMore(false);
       setMessage({ text: `${result.deleted} aset dihapus.${result.warning ? ` ${result.warning}` : ""}`, error: !!result.warning });
       router.refresh();
+    });
+  }
+
+  function release() {
+    const ids = held.map((a) => a.id);
+    startTransition(async () => {
+      const ok = await releaseMembers(createClient(), ids);
+      setMessage(
+        ok
+          ? { text: `${ids.length} aset dilepas dari bundle dan bisa diekspor lagi.` }
+          : { text: "Gagal melepas aset dari bundle. Coba lagi.", error: true },
+      );
+      if (ok) {
+        setSelected(new Set());
+        router.refresh();
+      }
     });
   }
 
@@ -203,6 +231,18 @@ export function AssetGrid({
               <Button type="button" size="sm" variant="outline" onClick={() => setMode("adobe")}>
                 Catat <span className="max-sm:hidden">hasil</span> Adobe
               </Button>
+              {picked.length >= 4 && (
+                <Button type="button" size="sm" variant="outline" onClick={() => setMode("bundle")}>
+                  <Package />
+                  Buat bundle
+                </Button>
+              )}
+              {held.length > 0 && (
+                <Button type="button" size="sm" variant="outline" onClick={release} disabled={pending}>
+                  <Unlink />
+                  Lepas {held.length} dari bundle
+                </Button>
+              )}
               <Button
                 type="button"
                 size="sm"
@@ -241,6 +281,23 @@ export function AssetGrid({
               `${picked.length - exportable.length} aset tidak ikut ekspor: belum Lolos/Perlu cek atau belum punya metadata. `}
             {exportedBefore > 0 && `${exportedBefore} sudah pernah diekspor dan akan diekspor lagi.`}
           </p>
+        )}
+
+        {picked.length > 0 && mode === "bundle" && (
+          <BundlePanel
+            ids={picked.map((a) => a.id)}
+            invalidCount={picked.length - bundleReady.length}
+            exportedCount={bundleReady.filter((a) => a.exported).length}
+            bannedWords={bannedWords}
+            onCancel={() => setMode("pilih")}
+            onDone={(result) => {
+              setMode("pilih");
+              setSelected(new Set());
+              setMore(false);
+              setMessage({ text: result.text, error: result.error });
+              router.refresh();
+            }}
+          />
         )}
 
         {picked.length > 0 && mode === "adobe" && (
@@ -366,6 +423,8 @@ export function AssetGrid({
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 pb-1">
                 <QcBadge status={asset.qcStatus} />
                 {asset.photo && <span className="rounded-sm border px-1.5 text-muted-foreground">Foto</span>}
+                {asset.kind === "bundle" && <span className="rounded-sm border border-foreground/40 px-1.5 font-medium">Bundle</span>}
+                {asset.heldBy && <span className="rounded-sm border px-1.5 text-muted-foreground">Dalam bundle</span>}
                 {asset.exported && <span className="text-muted-foreground">Diekspor</span>}
                 {asset.adobeStatus === "diterima" && <span className="font-medium text-success-foreground">Diterima Adobe</span>}
                 {asset.adobeStatus === "ditolak" && <span className="font-medium text-danger-foreground">Ditolak Adobe</span>}

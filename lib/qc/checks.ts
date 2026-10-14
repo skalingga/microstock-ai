@@ -1,5 +1,5 @@
 import { QC, type ComplexityLimits } from "./config";
-import { hammingHex } from "./hash";
+import { hammingHex, unionBitsHex } from "./hash";
 import { seamScore, seamsOk } from "./tile";
 import type { Box, HashPoolEntry, Pixels, QcNote } from "./types";
 
@@ -177,6 +177,10 @@ export function checkSimilarity(phash: string, pool: HashPoolEntry[], selfId?: s
     const distance = hammingHex(phash, entry.phash);
     const limit = entry.batch && batchMaxHamming !== undefined ? batchMaxHamming : QC.similarity.maxHamming;
     if (distance > limit) continue;
+    // Sparse pictures (few set bits) are often a few bits apart by chance: only a difference that is small next to
+    // the information the two hashes hold counts as "looks the same".
+    const union = unionBitsHex(phash, entry.phash);
+    if (union > 0 && distance / union > QC.similarity.maxRelative) continue;
     if (!nearest || distance < nearest.distance) nearest = { id: entry.id, distance };
   }
   if (nearest) {

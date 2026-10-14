@@ -265,7 +265,9 @@ export function metadataPrompt(input: MetadataInput): { system: string; user: st
       "You answer with a single JSON object and nothing else.",
     user: [
       `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
-      `Asset type: ${METADATA_STYLE[input.style]}`,
+      input.setSize
+        ? `Asset type: ONE vector file that holds a grid of ${input.setSize} separate matching items of the same set. Each item is ${METADATA_STYLE[input.style]}.`
+        : `Asset type: ${METADATA_STYLE[input.style]}`,
       `What the vector shows: ${input.concept}`,
       "",
       "Write the metadata a buyer would search for. Describe what the picture actually shows.",
@@ -276,6 +278,11 @@ export function metadataPrompt(input: MetadataInput): { system: string; user: st
       isIconStyle(input.style)
         ? 'This picture is an interface-style icon, so the words "icon" and "icon set" are right for the title and keywords. Do not use "pictogram".'
         : "Never use the words icon, icons, icon set, pictogram or glyph in the title or keywords, even if the theme above uses them: Adobe reserves them for interface symbols, and this picture is an illustration.",
+      ...(input.setSize
+        ? [
+            `This file is a set of ${input.setSize}: the title must say so (for example "Set of ${input.setSize} ..." or "... collection") and the keywords must include "set", "collection", "bundle" or "pack" together with the shared subject and style words. Do not list the items one by one.`,
+          ]
+        : []),
       "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters.",
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","needs_release":false}',

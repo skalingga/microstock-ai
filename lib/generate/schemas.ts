@@ -48,6 +48,8 @@ export const metadataRequestSchema = z.object({
   theme,
   style,
   concept: z.string().trim().min(1, "Deskripsi konsep kosong.").max(500, "Deskripsi konsep terlalu panjang."),
+  /** A bundle: how many matching items the picture holds. */
+  setSize: z.number().int().min(2).max(100).optional(),
 });
 
 export type MetadataRequest = z.infer<typeof metadataRequestSchema>;

@@ -96,6 +96,7 @@ export function RegenerateMetadataButton({ asset, style, theme, concept, bannedW
           theme: theme || "stock vector",
           style,
           concept: concept || "Stock vector asset.",
+          ...(asset.bundle_of && asset.bundle_of.length > 1 ? { setSize: asset.bundle_of.length } : {}),
         });
         const visual = parseNotes(asset.qc_notes).filter((n) => n.check !== "metadata");
         verdict = await applyMetadata(supabase, asset.id, visual, res.metadata, bannedWords);

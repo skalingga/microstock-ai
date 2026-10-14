@@ -15,6 +15,8 @@ export async function runVisualQc(args: {
   pool: HashPoolEntry[];
   selfId?: string;
   batchMaxHamming?: number;
+  /** The SVG is a bundle of this many members. */
+  members?: number;
 }): Promise<{ notes: QcNote[]; phash: string }> {
   const measured = await measureSvg(args.svg);
   return evaluateVisual({
@@ -27,11 +29,16 @@ export async function runVisualQc(args: {
     pool: args.pool,
     selfId: args.selfId,
     batchMaxHamming: args.batchMaxHamming,
+    members: args.members,
   });
 }
 
-/** Hashes of every asset of one kind the user already has, for the similarity check. Photos and vectors never compete. */
-export async function fetchHashPool(supabase: Client, kind: "vector" | "photo" = "vector"): Promise<HashPoolEntry[]> {
+/**
+ * Hashes of every asset of one kind the user already has, for the similarity check. Photos, vectors and bundles never
+ * compete: a 3x3 grid of drawings hashes like any other regular 3-column picture, so comparing it with single assets
+ * only produces false alarms.
+ */
+export async function fetchHashPool(supabase: Client, kind: "vector" | "photo" | "bundle" = "vector"): Promise<HashPoolEntry[]> {
   const { data } = await supabase.from("assets").select("id, phash").eq("kind", kind).not("phash", "is", null).limit(5000);
   return data ?? [];
 }
@@ -61,6 +68,8 @@ export type StoredAsset = {
   keywords: string[];
   category: string | null;
   needs_release: boolean;
+  /** Set on a bundle: its members, which are left out of the similarity check. */
+  bundle_of?: string[];
 };
 
 export function metadataOf(asset: Pick<StoredAsset, "title" | "keywords" | "category" | "needs_release">): MetadataFields | null {
@@ -86,7 +95,16 @@ export async function rerunQc(
 
   const svg = await file.data.text();
   const previous = parseNotes(asset.qc_notes);
-  const { notes, phash } = await runVisualQc({ svg, style, sanitizeNotes: [], pool, selfId: asset.id });
+  const members = asset.bundle_of && asset.bundle_of.length > 0 ? asset.bundle_of : undefined;
+  const { notes, phash } = await runVisualQc({
+    svg,
+    style,
+    sanitizeNotes: [],
+    // A bundle is compared with other bundles only.
+    pool: members ? await fetchHashPool(supabase, "bundle") : pool,
+    selfId: asset.id,
+    members: members?.length,
+  });
 
   // The sanitizer ran when the asset was created; keep what it reported.
   const sanitized = previous.find((n) => n.check === "sanitasi");

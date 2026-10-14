@@ -36,7 +36,13 @@ export type SvgInput = {
   feedback?: string;
 };
 
-export type MetadataInput = { theme: string; style: StyleId; concept: string };
+export type MetadataInput = {
+  theme: string;
+  style: StyleId;
+  concept: string;
+  /** Set for a bundle: the file holds a grid of this many matching items. */
+  setSize?: number;
+};
 /** Raw model output. lib/metadata/postprocess.ts cleans it before it is stored. */
 export type AssetMetadata = { title: string; keywords: string[]; category: string; needsRelease: boolean };
 

@@ -15,6 +15,7 @@ export const KINDS = [
   { value: "semua", label: "Semua jenis", kind: null },
   { value: "vektor", label: "Vektor", kind: "vector" },
   { value: "foto", label: "Foto", kind: "photo" },
+  { value: "bundle", label: "Bundle", kind: "bundle" },
 ] as const;
 export type KindValue = (typeof KINDS)[number]["value"];
 

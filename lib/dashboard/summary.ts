@@ -60,8 +60,8 @@ export async function fetchDeskSummary(supabase: SupabaseClient<Database>, now: 
   const since = new Date(now - UPLOAD_REMINDER_DAYS * 86_400_000).toISOString();
   const [pending, ready, check, accepted, rejected, run, exports] = await Promise.all([
     head().not("exported_at", "is", null).is("adobe_status", null),
-    head().eq("qc_status", "lolos").is("exported_at", null).not("title", "is", null),
-    head().eq("qc_status", "perlu_cek").is("exported_at", null),
+    head().eq("qc_status", "lolos").is("exported_at", null).is("bundled_in", null).not("title", "is", null),
+    head().eq("qc_status", "perlu_cek").is("exported_at", null).is("bundled_in", null),
     head().eq("adobe_status", "diterima"),
     head().eq("adobe_status", "ditolak"),
     supabase.from("research_runs").select("id").order("created_at", { ascending: false }).limit(1).maybeSingle(),
