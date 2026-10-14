@@ -21,13 +21,25 @@ describe("pickDeadlines", () => {
 
   it("drops passed deadlines, themes without a date, and dates beyond the window", () => {
     const themes = [
-      { title: "Halloween lewat", upload_by: "2026-10-01" },
+      { title: "Halloween lewat", upload_by: "2026-08-01" },
       { title: "Tanpa tanggal", upload_by: null },
       { title: "Jauh", upload_by: "2027-03-01" },
       { title: "Hari ini", upload_by: "2026-10-10" },
     ];
     expect(pickDeadlines(themes, NOW)).toEqual([{ title: "Hari ini", uploadBy: "2026-10-10", daysLeft: 0, status: "mendesak" }]);
     expect(DEADLINE_WINDOW_DAYS).toBeGreaterThan(14);
+  });
+
+  it("orders late themes by their last chance, not the missed ideal date", () => {
+    const themes = [
+      { title: "Diwali", upload_by: "2026-10-20" }, // 10 days to the ideal date
+      { title: "Halloween telat", upload_by: "2026-09-10" }, // last chance in 15 days
+      { title: "Natal telat", upload_by: "2026-10-01" }, // last chance in 36 days: outside the window
+    ];
+    const picked = pickDeadlines(themes, NOW);
+    expect(picked.map((d) => d.title)).toEqual(["Diwali", "Halloween telat"]);
+    expect(picked[1]).toMatchObject({ daysLeft: -30, status: "telat" });
+    expect(picked[1]).not.toHaveProperty("daysToAct");
   });
 });
 

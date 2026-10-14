@@ -13,7 +13,17 @@ import { formatIdr } from "@/lib/budget";
 import { postJson, type ThemesResponse, type TrendsResponse } from "@/lib/generate/client";
 import { REGIONS } from "@/lib/research/calendar";
 import { MAX_THEMES } from "@/lib/research/schemas";
-import { competitionFromCount, daysUntil, deadlineStatus, provenanceOf, scoreTheme, type Provenance } from "@/lib/research/score";
+import {
+  LAST_CHANCE_LEAD_DAYS,
+  LATE_GRACE_DAYS,
+  competitionFromCount,
+  daysUntil,
+  deadlineStatus,
+  lastChanceDate,
+  provenanceOf,
+  scoreTheme,
+  type Provenance,
+} from "@/lib/research/score";
 import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
 import type { ProviderEntry } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
@@ -532,7 +542,15 @@ function ThemeItem({
               ` · upload sebelum ${formatDate(row.uploadBy)}${days !== null && days >= 0 ? ` (${days} hari lagi)` : ""}`}
           </p>
           {status === "terlewat" && (
-            <p className="text-sm text-destructive">Batas upload sudah lewat; peluang dipotong separuh. Masih bisa dikejar bila kamu siap upload cepat.</p>
+            <p className="text-sm text-destructive">
+              Sudah kurang dari {LAST_CHANCE_LEAD_DAYS} hari sebelum event; peluang dipotong separuh.
+            </p>
+          )}
+          {status === "telat" && row.uploadBy && (
+            <p className="text-sm font-medium text-warning-foreground">
+              Lewat batas ideal, tapi masih bisa sampai {formatDate(lastChanceDate(row.uploadBy))} ({LAST_CHANCE_LEAD_DAYS} hari sebelum event,{" "}
+              {(days ?? 0) + LATE_GRACE_DAYS} hari lagi). Peluang sedikit dikurangi.
+            </p>
           )}
           {status === "mendesak" && <p className="text-sm font-medium text-warning-foreground">Batas upload kurang dari 14 hari lagi.</p>}
           <p className="text-sm text-muted-foreground">

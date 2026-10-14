@@ -8,6 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
 import { formatIdr, startOfDayWib, startOfMonthWib } from "@/lib/budget";
 import { acceptanceRate, fetchDeskSummary, type Deadline } from "@/lib/dashboard/summary";
+import { lastChanceDate } from "@/lib/research/score";
 import { fetchActiveJob } from "@/lib/generate/active-job";
 import { createClient } from "@/lib/supabase/server";
 import { tapTarget } from "@/lib/ui";
@@ -231,8 +232,10 @@ function WaitingRow({
 }
 
 function DeadlineRow({ deadline }: { deadline: Deadline }) {
-  const urgent = deadline.status === "mendesak";
+  const late = deadline.status === "telat";
+  const urgent = deadline.status === "mendesak" || late;
   const when = deadline.daysLeft === 0 ? "hari ini" : `${deadline.daysLeft} hari lagi`;
+  const lastChance = new Date(`${lastChanceDate(deadline.uploadBy)}T00:00:00Z`);
   return (
     <Link
       href={`/generate?tema=${encodeURIComponent(deadline.title)}&batas=${deadline.uploadBy}`}
@@ -243,7 +246,9 @@ function DeadlineRow({ deadline }: { deadline: Deadline }) {
       <span className="min-w-0 flex-1">
         <span className="block font-bold group-hover:underline group-hover:underline-offset-4">{deadline.title}</span>
         <span className={cn("block text-sm", urgent ? "font-medium text-foreground" : "text-muted-foreground")}>
-          Upload sebelum {deadlineFormat.format(new Date(`${deadline.uploadBy}T00:00:00Z`))} · {when}
+          {late
+            ? `Lewat batas ideal · masih bisa sampai ${deadlineFormat.format(lastChance)}`
+            : `Upload sebelum ${deadlineFormat.format(new Date(`${deadline.uploadBy}T00:00:00Z`))} · ${when}`}
         </span>
       </span>
       <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground">Generate</span>
