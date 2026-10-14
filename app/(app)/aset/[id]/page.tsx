@@ -88,7 +88,8 @@ export default async function HalamanDetailAset({
 
   const isPhoto = asset.kind === "photo";
   const style = (STYLES.find((s) => s.value === job?.style)?.value ?? "icon_set") as StyleId;
-  const styleLabel = isPhoto ? "Foto (Google Flow)" : (STYLES.find((s) => s.value === style)?.label ?? style);
+  const isBackground = isPhoto && asset.photo_variant === "background";
+  const styleLabel = isPhoto ? (isBackground ? "Background (Google Flow)" : "Foto (Google Flow)") : (STYLES.find((s) => s.value === style)?.label ?? style);
 
   // Same file name the export would give it, so a manual upload matches the CSV.
   const extension = isPhoto ? ADOBE_PHOTO.extension : ".svg";
@@ -273,7 +274,11 @@ export default async function HalamanDetailAset({
               theme={theme?.title ?? ""}
               concept={asset.concept ?? ""}
               bannedWords={settings?.banned_words ?? []}
-              photo={isPhoto && asset.image_path ? { imagePath: asset.image_path, prompt: photoPrompt || undefined } : undefined}
+              photo={
+                isPhoto && asset.image_path
+                  ? { imagePath: asset.image_path, prompt: photoPrompt || undefined, variant: isBackground ? "background" : "photo" }
+                  : undefined
+              }
             />
             {isPhoto && <FictionalToggle key={String(asset.fictional_people)} id={asset.id} initial={asset.fictional_people} />}
           </Section>

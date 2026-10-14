@@ -162,6 +162,7 @@ export async function uploadPhoto(file: File, p: PhotoUploadParams): Promise<Pho
     id: assetId,
     job_id: p.jobId,
     kind: "photo",
+    photo_variant: p.variant ?? DEFAULT_PHOTO_VARIANT,
     provider: "flow",
     model: p.flowModel,
     image_path: imagePath,

@@ -12,13 +12,11 @@ Pengguna membuat gambarnya sendiri di Google Flow; aplikasi menulis prompt, mene
 - Metadata (`photoMetadataPrompt` varian `background`): kata kunci "background/backdrop/wallpaper", teknik, warna, kegunaan, "copy space".
 - QC: batas kemiripan lebih longgar (`QC.similarity.maxHammingBackground = 3`, foto 8) karena gradien dan bokeh mudah ter-hash mirip;
   orang yang terdeteksi di background jadi Perlu cek.
-- Varian disimpan di `generation_jobs.photo_prompts.variant` (tanpa migrasi). Job lama dianggap foto. Aset tetap `kind = 'photo'`.
+- Varian disimpan di `generation_jobs.photo_prompts.variant` dan di `assets.photo_variant` (migrasi `20261019000000_photo_variant.sql`, sudah diterapkan; foto lama diisi `photo`). Aset tetap `kind = 'photo'`.
+- Galeri `/aset`: filter Jenis punya **Foto** (hanya foto biasa) dan **Background**; kartu bertanda "Background"; detail menyebut "Background (Google Flow)"; "Buat ulang metadata" memakai prompt background.
 
 ## Batasan
 
-- "Buat ulang metadata" di detail aset memakai prompt foto, bukan background (aset tidak menyimpan varian). Judul dan kata kunci
-  bisa diedit manual, atau unggah ulang.
-- Tidak ada filter galeri khusus background; aset tampil sebagai foto. Cari lewat batch (tema) atau judul.
 - Aturan Adobe untuk foto berlaku penuh: 4 sampai 100 MP, JPEG, tanpa teks atau logo, centang "Created using generative AI tools".
   Unduh dari Flow dengan 2K Upscale (16:9 = 2752×1536, sekitar 4,2 MP).
 - Kategori "abstract backgrounds" sangat jenuh (593 ribu hasil Adobe, 15 Okt 2026): tema harus spesifik.

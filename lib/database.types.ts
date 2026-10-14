@@ -37,6 +37,7 @@ export type Database = {
           needs_release: boolean
           path_count: number | null
           phash: string | null
+          photo_variant: string | null
           preview_path: string | null
           provider: string
           qc_notes: Json
@@ -68,6 +69,7 @@ export type Database = {
           needs_release?: boolean
           path_count?: number | null
           phash?: string | null
+          photo_variant?: string | null
           preview_path?: string | null
           provider: string
           qc_notes?: Json
@@ -99,6 +101,7 @@ export type Database = {
           needs_release?: boolean
           path_count?: number | null
           phash?: string | null
+          photo_variant?: string | null
           preview_path?: string | null
           provider?: string
           qc_notes?: Json

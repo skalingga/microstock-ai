@@ -11,11 +11,13 @@ export const FILTERS = [
 export type FilterValue = (typeof FILTERS)[number]["value"];
 
 // Stage 12: photos from Google Flow sit in the same gallery as the vectors.
+// Stage 15: a background is a photo (kind) whose photo_variant says it has no subject.
 export const KINDS = [
-  { value: "semua", label: "Semua jenis", kind: null },
-  { value: "vektor", label: "Vektor", kind: "vector" },
-  { value: "foto", label: "Foto", kind: "photo" },
-  { value: "bundle", label: "Bundle", kind: "bundle" },
+  { value: "semua", label: "Semua jenis", kind: null, variant: null },
+  { value: "vektor", label: "Vektor", kind: "vector", variant: null },
+  { value: "foto", label: "Foto", kind: "photo", variant: "photo" },
+  { value: "background", label: "Background", kind: "photo", variant: "background" },
+  { value: "bundle", label: "Bundle", kind: "bundle", variant: null },
 ] as const;
 export type KindValue = (typeof KINDS)[number]["value"];
 
@@ -74,8 +76,9 @@ type Filterable<Q> = {
 export function applyGalleryFilter<Q extends Filterable<Q>>(query: Q, filter: GalleryFilter, opts: { status?: boolean } = {}): Q {
   let q = query;
   if (filter.job) q = q.eq("job_id", filter.job);
-  const kind = KINDS.find((k) => k.value === filter.kind)?.kind;
-  if (kind) q = q.eq("kind", kind);
+  const picked = KINDS.find((k) => k.value === filter.kind);
+  if (picked?.kind) q = q.eq("kind", picked.kind);
+  if (picked?.variant) q = q.eq("photo_variant", picked.variant);
   if (filter.adobePending) q = q.not("exported_at", "is", null).is("adobe_status", null);
   // LIKE wildcards in the search text are literal characters.
   if (filter.q) q = q.ilike("title", `%${filter.q.replace(/[\\%_]/g, "\\$&")}%`);

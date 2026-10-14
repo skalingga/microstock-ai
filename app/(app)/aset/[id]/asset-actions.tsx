@@ -18,7 +18,7 @@ type Props = {
   concept: string;
   bannedWords: string[];
   /** Stage 12: a photo is described by a vision model looking at the stored JPEG. */
-  photo?: { imagePath: string; prompt?: string };
+  photo?: { imagePath: string; prompt?: string; variant?: "photo" | "background" };
 };
 
 type PhotoMetadataReply = Omit<MetadataResponse, "metadata"> & {
@@ -83,6 +83,7 @@ export function RegenerateMetadataButton({ asset, style, theme, concept, bannedW
         if (file.error || !file.data) throw new ApiError("storage", "Foto tersimpan tidak bisa diambil. Coba lagi.");
         const res = await postJson<PhotoMetadataReply>("/api/generate/photo-metadata", {
           theme: theme || "stock photo",
+          variant: photo.variant ?? "photo",
           ...(photo.prompt ? { prompt: photo.prompt } : {}),
           image: await visionCopy(file.data),
         });
@@ -90,7 +91,7 @@ export function RegenerateMetadataButton({ asset, style, theme, concept, bannedW
         // What the vision model saw is replaced too; size, file and similarity notes stay.
         const kept = parseNotes(asset.qc_notes).filter((n) => !["metadata", "isi", "orang"].includes(n.check));
         await supabase.from("assets").update({ fictional_people: hasPeople }).eq("id", asset.id);
-        verdict = await applyMetadata(supabase, asset.id, [...kept, ...photoContentNotes(problems, hasPeople)], meta, bannedWords);
+        verdict = await applyMetadata(supabase, asset.id, [...kept, ...photoContentNotes(problems, hasPeople, photo.variant)], meta, bannedWords);
       } else {
         const res = await postJson<MetadataResponse>("/api/generate/metadata", {
           theme: theme || "stock vector",

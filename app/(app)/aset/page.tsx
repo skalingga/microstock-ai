@@ -33,7 +33,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
   const query = applyGalleryFilter(
     supabase
       .from("assets")
-      .select("id, kind, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status, bundled_in", { count: "exact" })
+      .select("id, kind, photo_variant, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status, bundled_in", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
     filter,
@@ -89,7 +89,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
     job && `batch "${jobInfo?.data?.themes?.title ?? "tanpa tema"}"`,
     adobePending && "sudah diekspor, keputusan Adobe belum dicatat",
     q && `judul memuat "${q}"`,
-    kind !== "semua" && (kind === "foto" ? "foto" : kind === "bundle" ? "bundle" : "vektor"),
+    kind !== "semua" && (kind === "foto" ? "foto" : kind === "background" ? "background" : kind === "bundle" ? "bundle" : "vektor"),
   ].filter(Boolean);
 
   return (
@@ -240,8 +240,12 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
             assets={assets.map((asset) => ({
               id: asset.id,
               previewUrl: (asset.preview_path && urlByPath.get(asset.preview_path)) || undefined,
-              label: asset.title ?? asset.concept ?? (asset.kind === "photo" ? "Foto" : asset.kind === "bundle" ? "Bundle" : "Aset SVG"),
+              label:
+                asset.title ??
+                asset.concept ??
+                (asset.kind === "photo" ? (asset.photo_variant === "background" ? "Background" : "Foto") : asset.kind === "bundle" ? "Bundle" : "Aset SVG"),
               photo: asset.kind === "photo",
+              background: asset.photo_variant === "background",
               kind: asset.kind,
               heldBy: asset.bundled_in,
               qcStatus: asset.qc_status,
