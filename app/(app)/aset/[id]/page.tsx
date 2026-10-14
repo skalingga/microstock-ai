@@ -88,7 +88,8 @@ export default async function HalamanDetailAset({
 
   const isPhoto = asset.kind === "photo";
   const style = (STYLES.find((s) => s.value === job?.style)?.value ?? "icon_set") as StyleId;
-  const styleLabel = isPhoto ? "Foto (Google Flow)" : (STYLES.find((s) => s.value === style)?.label ?? style);
+  const isBackground = isPhoto && asset.photo_variant === "background";
+  const styleLabel = isPhoto ? (isBackground ? "Background (Google Flow)" : "Foto (Google Flow)") : (STYLES.find((s) => s.value === style)?.label ?? style);
 
   // Same file name the export would give it, so a manual upload matches the CSV.
   const extension = isPhoto ? ADOBE_PHOTO.extension : ".svg";
@@ -118,16 +119,32 @@ export default async function HalamanDetailAset({
             : "-",
         ]
       : ["Jumlah bentuk (path)", asset.path_count === null ? "-" : String(asset.path_count)],
+    ...(asset.kind === "bundle"
+      ? ([["Isi bundle", `${asset.bundle_of.length} aset dalam satu grid`]] as [string, React.ReactNode][])
+      : []),
+    ...(asset.bundled_in
+      ? ([
+          [
+            "Dalam bundle",
+            <Link key="b" href={withQuery(`/aset/${asset.bundled_in}`, query)} className="font-medium underline underline-offset-4">
+              Lihat bundle
+            </Link>,
+          ],
+        ] as [string, React.ReactNode][])
+      : []),
     ["Dibuat", dateFormat.format(new Date(asset.created_at))],
     ["Diekspor", asset.exported_at ? dateFormat.format(new Date(asset.exported_at)) : "Belum"],
     ["Nama file", <span key="f" className="font-mono text-xs break-all">{filename}</span>],
   ];
   const svgUrl = view?.data?.signedUrl;
-  const exportable = Boolean(asset.title) && (asset.qc_status === "lolos" || asset.qc_status === "perlu_cek");
+  const held = Boolean(asset.bundled_in);
+  const exportable = !held && Boolean(asset.title) && (asset.qc_status === "lolos" || asset.qc_status === "perlu_cek");
   // Why there is no Export button, so its absence is not a mystery.
   const exportBlockedReason = exportable
     ? null
-    : asset.qc_status === "gagal"
+    : held
+      ? "Ditahan karena sudah masuk bundle. Di galeri, pilih aset ini lalu klik Lepas dari bundle untuk mengekspornya satuan."
+      : asset.qc_status === "gagal"
       ? "Tidak bisa diekspor: status Gagal. Perbaiki lewat hasil QC di bawah, atau buat ulang asetnya."
       : !asset.title
         ? "Belum bisa diekspor: aset belum punya metadata."
@@ -140,6 +157,7 @@ export default async function HalamanDetailAset({
     keywords: asset.keywords,
     category: asset.category,
     needs_release: asset.needs_release,
+    bundle_of: asset.bundle_of,
   };
 
   const noteItem = (note: (typeof notes)[number], i: number) => (
@@ -256,7 +274,11 @@ export default async function HalamanDetailAset({
               theme={theme?.title ?? ""}
               concept={asset.concept ?? ""}
               bannedWords={settings?.banned_words ?? []}
-              photo={isPhoto && asset.image_path ? { imagePath: asset.image_path, prompt: photoPrompt || undefined } : undefined}
+              photo={
+                isPhoto && asset.image_path
+                  ? { imagePath: asset.image_path, prompt: photoPrompt || undefined, variant: isBackground ? "background" : "photo" }
+                  : undefined
+              }
             />
             {isPhoto && <FictionalToggle key={String(asset.fictional_people)} id={asset.id} initial={asset.fictional_people} />}
           </Section>

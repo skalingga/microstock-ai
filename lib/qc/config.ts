@@ -29,10 +29,26 @@ export const QC = {
     maxHamming: 8,
     /** Same, between assets of one "one subject, many variations" batch: they are alike on purpose, so only near copies count. */
     maxHammingVariations: 3,
+    /** Backgrounds (smooth gradients, bokeh, textures) have little structure, so unrelated ones hash close: only near copies count. */
+    maxHammingBackground: 3,
+    /**
+     * Differing bits as a share of the bits set in either hash. A small object on an empty canvas sets only 10 to 25 of
+     * the 64 bits, so unrelated pictures sit 4 to 8 bits apart (15 Oct 2026: an isometric solar farm "matched" a
+     * retro car). Those are 0.25 to 0.5 of the set bits; a real near copy is well under 0.2.
+     */
+    maxRelative: 0.2,
   },
   outline: {
     /** Share of shapes that may carry a fill on an outline icon (an eye or a dot) before it needs a look. */
     maxFilledShare: 0.25,
+  },
+  frame: {
+    /** Side of the central square (share of the canvas side) that a frame must leave empty. */
+    centerFraction: 0.5,
+    /** Share of that square that may be opaque (stray specks) before it needs a look... */
+    centerOpaqueMax: 0.02,
+    /** ...and above this share it is not a frame at all. */
+    centerFailShare: 0.3,
   },
   tile: {
     /** Seam mismatch relative to the strongest edge inside the tile; above this the tile does not join. */
@@ -45,7 +61,10 @@ export const QC = {
 } as const;
 
 /** Which checks apply to which style. */
-export const STYLE_RULES: Record<StyleId, { transparentBackground: boolean; seamless: boolean; boundsCheck: boolean; outline?: boolean }> = {
+export const STYLE_RULES: Record<
+  StyleId,
+  { transparentBackground: boolean; seamless: boolean; boundsCheck: boolean; outline?: boolean; copySpace?: boolean }
+> = {
   icon_set: { transparentBackground: true, seamless: false, boundsCheck: true },
   seamless_pattern: { transparentBackground: false, seamless: true, boundsCheck: false },
   flat_illustration: { transparentBackground: false, seamless: false, boundsCheck: true },
@@ -57,6 +76,10 @@ export const STYLE_RULES: Record<StyleId, { transparentBackground: boolean; seam
   line_icon: { transparentBackground: true, seamless: false, boundsCheck: true, outline: true },
   glyph_icon: { transparentBackground: true, seamless: false, boundsCheck: true },
   geometric_tile: { transparentBackground: false, seamless: false, boundsCheck: true },
+  // Stage 14 wave 1. A frame's decoration may sit right at the edge, so only its empty center is checked.
+  sticker: { transparentBackground: true, seamless: false, boundsCheck: true },
+  isometric: { transparentBackground: true, seamless: false, boundsCheck: true },
+  frame: { transparentBackground: false, seamless: false, boundsCheck: true, copySpace: true },
 };
 
 export type ComplexityLimits = { minShapes: number; warnShapes: number; failShapes: number; warnPoints: number };
@@ -69,10 +92,25 @@ const COMPLEXITY_OVERRIDES: Partial<Record<StyleId, Partial<ComplexityLimits>>> 
   // An icon is one symbol: a handful of shapes. Starting guesses, to be tuned on Adobe's decisions (stage 6).
   line_icon: { minShapes: 1, warnShapes: 40, failShapes: 100, warnPoints: 1200 },
   glyph_icon: { minShapes: 1, warnShapes: 40, failShapes: 100, warnPoints: 1200 },
+  // Stage 14 wave 1: starting guesses, to be tuned on Adobe's decisions (stage 6).
+  sticker: { warnShapes: 60, failShapes: 150, warnPoints: 2000 },
+  isometric: { warnShapes: 100, failShapes: 220, warnPoints: 3500 },
+  frame: { minShapes: 4, warnShapes: 110, failShapes: 240, warnPoints: 3500 },
 };
 
 export function complexityFor(style: StyleId): ComplexityLimits {
   return { ...QC.complexity, ...COMPLEXITY_OVERRIDES[style] };
+}
+
+/** A bundle holds many assets in one file: every limit grows with the number of members. */
+export function scaleLimits(limits: ComplexityLimits, members: number): ComplexityLimits {
+  const n = Math.max(1, members);
+  return {
+    minShapes: limits.minShapes * n,
+    warnShapes: limits.warnShapes * n,
+    failShapes: limits.failShapes * n,
+    warnPoints: limits.warnPoints * n,
+  };
 }
 
 // Titles must not imply a real news event (Adobe clarification). The AI is told too; this is the safety net.

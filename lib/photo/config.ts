@@ -6,6 +6,17 @@ export const PHOTO_ASPECTS = ["16:9", "4:3", "1:1", "3:4", "9:16"] as const;
 export type PhotoAspect = (typeof PHOTO_ASPECTS)[number];
 export const DEFAULT_PHOTO_ASPECT: PhotoAspect = "4:3";
 
+/**
+ * What the prompts are for. A "background" is a picture with no subject (abstract, technology, gradient, texture)
+ * that buyers put text or objects on; it follows the same Flow workflow but needs its own prompts, metadata words
+ * and a looser similarity check (smooth pictures hash alike).
+ */
+export const PHOTO_VARIANTS = ["photo", "background"] as const;
+export type PhotoVariant = (typeof PHOTO_VARIANTS)[number];
+export const DEFAULT_PHOTO_VARIANT: PhotoVariant = "photo";
+/** Backgrounds are wide: desktop wallpapers and presentation slides. */
+export const DEFAULT_BACKGROUND_ASPECT: PhotoAspect = "16:9";
+
 export const MAX_PHOTO_PROMPTS = 20;
 
 /** Labels for assets.model: which Flow model made the photo, picked by the user on upload. */

@@ -66,6 +66,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
       .from("assets")
       .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release, kind, fictional_people")
       .not("title", "is", null)
+      .is("bundled_in", null)
       .in("qc_status", ["lolos", "perlu_cek"])
       .order("created_at", { ascending: false })
       .limit(500),

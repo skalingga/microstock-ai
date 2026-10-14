@@ -15,14 +15,17 @@ import { FICTIONAL_LABEL } from "@/lib/adobe/rules";
 import { ApiError } from "@/lib/generate/client";
 import { RateGate } from "@/lib/generate/queue";
 import {
+  DEFAULT_BACKGROUND_ASPECT,
   DEFAULT_FLOW_MODEL,
   DEFAULT_PHOTO_ASPECT,
+  DEFAULT_PHOTO_VARIANT,
   FLOW_MODELS,
   FLOW_URL,
   MAX_PHOTO_PROMPTS,
   PHOTO_ASPECTS,
   PHOTO_INPUT_TYPES,
   type PhotoAspect,
+  type PhotoVariant,
 } from "@/lib/photo/config";
 import { PhotoReadError, uploadPhoto, writePhotoPrompts, type PhotoJobData, type PhotoPromptItem } from "@/lib/photo/run";
 import { fetchHashPool } from "@/lib/qc/store";
@@ -33,7 +36,7 @@ import { createClient } from "@/lib/supabase/client";
 import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
-export type PhotoJobSummary = { id: string; theme: string; createdAt: string; prompts: number; uploaded: number };
+export type PhotoJobSummary = { id: string; theme: string; createdAt: string; prompts: number; uploaded: number; variant: PhotoVariant };
 export type OpenPhotoJob = { id: string; theme: string; data: PhotoJobData; uploaded: number };
 
 type UploadStage = "menunggu" | "membaca" | "mengunggah" | "metadata" | "selesai" | "gagal";
@@ -59,10 +62,39 @@ const STAGE_LABEL: Record<UploadStage, string> = {
   gagal: "Gagal",
 };
 
-const SET_MODES = [
-  { label: "Adegan beragam", variations: false },
-  { label: "Variasi satu subjek", variations: true },
+const VARIANTS: { value: PhotoVariant; label: string }[] = [
+  { value: "photo", label: "Foto" },
+  { value: "background", label: "Background" },
 ];
+
+const SET_MODES: Record<PhotoVariant, { label: string; variations: boolean }[]> = {
+  photo: [
+    { label: "Adegan beragam", variations: false },
+    { label: "Variasi satu subjek", variations: true },
+  ],
+  background: [
+    { label: "Desain beragam", variations: false },
+    { label: "Variasi satu gaya", variations: true },
+  ],
+};
+
+const VARIANT_COPY: Record<PhotoVariant, { title: string; intro: string; placeholder: string; hint: string; button: string }> = {
+  photo: {
+    title: "Prompt foto baru",
+    intro: "Aplikasi menulis prompt, kamu membuat fotonya di Google Flow, lalu unggah hasilnya ke sini.",
+    placeholder: "mis. mental health counseling",
+    hint: "Bahasa Inggris. Orang di foto selalu fiktif; tanpa merek, tokoh, atau peristiwa berita.",
+    button: "Tulis prompt",
+  },
+  background: {
+    title: "Prompt background baru",
+    intro:
+      "Gambar tanpa subjek (abstrak, teknologi, gradien, tekstur) untuk presentasi, situs, dan media sosial. Aplikasi menulis prompt, kamu membuatnya di Google Flow, lalu unggah hasilnya ke sini.",
+    placeholder: "mis. technology background in deep teal and amber",
+    hint: "Bahasa Inggris. Tanpa orang, teks, logo, atau merek. Makin spesifik (bahan, pasangan warna, kegunaan) makin kecil risiko \"similar content\".",
+    button: "Tulis prompt background",
+  },
+};
 
 export function PhotoForm({
   userId,
@@ -84,7 +116,11 @@ export function PhotoForm({
   const router = useRouter();
   const [theme, setTheme] = useState(initialTheme);
   const [countText, setCountText] = useState("5");
-  const [aspect, setAspect] = useState<PhotoAspect>(DEFAULT_PHOTO_ASPECT);
+  // After writing prompts the page reloads with the job open: keep the kind the user was working on.
+  const [variant, setVariant] = useState<PhotoVariant>(openJob?.data.variant ?? DEFAULT_PHOTO_VARIANT);
+  const [aspect, setAspect] = useState<PhotoAspect>(
+    openJob?.data.variant === "background" ? DEFAULT_BACKGROUND_ASPECT : DEFAULT_PHOTO_ASPECT,
+  );
   const [variations, setVariations] = useState(false);
   const [writing, setWriting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -105,6 +141,18 @@ export function PhotoForm({
   const bannedHits = findBannedWords(theme, bannedWords);
   const saturatedHits = matchSaturated(theme, saturated);
   const themeValid = theme.trim().length >= 2;
+  const copyText = VARIANT_COPY[variant];
+
+  function pickVariant(next: PhotoVariant) {
+    if (next === variant) return;
+    setVariant(next);
+    // Backgrounds are wide; switch the ratio unless the user already chose another one.
+    setAspect((current) => {
+      const was = next === "background" ? DEFAULT_PHOTO_ASPECT : DEFAULT_BACKGROUND_ASPECT;
+      const now = next === "background" ? DEFAULT_BACKGROUND_ASPECT : DEFAULT_PHOTO_ASPECT;
+      return current === was ? now : current;
+    });
+  }
 
   // Object URLs of the previews belong to this page.
   useEffect(() => () => uploads.forEach((u) => u.previewUrl && URL.revokeObjectURL(u.previewUrl)), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -114,7 +162,7 @@ export function PhotoForm({
     if (!themeValid || !countValid || bannedHits.length > 0 || writing) return;
     setWriting(true);
     setError(null);
-    setStatus("Menulis prompt foto...");
+    setStatus(variant === "background" ? "Menulis prompt background..." : "Menulis prompt foto...");
     const controller = new AbortController();
     try {
       const { jobId } = await writePhotoPrompts({
@@ -124,6 +172,7 @@ export function PhotoForm({
         aspect,
         avoid: saturated.slice(0, MAX_AVOID).map((s) => s.subject),
         variations,
+        variant,
         signal: controller.signal,
         onStatus: setStatus,
       });
@@ -183,6 +232,7 @@ export function PhotoForm({
           theme: openJob.theme,
           flowModel,
           prompt,
+          variant: openJob.data.variant,
           bannedWords,
           pool: pool.current,
           gate: gate.current,
@@ -233,7 +283,9 @@ export function PhotoForm({
         <Card>
           <CardHeader>
             <CardTitle>
-              <h2 className="text-lg font-extrabold">Prompt untuk Flow: {openJob.theme}</h2>
+              <h2 className="text-lg font-extrabold">
+                {openJob.data.variant === "background" ? "Prompt background untuk Flow" : "Prompt untuk Flow"}: {openJob.theme}
+              </h2>
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               Di Flow pilih Image, rasio {openJob.data.aspect}. Unduh dengan <strong className="text-foreground">2K Upscale</strong>: 1K
@@ -370,14 +422,37 @@ export function PhotoForm({
       <Card>
         <CardHeader>
           <CardTitle>
-            <h2 className="text-lg font-extrabold">Prompt foto baru</h2>
+            <h2 className="text-lg font-extrabold">{copyText.title}</h2>
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Aplikasi menulis prompt, kamu membuat fotonya di Google Flow, lalu unggah hasilnya ke sini.
-          </p>
+          <p className="text-sm text-muted-foreground">{copyText.intro}</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={writePrompts} noValidate className="space-y-5">
+            <fieldset className="space-y-2" disabled={writing}>
+              <legend className="text-sm font-medium">Jenis gambar</legend>
+              <div className="flex flex-wrap gap-1">
+                {VARIANTS.map((v) => (
+                  <label
+                    key={v.value}
+                    className={cn(
+                      "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm",
+                      tapTarget,
+                      variant === v.value ? "border-foreground bg-secondary font-semibold" : "hover:bg-muted/50",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="photo-variant"
+                      checked={variant === v.value}
+                      onChange={() => pickVariant(v.value)}
+                      className="accent-foreground"
+                    />
+                    {v.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <div className="space-y-2">
               <Label htmlFor="photo-theme">Tema</Label>
               <Input
@@ -387,7 +462,7 @@ export function PhotoForm({
                 maxLength={120}
                 required
                 disabled={writing}
-                placeholder="mis. mental health counseling"
+                placeholder={copyText.placeholder}
                 aria-invalid={bannedHits.length > 0 ? true : undefined}
                 aria-describedby={cn(bannedHits.length > 0 && "photo-theme-error", saturatedHits.length > 0 && "photo-theme-saturated", "photo-theme-hint")}
               />
@@ -397,7 +472,7 @@ export function PhotoForm({
                 </p>
               )}
               <p id="photo-theme-hint" className="text-sm text-muted-foreground">
-                Bahasa Inggris. Orang di foto selalu fiktif; tanpa merek, tokoh, atau peristiwa berita.
+                {copyText.hint}
               </p>
               {saturatedHits.length > 0 && (
                 <p id="photo-theme-saturated" className="text-sm font-medium">
@@ -416,7 +491,7 @@ export function PhotoForm({
             <fieldset className="space-y-2" disabled={writing}>
               <legend className="text-sm font-medium">Isi set</legend>
               <div className="flex flex-wrap gap-1">
-                {SET_MODES.map((mode) => (
+                {SET_MODES[variant].map((mode) => (
                   <label
                     key={mode.label}
                     className={cn(
@@ -487,7 +562,7 @@ export function PhotoForm({
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={writing || !themeValid || !countValid || bannedHits.length > 0}>
                 {writing && <Loader2 className="animate-spin" />}
-                Tulis prompt
+                {copyText.button}
               </Button>
               <p role="status" className="text-sm text-muted-foreground empty:hidden">
                 {status ?? (!themeValid ? "Isi tema dulu." : "")}
@@ -507,7 +582,8 @@ export function PhotoForm({
                   {job.theme}
                 </Link>
                 <span className="text-muted-foreground">
-                  {job.prompts} prompt · {job.uploaded} foto ·{" "}
+                  {job.variant === "background" ? "Background · " : ""}
+                  {job.prompts} prompt · {job.uploaded} {job.variant === "background" ? "gambar" : "foto"} ·{" "}
                   {new Date(job.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}
                 </span>
               </li>

@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { unifyPalettes } from "@/lib/generate/concept";
 import { retryFeedback } from "@/lib/generate/retry";
-import { SVG_EXAMPLES } from "@/lib/providers/examples";
+import { SVG_EXAMPLES, SVG_EXAMPLE_NOTES } from "@/lib/providers/examples";
 import { conceptsPrompt, svgPrompt } from "@/lib/providers/prompts";
 import { PRESET_PALETTES, withPresetPalettes } from "@/lib/settings/palettes";
 import { sanitizeSvg } from "@/lib/svg/sanitize";
 import { analyzeSvg } from "@/lib/svg/stats";
 
 describe("reference SVG example", () => {
-  it("only the seamless pattern has one, and it is clean and grouped", () => {
-    expect(Object.keys(SVG_EXAMPLES)).toEqual(["seamless_pattern"]);
+  it("only the seamless pattern and the frame have one, each with a note", () => {
+    expect(Object.keys(SVG_EXAMPLES)).toEqual(["seamless_pattern", "frame"]);
+    expect(Object.keys(SVG_EXAMPLE_NOTES)).toEqual(Object.keys(SVG_EXAMPLES));
+  });
+
+  it("the pattern example is clean and grouped", () => {
     const svg = SVG_EXAMPLES.seamless_pattern!;
     expect(sanitizeSvg(svg).ok).toBe(true);
     expect(svg).not.toMatch(/<text|<image|<style|<script|stroke=/);
@@ -18,10 +22,37 @@ describe("reference SVG example", () => {
   });
 });
 
+describe("frame example", () => {
+  const svg = SVG_EXAMPLES.frame!;
+
+  it("is clean, grouped, transparent and within the frame shape budget", () => {
+    expect(sanitizeSvg(svg).ok).toBe(true);
+    expect(svg).not.toMatch(/<text|<image|<style|<script|stroke=|<rect/);
+    expect(svg).toContain("<g id=");
+    expect(analyzeSvg(svg).shapeCount).toBeLessThanOrEqual(90);
+  });
+
+  it("keeps the central square empty and the decoration 40 px from the edge", () => {
+    const centers = [...svg.matchAll(/<(?:circle|ellipse) cx="(\d+)" cy="(\d+)"/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    expect(centers.length).toBeGreaterThan(40);
+    for (const [x, y] of centers) {
+      expect(x > 250 && x < 750 && y > 250 && y < 750).toBe(false);
+      expect(Math.min(x, y, 1000 - x, 1000 - y)).toBeGreaterThanOrEqual(70);
+    }
+  });
+});
+
 describe("svgPrompt", () => {
   const concept = { subject: "A leaf", composition: "centered", palette: ["#C8553D"] };
 
-  it("shows the example for patterns only", () => {
+  it("shows the frame example with its own note", () => {
+    const frame = svgPrompt({ theme: "spring", style: "frame", concept }).user;
+    expect(frame).toContain(SVG_EXAMPLES.frame!);
+    expect(frame).toContain("central square left completely empty");
+    expect(frame).not.toContain("opposite edge");
+  });
+
+  it("shows the example for patterns", () => {
     const pattern = svgPrompt({ theme: "autumn", style: "seamless_pattern", concept }).user;
     expect(pattern).toContain(SVG_EXAMPLES.seamless_pattern!);
     expect(pattern).toContain("Do NOT copy its subject");

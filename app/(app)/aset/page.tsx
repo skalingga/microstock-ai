@@ -33,7 +33,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
   const query = applyGalleryFilter(
     supabase
       .from("assets")
-      .select("id, kind, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status", { count: "exact" })
+      .select("id, kind, photo_variant, preview_path, title, concept, provider, qc_status, created_at, exported_at, adobe_status, bundled_in", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1),
     filter,
@@ -46,7 +46,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
   const firstQuery = applyGalleryFilter(
     supabase
       .from("assets")
-      .select("id, title, qc_status, exported_at, adobe_status")
+      .select("id, title, kind, qc_status, exported_at, adobe_status, bundled_in")
       .order("created_at", { ascending: false })
       .range(0, MAX_BULK_DELETE - 1),
     filter,
@@ -89,7 +89,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
     job && `batch "${jobInfo?.data?.themes?.title ?? "tanpa tema"}"`,
     adobePending && "sudah diekspor, keputusan Adobe belum dicatat",
     q && `judul memuat "${q}"`,
-    kind !== "semua" && (kind === "foto" ? "foto" : "vektor"),
+    kind !== "semua" && (kind === "foto" ? "foto" : kind === "background" ? "background" : kind === "bundle" ? "bundle" : "vektor"),
   ].filter(Boolean);
 
   return (
@@ -227,8 +227,12 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
           <AssetGrid
             detailQuery={galleryQuery(filter)}
             filterTotal={total}
+            bannedWords={settings.data?.banned_words ?? []}
             filterFirst={(first ?? []).map((a) => ({
               id: a.id,
+              kind: a.kind,
+              qcStatus: a.qc_status,
+              heldBy: a.bundled_in,
               exported: Boolean(a.exported_at),
               adobeStatus: a.adobe_status,
               exportable: Boolean(a.title) && (a.qc_status === "lolos" || a.qc_status === "perlu_cek"),
@@ -236,8 +240,14 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
             assets={assets.map((asset) => ({
               id: asset.id,
               previewUrl: (asset.preview_path && urlByPath.get(asset.preview_path)) || undefined,
-              label: asset.title ?? asset.concept ?? (asset.kind === "photo" ? "Foto" : "Aset SVG"),
+              label:
+                asset.title ??
+                asset.concept ??
+                (asset.kind === "photo" ? (asset.photo_variant === "background" ? "Background" : "Foto") : asset.kind === "bundle" ? "Bundle" : "Aset SVG"),
               photo: asset.kind === "photo",
+              background: asset.photo_variant === "background",
+              kind: asset.kind,
+              heldBy: asset.bundled_in,
               qcStatus: asset.qc_status,
               exported: Boolean(asset.exported_at),
               adobeStatus: asset.adobe_status,

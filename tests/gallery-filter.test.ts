@@ -27,3 +27,32 @@ describe("gallery filter search", () => {
     expect(calls).toEqual([["ilike", "title", `%50${bs}%${bs}_off${bs}${bs}%`]]);
   });
 });
+
+describe("gallery filter by kind", () => {
+  it("filters photos and backgrounds by kind and photo_variant, and carries the kind in the URL", () => {
+    const photo = recorder();
+    applyGalleryFilter(photo.q, parseGalleryFilter({ jenis: "foto" }));
+    expect(photo.calls).toEqual([
+      ["eq", "kind", "photo"],
+      ["eq", "photo_variant", "photo"],
+    ]);
+
+    const background = recorder();
+    applyGalleryFilter(background.q, parseGalleryFilter({ jenis: "background" }));
+    expect(background.calls).toEqual([
+      ["eq", "kind", "photo"],
+      ["eq", "photo_variant", "background"],
+    ]);
+    expect(galleryQuery(parseGalleryFilter({ jenis: "background" }))).toBe("jenis=background");
+  });
+
+  it("leaves vectors, bundles and the unfiltered gallery without a variant", () => {
+    const vector = recorder();
+    applyGalleryFilter(vector.q, parseGalleryFilter({ jenis: "vektor" }));
+    expect(vector.calls).toEqual([["eq", "kind", "vector"]]);
+    const all = recorder();
+    applyGalleryFilter(all.q, parseGalleryFilter({}));
+    expect(all.calls).toEqual([]);
+    expect(parseGalleryFilter({ jenis: "nonsense" }).kind).toBe("semua");
+  });
+});

@@ -15,8 +15,9 @@ import { pinnedBar, selectClass, tapTarget } from "@/lib/ui";
 import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { cn } from "@/lib/utils";
 import { simpanPengaturan, type SettingsField } from "./actions";
+import { ModelPicker, type ModelOption } from "./model-picker";
 
-export type ModelOption = { id: string; note: string; tested: boolean; paid: boolean; testNote: string | null };
+export type { ModelOption };
 
 type Provider = "kenari" | "gemini";
 
@@ -27,6 +28,8 @@ type Props = {
   /** What an empty model field falls back to on the server. */
   defaults: { kenari: string; gemini: string; image: string };
   imagePrices: Record<string, number>;
+  /** Kenari image models with price and test score, for the image model drop-down. */
+  imageOptions: ModelOption[];
   /** Average real cost of one SVG call per paid Kenari model, from provider_usage. */
   svgCostIdr: Record<string, number>;
   options: Record<Provider, ModelOption[]>;
@@ -90,7 +93,7 @@ const describe = (name: string, error?: string, hint?: unknown) => ({
   "aria-describedby": error || hint ? `${name}-msg` : undefined,
 });
 
-export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePrices, svgCostIdr, options }: Props) {
+export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePrices, imageOptions, svgCostIdr, options }: Props) {
   const [primary, backup] = toProviderOrder(settings.provider_order);
   const initial = {
     primaryProvider: primary.provider as Provider,
@@ -202,7 +205,9 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     budgetNumber === null
       ? "Wajib diisi. Tulis 0 untuk mematikan semua model berbayar."
       : budgetNumber === 0
-        ? "0: semua model berbayar mati, termasuk Siluet dan Line art. Model gratis tetap jalan."
+        ? imagePrice === 0
+          ? "0: semua model berbayar mati. Model gratis tetap jalan, termasuk Siluet dan Line art dengan model gambar yang dipilih."
+          : "0: semua model berbayar mati, termasuk Siluet dan Line art. Model gratis tetap jalan."
         : imagePrice && budgetNumber > spentIdr
           ? `Sisa bulan ini ${formatIdr(budgetNumber - spentIdr)}: cukup untuk sekitar ${Math.floor((budgetNumber - spentIdr) / imagePrice)} gambar ${effectiveImageModel}. Model teks berbayar memakai batas yang sama; model gratis tidak dihitung.`
           : "Berlaku untuk model teks dan gambar berbayar. Model gratis tidak dihitung.";
@@ -232,7 +237,8 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
 
   const bannedCount = parseBannedWords(banned).length;
   const paletteRows = parsePalettes(palettes);
-  const paidStyleBlocked = budgetNumber === 0 && isImageStyle(style);
+  // A free image model (":free") passes the budget guard, so Siluet and Line art still run at a zero budget.
+  const paidStyleBlocked = budgetNumber === 0 && isImageStyle(style) && imagePrice !== 0;
 
   return (
     <form
@@ -255,20 +261,6 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
       className="max-w-3xl space-y-8"
       noValidate
     >
-      {/* Shared suggestion lists for the model fields. */}
-      {(["kenari", "gemini"] as const).map((p) => (
-        <datalist key={p} id={`models-${p}`}>
-          {options[p].map((m) => (
-            <option key={m.id} value={m.id} label={m.note || undefined} />
-          ))}
-        </datalist>
-      ))}
-      <datalist id="models-image">
-        {Object.entries(imagePrices).map(([id, price]) => (
-          <option key={id} value={id} label={`${formatIdr(price)} per gambar`} />
-        ))}
-      </datalist>
-
       <Section id="biaya-heading" title="Biaya dan model berbayar">
         <div className="space-y-2">
           <p className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
@@ -307,23 +299,22 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
             name="kenari_image_model"
             label="Model gambar (Siluet dan Line art)"
             hint={
-              imagePrice
-                ? `${formatIdr(imagePrice)} per gambar dari saldo Kenari. Tanpa cadangan.`
-                : `Harga ${effectiveImageModel} belum dikenal aplikasi, jadi panggilannya akan ditolak. Pilih dari daftar.`
+              imagePrice === 0
+                ? "Model gratis: tidak dihitung ke anggaran. Tanpa cadangan."
+                : imagePrice
+                  ? `${formatIdr(imagePrice)} per gambar dari saldo Kenari. Tanpa cadangan.`
+                  : `Harga ${effectiveImageModel} belum dikenal aplikasi, jadi panggilannya akan ditolak. Pilih dari daftar.`
             }
             error={errors.kenari_image_model}
           >
-            <Input
+            <ModelPicker
               id="kenari_image_model"
               name="kenari_image_model"
-              list="models-image"
               value={imageModel}
-              onChange={(e) => setImageModel(e.target.value)}
-              placeholder={`Bawaan: ${defaults.image}`}
-              className="font-mono md:text-sm"
-              autoComplete="off"
-              spellCheck={false}
-              {...describe("kenari_image_model", errors.kenari_image_model, true)}
+              onChange={setImageModel}
+              options={imageOptions}
+              emptyLabel={`Bawaan: ${defaults.image}`}
+              aria={describe("kenari_image_model", errors.kenari_image_model, true)}
             />
           </Field>
         </div>
@@ -363,21 +354,23 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
                 ))}
               </select>
             </Field>
-            <Field name="primary_model" label="Model utama" hint={modelNote.primary ?? joinHint("Kosong: model bawaan.", modelCost(primaryProvider, primaryModel))} error={errors.primary_model}>
-              <Input
+            <Field
+              name="primary_model"
+              label="Model utama"
+              hint={modelNote.primary ?? joinHint("Pilih dari daftar, atau baris teratas untuk model bawaan.", modelCost(primaryProvider, primaryModel))}
+              error={errors.primary_model}
+            >
+              <ModelPicker
                 id="primary_model"
                 name="primary_model"
-                list={`models-${primaryProvider}`}
                 value={primaryModel}
-                onChange={(e) => {
-                  setPrimaryModel(e.target.value);
+                onChange={(v) => {
+                  setPrimaryModel(v);
                   setModelNote((n) => ({ ...n, primary: undefined }));
                 }}
-                placeholder={modelPlaceholder(primaryProvider)}
-                className="font-mono md:text-sm"
-                autoComplete="off"
-                spellCheck={false}
-                {...describe("primary_model", errors.primary_model, true)}
+                options={options[primaryProvider]}
+                emptyLabel={modelPlaceholder(primaryProvider) || "Bawaan server"}
+                aria={describe("primary_model", errors.primary_model, true)}
               />
             </Field>
           </div>
@@ -401,21 +394,23 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
               </select>
             </Field>
             {backupProvider && (
-              <Field name="backup_model" label="Model cadangan" hint={modelNote.backup ?? joinHint("Kosong: model bawaan.", modelCost(backupProvider, backupModel))} error={errors.backup_model}>
-                <Input
+              <Field
+                name="backup_model"
+                label="Model cadangan"
+                hint={modelNote.backup ?? joinHint("Pilih dari daftar, atau baris teratas untuk model bawaan.", modelCost(backupProvider, backupModel))}
+                error={errors.backup_model}
+              >
+                <ModelPicker
                   id="backup_model"
                   name="backup_model"
-                  list={`models-${backupProvider}`}
                   value={backupModel}
-                  onChange={(e) => {
-                    setBackupModel(e.target.value);
+                  onChange={(v) => {
+                    setBackupModel(v);
                     setModelNote((n) => ({ ...n, backup: undefined }));
                   }}
-                  placeholder={modelPlaceholder(backupProvider)}
-                  className="font-mono md:text-sm"
-                  autoComplete="off"
-                  spellCheck={false}
-                  {...describe("backup_model", errors.backup_model, true)}
+                  options={options[backupProvider]}
+                  emptyLabel={modelPlaceholder(backupProvider) || "Bawaan server"}
+                  aria={describe("backup_model", errors.backup_model, true)}
                 />
               </Field>
             )}
@@ -430,17 +425,14 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
             error={errors.kenari_text_model}
             className="sm:col-span-2"
           >
-            <Input
+            <ModelPicker
               id="kenari_text_model"
               name="kenari_text_model"
-              list="models-kenari"
               value={textModel}
-              onChange={(e) => setTextModel(e.target.value)}
-              placeholder="Sama dengan model Kenari di atas"
-              className="font-mono md:text-sm"
-              autoComplete="off"
-              spellCheck={false}
-              {...describe("kenari_text_model", errors.kenari_text_model, true)}
+              onChange={setTextModel}
+              options={options.kenari}
+              emptyLabel="Sama dengan model Kenari di atas"
+              aria={describe("kenari_text_model", errors.kenari_text_model, true)}
             />
           </Field>
         </div>
@@ -450,7 +442,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
         <Field
           name="default_style"
           label="Gaya bawaan"
-          hint={paidStyleBlocked ? undefined : "Siluet dan Line art memakai model gambar berbayar."}
+          hint={paidStyleBlocked ? undefined : `Siluet dan Line art memakai model gambar ${imagePrice === 0 ? "gratis" : "berbayar"} (${effectiveImageModel}).`}
           error={errors.default_style}
         >
           <select
@@ -469,7 +461,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
           </select>
         </Field>
         {paidStyleBlocked && (
-          <p className="text-sm text-warning-foreground">Batas biaya Rp0, jadi gaya ini tidak akan bisa jalan sampai batasnya dinaikkan.</p>
+          <p className="text-sm text-warning-foreground">Batas biaya Rp0 dan model gambar {effectiveImageModel} berbayar, jadi gaya ini tidak akan jalan. Pilih model gambar gratis atau naikkan batasnya.</p>
         )}
 
         <Field

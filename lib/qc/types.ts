@@ -12,6 +12,7 @@ export type QcCheckId =
   | "latar"
   | "pola"
   | "kontur"
+  | "ruang"
   | "kemiripan"
   | "metadata"
   // Stage 12 photos.
@@ -55,6 +56,7 @@ const CHECK_IDS: QcCheckId[] = [
   "latar",
   "pola",
   "kontur",
+  "ruang",
   "kemiripan",
   "metadata",
   "resolusi",

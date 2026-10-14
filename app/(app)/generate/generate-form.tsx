@@ -574,11 +574,13 @@ export function GenerateForm({
                   >
                     <option value="">
                       Sesuai Pengaturan ({defaultImageModel}
-                      {imagePriceIdr(defaultImageModel) !== undefined ? ` · ${formatIdr(imagePriceIdr(defaultImageModel)!)}` : ""})
+                      {imagePriceIdr(defaultImageModel) !== undefined
+                        ? ` · ${imagePriceIdr(defaultImageModel) === 0 ? "gratis" : formatIdr(imagePriceIdr(defaultImageModel)!)}`
+                        : ""})
                     </option>
                     {IMAGE_MODELS.map(([id, price]) => (
                       <option key={id} value={id}>
-                        {id} · {formatIdr(price)} per gambar
+                        {id} · {price === 0 ? "gratis" : `${formatIdr(price)} per gambar`}
                       </option>
                     ))}
                   </select>
@@ -798,6 +800,7 @@ function estimateCost(p: {
   if (p.traced) {
     const price = imagePriceIdr(p.imageModel);
     if (price === undefined) return { paid: true, chip: "Harga model belum diketahui", modelLabel: p.imageModel };
+    if (price === 0) return { paid: false, chip: "gratis", detail: "Model gambar gratis, tidak dihitung ke anggaran.", modelLabel: `${p.imageModel} · gratis` };
     return {
       paid: true,
       totalIdr: price * p.count,

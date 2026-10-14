@@ -1,6 +1,6 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import { colorRangeFor, isIconStyle, isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
-import { SVG_EXAMPLES } from "./examples";
+import { SVG_EXAMPLES, SVG_EXAMPLE_NOTES } from "./examples";
 import { PHOTO_PROBLEM_IDS } from "@/lib/photo/config";
 import type { ConceptInput, MetadataInput, PhotoMetadataInput, PhotoPromptsInput, SvgInput, ThemesInput } from "./types";
 
@@ -15,6 +15,8 @@ type StyleSpec = {
   fills?: string;
   /** Which colors to use, as a sentence. Defaults to "only these colors (plus white or near-black)". */
   colors?: (palette: string) => string;
+  /** Shape budget told to the model. Defaults to 60; scenes and frames need more. */
+  maxShapes?: number;
 };
 
 const DEFAULT_CONSISTENCY = "Set consistency: flat solid fills and no outlines, so this asset sits well next to the rest of its set.";
@@ -74,6 +76,36 @@ const STYLE_SPECS: Record<StyleId, StyleSpec> = {
       "Set consistency: the same tile shape, frame width and motif density in every tile, so this tile sits well next to the rest of its set.",
     fills: "- Flat solid fills; the motif may use strokes of one constant width. No gradients.",
     colors: (palette) => `Colors: use only these colors: ${palette}.`,
+  },
+  // Stage 14 wave 1.
+  sticker: {
+    viewBox: "0 0 512 512",
+    brief:
+      "One cartoon sticker: a single cute, simple object, animal, food item or plant, drawn with a bold dark outline (stroke-width 10, round line joins) and flat colors, with at most one small highlight shape. Add a thick white die-cut border: FIRST draw one smooth white shape that follows the silhouette about 20 px outside the artwork (this is the cut line), THEN draw the artwork on top of it. Center it with at least 40 px of margin. TRANSPARENT background: do not draw any background rectangle. No text, no letters.",
+    consistency:
+      "Set consistency: the same outline width (10) and the same near-black outline color, the same white border width and the same level of detail in every sticker, so this sticker sits well next to the rest of its set.",
+    fills: "- Flat solid fills; the dark outline is a stroke of one constant width, and the die-cut border is a white fill. No gradients.",
+    colors: (palette) =>
+      `Colors: use only these colors for the fills: ${palette}. The outline is one near-black color and the die-cut border is white.`,
+  },
+  isometric: {
+    viewBox: "0 0 800 600",
+    brief:
+      "One isometric object or a small isometric scene (an object on a small platform), seen from above: horizontal edges become 30 degree lines, no perspective, no vanishing points. Build every solid from parallelograms with three visible faces: the top face lightest, the left face medium, the right face darkest, all tints and shades of the same hue. No outlines. A flat, soft ground shadow is allowed. The object or scene fills about 70 percent of the canvas width: do not draw it small. Centered with a margin of at least 60 px. TRANSPARENT background: do not draw any background rectangle. No text, no letters, no screens or signs showing writing.",
+    consistency:
+      "Set consistency: the same isometric angle (30 degrees), the same light direction (top lightest, left medium, right darkest) and the same level of detail in every asset, so this asset sits well next to the rest of its set.",
+    fills: "- Flat solid fills only: every face is its own flat polygon. No outlines and no gradients.",
+    colors: (palette) => `Colors: build the faces from these colors and from darker and lighter shades of them: ${palette}.`,
+    maxShapes: 80,
+  },
+  frame: {
+    viewBox: "0 0 1000 1000",
+    brief:
+      "A decorative frame, wreath or border for stock use. Put all decoration in the outer band of the canvas and fill that band richly, from 40 px to about 220 px away from every edge: dense, bold ornament, never a thin hairline (no stroke thinner than 8). The central square from 250,250 to 750,750 must stay completely empty, with nothing drawn in it, so a buyer can place text or a photo there. Balanced, symmetric or rhythmic composition built from simple shapes (leaves, flowers, geometric ornaments, lines), colored with the palette (never white or near-white decoration on its own). TRANSPARENT background: do not draw any background rectangle or filled panel. No text, no letters.",
+    consistency:
+      "Set consistency: the same decoration style, line weight and level of detail in every frame, so this frame sits well next to the rest of its set.",
+    fills: "- Flat solid fills; thin ornament lines may use strokes of one constant width. No gradients.",
+    maxShapes: 90,
   },
   // Drawn by an image model and traced (stage 7): the viewBox is unused, the brief steers the concepts.
   silhouette: {
@@ -176,7 +208,7 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       "",
       "Technical rules:",
       `- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="${spec.viewBox}">.`,
-      "- Use simple <path>, <rect>, <circle>, <ellipse>, <polygon> elements and <g> groups. Keep it under 60 shapes in total.",
+      `- Use simple <path>, <rect>, <circle>, <ellipse>, <polygon> elements and <g> groups. Keep it under ${spec.maxShapes ?? 60} shapes in total.`,
       spec.fills ?? DEFAULT_FILLS,
       "- NO <text>, <image>, <foreignObject>, <script>, <style>, filters, masks, or external links.",
       "- Use short coordinates (integers, at most one decimal) and keep every shape inside the viewBox.",
@@ -184,7 +216,7 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       ...SAFETY_RULES.map((rule) => `- ${rule}`),
       "",
       ...(example
-        ? ["", "Reference for structure only (how shapes crossing an edge are repeated on the opposite edge). Do NOT copy its subject; draw the concept above:", example]
+        ? ["", `Reference for structure only (${SVG_EXAMPLE_NOTES[input.style]}). Do NOT copy its subject; draw the concept above:`, example]
         : []),
       ...(input.feedback
         ? ["", `Your previous attempt was rejected by the quality check: ${input.feedback} Fix this in the new version.`]
@@ -221,6 +253,9 @@ const METADATA_STYLE: Record<StyleId, string> = {
   line_icon: "a single outline vector icon with uniform stroke width on a transparent background",
   glyph_icon: "a single solid glyph vector icon on a transparent background",
   geometric_tile: "a square geometric vector tile with a symmetric motif",
+  sticker: "a cartoon sticker illustration with a thick white die-cut border on a transparent background",
+  isometric: "an isometric vector illustration of an object or small scene on a transparent background",
+  frame: "a decorative vector frame or border with an empty center on a transparent background",
 };
 
 export function metadataPrompt(input: MetadataInput): { system: string; user: string } {
@@ -230,7 +265,9 @@ export function metadataPrompt(input: MetadataInput): { system: string; user: st
       "You answer with a single JSON object and nothing else.",
     user: [
       `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
-      `Asset type: ${METADATA_STYLE[input.style]}`,
+      input.setSize
+        ? `Asset type: ONE vector file that holds a grid of ${input.setSize} separate matching items of the same set. Each item is ${METADATA_STYLE[input.style]}.`
+        : `Asset type: ${METADATA_STYLE[input.style]}`,
       `What the vector shows: ${input.concept}`,
       "",
       "Write the metadata a buyer would search for. Describe what the picture actually shows.",
@@ -241,6 +278,11 @@ export function metadataPrompt(input: MetadataInput): { system: string; user: st
       isIconStyle(input.style)
         ? 'This picture is an interface-style icon, so the words "icon" and "icon set" are right for the title and keywords. Do not use "pictogram".'
         : "Never use the words icon, icons, icon set, pictogram or glyph in the title or keywords, even if the theme above uses them: Adobe reserves them for interface symbols, and this picture is an illustration.",
+      ...(input.setSize
+        ? [
+            `This file is a set of ${input.setSize}: the title must say so (for example "Set of ${input.setSize} ..." or "... collection") and the keywords must include "set", "collection", "bundle" or "pack" together with the shared subject and style words. Do not list the items one by one.`,
+          ]
+        : []),
       "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters.",
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","needs_release":false}',
@@ -287,7 +329,48 @@ const PHOTO_RULES = [
   "Never show or imply a real news event, disaster, protest, politics, or anything that looks like documentary coverage of a real event.",
 ];
 
+// Backgrounds (abstract, technology, gradient, texture) have no subject: buyers lay text, UI or objects over them.
+// The category is the most crowded on Adobe Stock, so the prompts must be specific about technique and color.
+const BACKGROUND_RULES = [
+  "No people, no animals, no faces, no recognizable objects, no landmarks. The picture is a surface or an atmosphere, never a scene with a main subject.",
+  "No text anywhere: no letters, numbers, symbols, code, interface, charts, screens with writing, logos, brand names, or watermarks. For technology themes use only abstract forms: light trails, glowing lines, particles, grids, glass, circuit-like patterns without readable parts.",
+  "Never name or imitate brands, trademarks, artists, characters, or recognizable artworks.",
+];
+
+function backgroundPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  return {
+    system:
+      "You are a stock art director planning AI-generated background images for Adobe Stock. " +
+      "You write prompts for an image model and answer with a single JSON object and nothing else.",
+    user: [
+      `Theme: ${input.theme}`,
+      `Aspect ratio of every image: ${input.aspect}`,
+      "",
+      ...(input.variations
+        ? [
+            `Write exactly ${input.count} prompts for ONE design direction: the look of the theme. Each prompt keeps the same technique and mood but changes the color pair, the light direction, the scale of the pattern or where the calm area sits, so the set is cohesive yet no two images look alike.`,
+          ]
+        : [
+            `Write exactly ${input.count} prompts for clearly different backgrounds about this theme. Vary the technique, the color pair, the light and the composition so no two images look alike.`,
+          ]),
+      // Adobe refuses "similar content"; "blue abstract gradient" is already in its collection many times over.
+      "Backgrounds are the most crowded category: never write the plain version (a blue gradient, generic bokeh, generic waves). Give every prompt a distinct technique AND a named color pair AND a mood or use. Techniques to draw from: blurred gradient mesh, soft bokeh light, flowing glass or liquid waves, frosted glass layers, low-poly facets, layered paper cut, halftone dots, fine grain or film texture, brushed metal, marble or ink swirls, light rays, glowing line grids, particle fields, fabric folds, watercolor wash. No two prompts may share the same technique and color pair.",
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
+      "Each prompt describes ONE image in 40 to 80 words of plain English: the technique or material, 2 to 4 specific colors, the light and depth, the composition, and the mood. Smooth, high resolution, clean and sharp, no noise artifacts.",
+      "In at least half of the prompts, keep one side or the center calm and uncluttered for buyers who add text or a product, and say where it is.",
+      ...BACKGROUND_RULES,
+      "",
+      'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',
+      "- subject: the look in a few words, max 10 words (technique + colors), for example: frosted glass waves in teal and amber.",
+      "- prompt: the full prompt for the image model. Never mention Adobe, stock, AI, or these instructions in it.",
+    ].join("\n"),
+  };
+}
+
 export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  if (input.variant === "background") return backgroundPromptsPrompt(input);
   return {
     system:
       "You are a stock photography art director planning AI-generated photos for Adobe Stock. " +
@@ -320,20 +403,24 @@ export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; 
 }
 
 export function photoMetadataPrompt(input: Omit<PhotoMetadataInput, "image">): { system: string; user: string } {
+  const background = input.variant === "background";
+  const noun = background ? "picture" : "photo";
   return {
     system:
-      "You write search metadata for Adobe Stock photos and check them for defects before upload. " +
-      "You look at the attached photo and answer with a single JSON object and nothing else.",
+      `You write search metadata for Adobe Stock ${background ? "background images" : "photos"} and check them for defects before upload. ` +
+      `You look at the attached ${noun} and answer with a single JSON object and nothing else.`,
     user: [
       `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
-      ...(input.prompt ? [`Prompt the photo was made from (the photo may differ; describe the photo): ${input.prompt}`] : []),
+      ...(input.prompt ? [`Prompt the ${noun} was made from (the ${noun} may differ; describe the ${noun}): ${input.prompt}`] : []),
       "",
-      "Write the metadata a buyer would search for. Describe what the photo actually shows.",
-      `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters. Do not mention AI or how the photo was made.`,
-      "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
+      `Write the metadata a buyer would search for. Describe what the ${noun} actually shows.`,
+      `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters. Do not mention AI or how the ${noun} was made.`,
+      background
+        ? '- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. This is a background with no subject: include "background", "backdrop" or "wallpaper" as fitting, the style or technique (gradient, bokeh, glass, texture, geometric...), the dominant colors, the mood, the uses (presentation, website banner, social media, technology, business...), and "copy space" when an area is left empty. No brand, artist, character, or celebrity names, and no words about AI.'
+        : "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
       `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
       "- has_people: true if any person or part of a person is visible, otherwise false.",
-      `- problems: the defects you see, as a list using only these ids: ${PHOTO_PROBLEM_IDS.join(", ")}. visible_text = any readable or garbled letters, numbers, signs, labels or book titles. logo_or_watermark = any logo, brand mark or watermark. deformed_people = extra, missing or merged fingers, distorted faces, impossible limbs. real_person_or_brand = looks like a celebrity, a branded product or a trademarked design. artifact = melted or impossible objects and other obvious AI glitches. Be strict and report anything you notice; use an empty list only when the photo is clean.`,
+      `- problems: the defects you see, as a list using only these ids: ${PHOTO_PROBLEM_IDS.join(", ")}. visible_text = any readable or garbled letters, numbers, signs, labels or book titles. logo_or_watermark = any logo, brand mark or watermark. deformed_people = extra, missing or merged fingers, distorted faces, impossible limbs. real_person_or_brand = looks like a celebrity, a branded product or a trademarked design. artifact = melted or impossible objects and other obvious AI glitches. Be strict and report anything you notice; use an empty list only when the ${noun} is clean.`,
       "Never describe a real news event, and never mention trademarks, logos, or copyrighted characters in the metadata.",
       "",
       'Reply with JSON only, in this exact shape: {"title":"...","keywords":["..."],"category":"...","has_people":false,"problems":[]}',

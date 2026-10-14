@@ -15,7 +15,7 @@ export function isFreeModel(model: string): boolean {
   return model.endsWith(":free");
 }
 
-type CatalogEntry = { id?: string; pricing?: { input?: number | null; output?: number | null } };
+type CatalogEntry = { id?: string; endpoints?: string[]; pricing?: { input?: number | null; output?: number | null } };
 
 export function createPriceLookup(
   opts: { baseUrl?: string; fetchImpl?: typeof fetch; now?: () => number } = {},
@@ -66,6 +66,10 @@ export function computeCostIdr(price: ModelPrice, usage: { prompt_tokens?: numbe
 export type CatalogModel = {
   id: string;
   free: boolean;
+  /** Writes text (SVG, concepts, metadata). False for image, speech, video and transcription models. */
+  chat: boolean;
+  /** Draws pictures through /images/generations. */
+  image: boolean;
   /** Rupiah per 1M input / output tokens; null when the catalog gives no price. */
   inPerMTokIdr: number | null;
   outPerMTokIdr: number | null;
@@ -96,6 +100,9 @@ export async function fetchModelCatalog(
       models.push({
         id: entry.id,
         free: isFreeModel(entry.id),
+        // An entry without "endpoints" (older catalogs) is taken as a chat model.
+        chat: entry.endpoints ? entry.endpoints.includes("chat") : true,
+        image: entry.endpoints ? entry.endpoints.includes("images") : false,
         inPerMTokIdr: typeof input === "number" ? input / 1e6 : null,
         outPerMTokIdr: typeof output === "number" ? output / 1e6 : null,
       });

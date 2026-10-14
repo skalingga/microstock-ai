@@ -89,6 +89,8 @@ const GRAPHIC_STYLES: StyleId[] = [
   "line_icon",
   "glyph_icon",
   "geometric_tile",
+  // Frames are decorative elements. Stickers and isometric scenes keep the AI's category (food, business...).
+  "frame",
 ];
 
 export type CleanMetadata = {

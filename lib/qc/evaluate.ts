@@ -3,6 +3,7 @@ import type { SvgStats } from "@/lib/svg/stats";
 import {
   checkBounds,
   checkComplexity,
+  checkCopySpace,
   checkEmpty,
   checkOutline,
   checkSeamless,
@@ -10,7 +11,7 @@ import {
   checkText,
   checkTransparentBackground,
 } from "./checks";
-import { STYLE_RULES, complexityFor } from "./config";
+import { STYLE_RULES, complexityFor, scaleLimits } from "./config";
 import { dHash } from "./hash";
 import { checkMetadata } from "./metadata-checks";
 import type { Box, HashPoolEntry, MetadataFields, Pixels, QcNote, QcStatus } from "./types";
@@ -28,6 +29,8 @@ export type VisualInput = {
   selfId?: string;
   /** Looser limit between assets of this batch (one-subject variations); see checkSimilarity. */
   batchMaxHamming?: number;
+  /** Set when the SVG is a bundle of this many members: complexity limits scale up and a frame's empty center is not checked. */
+  members?: number;
 };
 
 /** The checks that need the SVG itself. Everything here is pure; measuring happens in lib/qc/measure.ts. */
@@ -40,12 +43,14 @@ export function evaluateVisual(input: VisualInput): { notes: QcNote[]; phash: st
     notes.push({ check: "sanitasi", status: "ok", message: `Dibersihkan otomatis: ${input.sanitizeNotes.join(", ")}.` });
   }
   notes.push(checkText(input.stats.hasText));
-  notes.push(checkComplexity(input.stats, complexityFor(input.style)));
+  const limits = complexityFor(input.style);
+  notes.push(checkComplexity(input.stats, input.members ? scaleLimits(limits, input.members) : limits));
   notes.push(checkEmpty(input.pixels));
   if (rules.boundsCheck) notes.push(checkBounds(input.bbox, input.viewBox));
   if (rules.transparentBackground) notes.push(checkTransparentBackground(input.pixels));
   if (rules.seamless) notes.push(checkSeamless(input.pixels));
   if (rules.outline) notes.push(checkOutline(input.stats));
+  if (rules.copySpace && !input.members) notes.push(checkCopySpace(input.pixels));
   notes.push(checkSimilarity(phash, input.pool, input.selfId, input.batchMaxHamming));
 
   return { notes, phash };

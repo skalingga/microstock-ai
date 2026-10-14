@@ -1,5 +1,5 @@
 import { QC, type ComplexityLimits } from "./config";
-import { hammingHex } from "./hash";
+import { hammingHex, unionBitsHex } from "./hash";
 import { seamScore, seamsOk } from "./tile";
 import type { Box, HashPoolEntry, Pixels, QcNote } from "./types";
 
@@ -104,6 +104,40 @@ export function checkTransparentBackground(p: Pixels): QcNote {
   return { check: "latar", status: "ok", message: "Latar transparan." };
 }
 
+/** Share of opaque pixels inside the central square whose side is `fraction` of the canvas side. */
+export function centerOpaqueShare(p: Pixels, fraction: number = QC.frame.centerFraction): number {
+  const x0 = Math.floor((p.width * (1 - fraction)) / 2);
+  const y0 = Math.floor((p.height * (1 - fraction)) / 2);
+  const x1 = p.width - x0;
+  const y1 = p.height - y0;
+  let opaque = 0;
+  let total = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      total += 1;
+      if (p.data[(y * p.width + x) * 4 + 3] > OPAQUE_ALPHA) opaque += 1;
+    }
+  }
+  return total === 0 ? 0 : opaque / total;
+}
+
+/** A frame is sold for the space inside it: the center must stay empty for the buyer's text or photo. */
+export function checkCopySpace(p: Pixels): QcNote {
+  const share = centerOpaqueShare(p);
+  const percent = Math.round(share * 100);
+  if (share > QC.frame.centerFailShare) {
+    return { check: "ruang", status: "gagal", message: `Bagian tengah terisi ${percent}%: ini bukan bingkai dengan ruang kosong.` };
+  }
+  if (share > QC.frame.centerOpaqueMax) {
+    return {
+      check: "ruang",
+      status: "cek",
+      message: `Bagian tengah tidak sepenuhnya kosong (${percent}% terisi); pembeli butuh ruang kosong untuk teks atau foto.`,
+    };
+  }
+  return { check: "ruang", status: "ok", message: "Bagian tengah kosong: ada ruang untuk teks atau foto." };
+}
+
 export function checkSeamless(p: Pixels): QcNote {
   const result = seamScore(p);
   if (!seamsOk(result)) {
@@ -136,13 +170,24 @@ export function checkOutline(stats: { shapeCount: number; filledShapes: number }
  * Nearest look-alike in the pool. Entries made in the batch that is running count only when they are closer than
  * `batchMaxHamming` (variations batches); everything else uses the normal limit.
  */
-export function checkSimilarity(phash: string, pool: HashPoolEntry[], selfId?: string, batchMaxHamming?: number): QcNote {
+export function checkSimilarity(
+  phash: string,
+  pool: HashPoolEntry[],
+  selfId?: string,
+  batchMaxHamming?: number,
+  /** Replaces the default limit for every entry (backgrounds). */
+  maxHamming: number = QC.similarity.maxHamming,
+): QcNote {
   let nearest: { id: string; distance: number } | null = null;
   for (const entry of pool) {
     if (!entry.phash || entry.id === selfId) continue;
     const distance = hammingHex(phash, entry.phash);
-    const limit = entry.batch && batchMaxHamming !== undefined ? batchMaxHamming : QC.similarity.maxHamming;
+    const limit = entry.batch && batchMaxHamming !== undefined ? Math.min(batchMaxHamming, maxHamming) : maxHamming;
     if (distance > limit) continue;
+    // Sparse pictures (few set bits) are often a few bits apart by chance: only a difference that is small next to
+    // the information the two hashes hold counts as "looks the same".
+    const union = unionBitsHex(phash, entry.phash);
+    if (union > 0 && distance / union > QC.similarity.maxRelative) continue;
     if (!nearest || distance < nearest.distance) nearest = { id: entry.id, distance };
   }
   if (nearest) {

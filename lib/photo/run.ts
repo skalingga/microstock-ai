@@ -8,7 +8,7 @@ import { combine, type Verdict } from "@/lib/qc/evaluate";
 import { photoContentNotes, photoTechNotes } from "@/lib/qc/photo";
 import { applyMetadata } from "@/lib/qc/store";
 import type { HashPoolEntry } from "@/lib/qc/types";
-import type { PhotoAspect, PhotoProblem } from "./config";
+import { DEFAULT_PHOTO_VARIANT, PHOTO_VARIANTS, type PhotoAspect, type PhotoProblem, type PhotoVariant } from "./config";
 import { PhotoReadError, readPhoto } from "./process";
 
 // Stage 12, browser side. The prompts come from one AI call; every uploaded photo then gets one vision call for its
@@ -20,7 +20,7 @@ const BUCKET = "assets";
 export type PhotoPromptItem = { subject: string; prompt: string };
 
 /** What generation_jobs.photo_prompts holds. */
-export type PhotoJobData = { aspect: PhotoAspect; prompts: PhotoPromptItem[]; model: string; provider: string };
+export type PhotoJobData = { aspect: PhotoAspect; prompts: PhotoPromptItem[]; model: string; provider: string; variant: PhotoVariant };
 
 type PromptsResponse = { prompts: PhotoPromptItem[]; model: string; provider: string; rateLimit?: RateLimit };
 type PhotoMetadataResponse = {
@@ -51,6 +51,8 @@ export function parsePhotoJob(value: Json | null | undefined): PhotoJobData | nu
     prompts,
     model: typeof v.model === "string" ? v.model : "",
     provider: typeof v.provider === "string" ? v.provider : "",
+    // Jobs written before backgrounds existed have no variant: they are photos.
+    variant: PHOTO_VARIANTS.find((x) => x === v.variant) ?? DEFAULT_PHOTO_VARIANT,
   };
 }
 
@@ -66,21 +68,23 @@ export async function writePhotoPrompts(p: {
   aspect: PhotoAspect;
   avoid: string[];
   variations: boolean;
+  variant?: PhotoVariant;
   signal: AbortSignal;
   onStatus: (message: string) => void;
 }): Promise<{ jobId: string; data: PhotoJobData }> {
+  const variant = p.variant ?? DEFAULT_PHOTO_VARIANT;
   const gate = new RateGate();
   const res = await callWithRetry(
     (ctx) =>
       postJson<PromptsResponse>(
         "/api/generate/photo-prompts",
-        { theme: p.theme, count: p.count, aspect: p.aspect, avoid: p.avoid, variations: p.variations, ...skip(ctx) },
+        { theme: p.theme, count: p.count, aspect: p.aspect, avoid: p.avoid, variations: p.variations, variant, ...skip(ctx) },
         p.signal,
       ),
     { gate, signal: p.signal, onStatus: p.onStatus },
   );
 
-  const data: PhotoJobData = { aspect: p.aspect, prompts: res.prompts, model: res.model, provider: res.provider };
+  const data: PhotoJobData = { aspect: p.aspect, prompts: res.prompts, model: res.model, provider: res.provider, variant };
   const theme = await p.supabase.from("themes").insert({ title: p.theme }).select("id").single();
   if (theme.error) throw new ApiError("internal", "Gagal menyimpan tema.");
   const job = await p.supabase
@@ -106,6 +110,8 @@ export type PhotoUploadParams = {
   /** Label of the Flow model that made the photo (assets.model). */
   flowModel: string;
   prompt?: PhotoPromptItem;
+  /** Backgrounds get their own metadata words and a looser similarity check. */
+  variant?: PhotoVariant;
   bannedWords: string[];
   pool: HashPoolEntry[];
   gate: RateGate;
@@ -135,6 +141,7 @@ export async function uploadPhoto(file: File, p: PhotoUploadParams): Promise<Pho
     read.phash,
     p.pool,
     assetId,
+    p.variant,
   );
 
   p.onStage("mengunggah");
@@ -155,6 +162,7 @@ export async function uploadPhoto(file: File, p: PhotoUploadParams): Promise<Pho
     id: assetId,
     job_id: p.jobId,
     kind: "photo",
+    photo_variant: p.variant ?? DEFAULT_PHOTO_VARIANT,
     provider: "flow",
     model: p.flowModel,
     image_path: imagePath,
@@ -180,7 +188,7 @@ export async function uploadPhoto(file: File, p: PhotoUploadParams): Promise<Pho
       (ctx) =>
         postJson<PhotoMetadataResponse>(
           "/api/generate/photo-metadata",
-          { theme: p.theme, ...(p.prompt ? { prompt: p.prompt.prompt } : {}), image: read.visionImage, ...skip(ctx) },
+          { theme: p.theme, variant: p.variant ?? DEFAULT_PHOTO_VARIANT, ...(p.prompt ? { prompt: p.prompt.prompt } : {}), image: read.visionImage, ...skip(ctx) },
           p.signal,
         ).then((r) => {
           p.gate.update(r.rateLimit);
@@ -191,7 +199,7 @@ export async function uploadPhoto(file: File, p: PhotoUploadParams): Promise<Pho
 
     const { hasPeople, problems, ...meta } = res.metadata;
     await p.supabase.from("assets").update({ fictional_people: hasPeople }).eq("id", assetId);
-    const verdict = await applyMetadata(p.supabase, assetId, [...techNotes, ...photoContentNotes(problems, hasPeople)], meta, p.bannedWords);
+    const verdict = await applyMetadata(p.supabase, assetId, [...techNotes, ...photoContentNotes(problems, hasPeople, p.variant)], meta, p.bannedWords);
     if (!verdict) throw new ApiError("storage", "Gagal menyimpan metadata.");
     return { assetId, previewUrl, verdict };
   } catch (err) {
