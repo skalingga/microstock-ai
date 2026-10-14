@@ -89,13 +89,34 @@ describe("composeBundle", () => {
     expect(first).toMatch(/scale\(0\.6\)$/); // (512 - 32) / 800
   });
 
-  it("refuses a wrong member count, broken SVG, and <style>", () => {
+  it("refuses a wrong member count and broken SVG", () => {
     expect(composeBundle(members(3), { columns: 2, rows: 2 })).toMatchObject({ ok: false });
     expect(composeBundle([{ id: "x", svg: "<svg" }, ...members(3)], { columns: 2, rows: 2 })).toMatchObject({ ok: false });
-    const styled = { id: "s", svg: square("s", "<style>.a{fill:red}</style>") };
-    const result = composeBundle([styled, ...members(3)], { columns: 2, rows: 2 });
-    expect(result).toMatchObject({ ok: false });
-    if (!result.ok) expect(result.reason).toContain("<style>");
+  });
+
+  it("gives each member its own copy of the classes used in <style>", () => {
+    const styled = (n: number) => ({
+      id: `s${n}`,
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><style>.a, .b{fill:red}.c{stroke:#000}</style><rect class="a c" width="9" height="9"/><circle class="b" r="4"/></svg>`,
+    });
+    const result = composeBundle([styled(1), styled(2), ...members(2)], { columns: 2, rows: 2 });
+    if (!result.ok) throw new Error(result.reason);
+    const doc = parse(result.svg);
+    const css = Array.from(doc.querySelectorAll("style")).map((s) => s.textContent ?? "");
+    expect(css).toHaveLength(2);
+    expect(css[0]).toContain(".i01-a, .i01-b{fill:red}");
+    expect(css[1]).toContain(".i02-c{stroke:#000}");
+    const rects = Array.from(doc.querySelectorAll("rect[class]")).map((r) => r.getAttribute("class"));
+    expect(rects).toEqual(["i01-a i01-c", "i02-a i02-c"]);
+  });
+
+  it("refuses <style> that could leak into other members", () => {
+    for (const css of ["rect{fill:red}", "@media print{.a{fill:red}}", "svg .a{fill:red}"]) {
+      const styled = { id: "s", svg: square("s", `<style>${css}</style>`) };
+      const result = composeBundle([styled, ...members(3)], { columns: 2, rows: 2 });
+      expect(result, css).toMatchObject({ ok: false });
+      if (!result.ok) expect(result.reason).toContain("<style>");
+    }
   });
 });
 

@@ -87,6 +87,40 @@ function prefixIds(root: Element, prefix: string): void {
   }
 }
 
+const CLASS_ONLY_SELECTORS = /^\s*\.[A-Za-z_][\w-]*(\s*,\s*\.[A-Za-z_][\w-]*)*\s*$/;
+
+/**
+ * Models sometimes style shapes with a `<style>` block and classes. Inside a bundle those classes would collide
+ * between members, so every class of one member gets the member's prefix, in the CSS and in the `class`
+ * attributes. Only plain class selectors are supported; anything else (element selectors, @rules) could leak
+ * into the other members, so the member is refused. Returns an error text, or null when the CSS was scoped.
+ */
+function scopeStyles(root: Element, prefix: string): string | null {
+  const styles = Array.from(root.getElementsByTagName("style"));
+  if (styles.length === 0) return null;
+
+  for (const style of styles) {
+    const css = (style.textContent ?? "").replace(/\/\*[\s\S]*?\*\//g, "");
+    if (css.includes("@")) return "memakai aturan CSS @ (media, keyframes, import) di <style>";
+    let scoped = "";
+    for (const rule of css.split("}")) {
+      if (rule.trim() === "") continue;
+      const open = rule.indexOf("{");
+      if (open === -1) return "punya <style> yang tidak bisa dibaca";
+      const selectors = rule.slice(0, open);
+      if (!CLASS_ONLY_SELECTORS.test(selectors)) return "memakai selektor <style> selain kelas (.nama)";
+      scoped += `${selectors.replace(/\.([A-Za-z_][\w-]*)/g, `.${prefix}-$1`)}{${rule.slice(open + 1)}}`;
+    }
+    style.textContent = scoped;
+  }
+
+  for (const el of Array.from(root.querySelectorAll("[class]"))) {
+    const classes = (el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
+    el.setAttribute("class", classes.map((c) => `${prefix}-${c}`).join(" "));
+  }
+  return null;
+}
+
 /**
  * Lays the members out left to right, top to bottom. Each one is scaled to fit its cell and wrapped in its own
  * `<g id="item-N">`, so the bundle stays an editable layered vector. The background stays transparent.
@@ -109,13 +143,13 @@ export function composeBundle(members: BundleMember[], grid: Pick<GridOption, "c
     if (doc.getElementsByTagName("parsererror").length > 0 || root.localName !== "svg") {
       return { ok: false, reason: `${label} bukan SVG yang valid.` };
     }
-    if (root.getElementsByTagName("style").length > 0) {
-      return { ok: false, reason: `${label} memakai <style>; bundle butuh SVG tanpa style supaya kelas tidak bentrok.` };
-    }
     const box = viewBoxOf(root);
     if (!box) return { ok: false, reason: `${label} tidak punya viewBox.` };
 
-    prefixIds(root, `i${String(index + 1).padStart(2, "0")}`);
+    const prefix = `i${String(index + 1).padStart(2, "0")}`;
+    const styleProblem = scopeStyles(root, prefix);
+    if (styleProblem) return { ok: false, reason: `${label} ${styleProblem}; bundle butuh kelas yang aman dipakai bersama.` };
+    prefixIds(root, prefix);
 
     const scale = Math.min(inner / box.width, inner / box.height);
     const col = index % grid.columns;
