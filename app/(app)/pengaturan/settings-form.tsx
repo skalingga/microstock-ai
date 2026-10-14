@@ -205,7 +205,9 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     budgetNumber === null
       ? "Wajib diisi. Tulis 0 untuk mematikan semua model berbayar."
       : budgetNumber === 0
-        ? "0: semua model berbayar mati, termasuk Siluet dan Line art. Model gratis tetap jalan."
+        ? imagePrice === 0
+          ? "0: semua model berbayar mati. Model gratis tetap jalan, termasuk Siluet dan Line art dengan model gambar yang dipilih."
+          : "0: semua model berbayar mati, termasuk Siluet dan Line art. Model gratis tetap jalan."
         : imagePrice && budgetNumber > spentIdr
           ? `Sisa bulan ini ${formatIdr(budgetNumber - spentIdr)}: cukup untuk sekitar ${Math.floor((budgetNumber - spentIdr) / imagePrice)} gambar ${effectiveImageModel}. Model teks berbayar memakai batas yang sama; model gratis tidak dihitung.`
           : "Berlaku untuk model teks dan gambar berbayar. Model gratis tidak dihitung.";
@@ -235,7 +237,8 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
 
   const bannedCount = parseBannedWords(banned).length;
   const paletteRows = parsePalettes(palettes);
-  const paidStyleBlocked = budgetNumber === 0 && isImageStyle(style);
+  // A free image model (":free") passes the budget guard, so Siluet and Line art still run at a zero budget.
+  const paidStyleBlocked = budgetNumber === 0 && isImageStyle(style) && imagePrice !== 0;
 
   return (
     <form
@@ -439,7 +442,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
         <Field
           name="default_style"
           label="Gaya bawaan"
-          hint={paidStyleBlocked ? undefined : "Siluet dan Line art memakai model gambar berbayar."}
+          hint={paidStyleBlocked ? undefined : `Siluet dan Line art memakai model gambar ${imagePrice === 0 ? "gratis" : "berbayar"} (${effectiveImageModel}).`}
           error={errors.default_style}
         >
           <select
@@ -458,7 +461,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
           </select>
         </Field>
         {paidStyleBlocked && (
-          <p className="text-sm text-warning-foreground">Batas biaya Rp0, jadi gaya ini tidak akan bisa jalan sampai batasnya dinaikkan.</p>
+          <p className="text-sm text-warning-foreground">Batas biaya Rp0 dan model gambar {effectiveImageModel} berbayar, jadi gaya ini tidak akan jalan. Pilih model gambar gratis atau naikkan batasnya.</p>
         )}
 
         <Field
