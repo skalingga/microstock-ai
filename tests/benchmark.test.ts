@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellsToRedo, confidence, estimateRemainingMs, fitsStyle, isImageModel, parseCells, quotaGroup, suggest, suggestImage, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
+import { cellsToRedo, confidence, estimateRemainingMs, fitsStyle, isImageModel, lanesOf, parseCells, quotaGroup, suggest, suggestImage, summarize, visualStatus, type BenchCell } from "@/lib/generate/benchmark";
 
 const cell = (model: string, patch: Partial<BenchCell> = {}): BenchCell => ({
   theme: "autumn",
@@ -150,5 +150,32 @@ describe("image models", () => {
     expect(suggest(rows).primary?.model).not.toBe("gpt-image-2");
     expect(suggest(rows).primary?.image).toBe(false);
     expect(suggestImage(rows)?.model).toBe("gpt-image-2");
+  });
+});
+
+describe("lanesOf", () => {
+  const cell = (provider: "kenari" | "gemini", model: string, theme = "t"): BenchCell => ({
+    theme,
+    style: "icon_set",
+    concept: "c",
+    provider,
+    model,
+    status: "menunggu",
+  });
+
+  it("gives each quota group its own lane and keeps the order inside a lane", () => {
+    const cells = [
+      cell("gemini", "g-a"),
+      cell("kenari", "m:free"),
+      cell("gemini", "g-b"),
+      cell("kenari", "n:free"),
+      cell("gemini", "g-a"),
+    ];
+    expect(lanesOf(cells, [0, 1, 2, 3, 4])).toEqual([[0, 4], [1, 3], [2]]);
+  });
+
+  it("only lays out the cells asked for", () => {
+    const cells = [cell("gemini", "g-a"), cell("gemini", "g-b"), cell("gemini", "g-a")];
+    expect(lanesOf(cells, [2, 1])).toEqual([[2], [1]]);
   });
 });

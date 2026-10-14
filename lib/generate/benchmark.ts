@@ -174,6 +174,23 @@ function stopsEverything(code: string): boolean {
   return code === "unauthenticated" || code === "storage";
 }
 
+/**
+ * The cells to draw, split into lanes by quota group. Lanes run side by side and the cells of a lane run in order, so a
+ * model that is waiting for quota (or is slow) no longer holds up the others, while models that share one quota (the
+ * free Kenari ones) stay in one lane and keep taking turns.
+ */
+export function lanesOf(cells: BenchCell[], indices: number[]): number[][] {
+  const lanes = new Map<string, number[]>();
+  for (const i of indices) {
+    const c = cells[i];
+    const k = quotaGroup({ provider: c.provider, model: c.model });
+    const lane = lanes.get(k);
+    if (lane) lane.push(i);
+    else lanes.set(k, [i]);
+  }
+  return [...lanes.values()];
+}
+
 /** Cells to draw again when a saved run continues: never finished, and with `retryFailed` the failed ones too. */
 export function cellsToRedo(cells: BenchCell[], retryFailed: boolean): number[] {
   return cells.flatMap((c, i) =>
@@ -322,10 +339,18 @@ function createRunner(p: RunBenchmarkParams, initial: BenchState) {
       // same concept (that would punish whichever model runs later).
       const pool = await fetchHashPool(p.supabase);
       emit({ phase: "antrean" });
-      for (const i of indices) {
-        if (p.signal.aborted) break;
-        if (!(await drawCell(i, pool))) break;
-      }
+      let stop = false;
+      await Promise.all(
+        lanesOf(state.cells, indices).map(async (lane) => {
+          for (const i of lane) {
+            if (stop || p.signal.aborted) break;
+            if (!(await drawCell(i, pool))) {
+              stop = true; // an error no model can recover from: the other lanes stop too
+              break;
+            }
+          }
+        }),
+      );
       await finish();
     } catch (err) {
       await fail(err);
@@ -438,7 +463,7 @@ export async function runBenchmark(p: RunBenchmarkParams): Promise<void> {
     return;
   }
 
-  // 2. One SVG call per cell, in order. Models take turns, so the free models' shared quota gets breathing room.
+  // 2. One SVG call per cell. Each quota group is a lane, run side by side (see lanesOf).
   await runner.drawAll(runner.state.cells.map((_, i) => i));
 }
 

@@ -19,6 +19,7 @@ import {
   estimateRemainingMs,
   fitsStyle,
   isImageModel,
+  quotaGroup,
   runBenchmark,
   suggest,
   suggestImage,
@@ -210,10 +211,13 @@ export function BenchmarkRunner({
   const costEstimate = knownCost.reduce((sum, m) => sum + priceOf(m)! * countFor(m), 0);
   const unknownPaid = paid.length - knownCost.length;
   const paidCount = paid.reduce((sum, m) => sum + countFor(m), 0);
-  const timeEstimateMs = picked.reduce(
-    (sum, m) => sum + (msPerSvg[key(m)] ?? (isImageModel(m) ? FALLBACK_MS_PER_IMAGE : FALLBACK_MS_PER_SVG)) * countFor(m),
-    0,
-  );
+  // Quota groups run side by side, so the slowest group decides (free Kenari models share one group).
+  const laneMs = new Map<string, number>();
+  for (const m of picked) {
+    const ms = (msPerSvg[key(m)] ?? (isImageModel(m) ? FALLBACK_MS_PER_IMAGE : FALLBACK_MS_PER_SVG)) * countFor(m);
+    laneMs.set(quotaGroup(m), (laneMs.get(quotaGroup(m)) ?? 0) + ms);
+  }
+  const timeEstimateMs = Math.max(0, ...laneMs.values());
   const hasImageTheme = validThemes.some((t) => isImageStyle(t.style));
   const idleModels = picked.filter((m) => countFor(m) === 0);
   const overBudget = paid.length > 0 && costEstimate > budgetLeftIdr;
