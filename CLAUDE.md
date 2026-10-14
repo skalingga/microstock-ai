@@ -99,6 +99,7 @@ Status per aset: `lolos`, `perlu_cek`, `gagal`. Hanya `lolos` yang bisa diekspor
 - [ ] 10b. Tata letak HP dan PC (sisipan, opsi B "Meja hari ini" dari `docs/mockups/opsi-tata-letak.html`, kritik 10 Okt 2026): bilah tab bawah di HP dengan lencana batch, halaman awal `/meja`, Generate ringkas dengan lembar pilihan dan bilah aksi menempel, Tinjau dengan bilah keputusan menempel, filter galeri di lembar bawah
 - [ ] 11. Bundle: 16 aset Lolos jadi satu SVG grid 4x4 + metadata set
 - [ ] 12. Mode foto (Google Flow, setengah manual; rincian: `docs/PLAN-mode-foto.md`): aplikasi menulis prompt foto, pengguna generate di Flow lalu mengunggah hasilnya, aplikasi menjalankan QC foto, metadata AI vision, ekspor JPEG + CSV. Flow tidak diotomatisasi. Video ditunda. Kode selesai 10 Okt 2026 di branch `dev`, menunggu uji pengguna
+- [ ] 13. Shutterstock uji coba (foto saja, permintaan pengguna 14 Okt 2026): pilihan agensi di `/ekspor`, CSV Shutterstock, kategori dipetakan dari kategori Adobe (`lib/shutterstock/rules.ts`). Shutterstock resmi tidak menerima konten AI dari kontributor; pengguna menerima risiko ditolak. Vektor butuh EPS, belum dibangun. Ekspor hanya diunduh, tidak masuk Riwayat
 
 Centang tahap setelah selesai dan diverifikasi pengguna.
 
