@@ -14,6 +14,10 @@ export const STYLES = [
   { value: "line_icon", label: "Ikon garis (outline)" },
   { value: "glyph_icon", label: "Ikon glyph (solid)" },
   { value: "geometric_tile", label: "Ubin geometris" },
+  // Stage 14 wave 1 (docs/PLAN-gaya-baru-dan-bundle.md): written by the text model as SVG, like icon_set.
+  { value: "sticker", label: "Stiker kartun (die-cut)" },
+  { value: "isometric", label: "Isometrik (objek dan adegan)" },
+  { value: "frame", label: "Bingkai dan border dekoratif" },
 ] as const;
 
 /** The styles that make interface-style icons: unlike clipart, "icon" is the right word in their titles and keywords. */

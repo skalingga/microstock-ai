@@ -19,6 +19,9 @@ const DESCRIPTIONS: Record<StyleId, string> = {
   line_icon: "Ikon dari garis dengan tebal seragam, satu warna. Untuk set ikon antarmuka.",
   glyph_icon: "Ikon padat satu atau dua warna, tanpa garis tepi. Untuk set ikon antarmuka.",
   geometric_tile: "Ubin persegi dengan motif geometris simetris. Untuk set ubin dan pola dekoratif.",
+  sticker: "Kartun lucu bergaris tebal dengan tepi putih tebal, siap dipotong. Untuk stiker dan planner.",
+  isometric: "Objek atau adegan isometrik dengan tiga sisi terang-gelap. Untuk presentasi bisnis dan teknologi.",
+  frame: "Bingkai atau karangan bunga dengan bagian tengah kosong. Untuk undangan, kartu, dan template.",
 };
 
 function lightness(hex: string): number {
@@ -44,7 +47,7 @@ export function styleDescription(style: StyleId): string {
 
 /** Styles whose output has a transparent background, shown over the checkerboard. */
 export function isTransparentStyle(style: StyleId): boolean {
-  return ["icon_set", "badge_label", "silhouette", "line_art", "line_icon", "glyph_icon"].includes(style);
+  return ["icon_set", "badge_label", "silhouette", "line_art", "line_icon", "glyph_icon", "sticker", "isometric", "frame"].includes(style);
 }
 
 export function StylePreview({ style, palette }: { style: StyleId; palette: string[] }) {
@@ -161,6 +164,43 @@ export function StyleArt({ style, palette, label, className }: { style: StyleId;
           <circle cx="256" cy="256" r="44" fill={bg} />
         </>
       )}
+      {style === "sticker" && (
+        <>
+          <path d="M256 56 C384 56 454 150 454 282 C454 404 372 466 256 466 C140 466 58 404 58 282 C58 150 128 56 256 56Z" fill="#ffffff" />
+          <ellipse cx="256" cy="292" rx="140" ry="150" fill={a} stroke="#1f1f1f" strokeWidth="10" />
+          <ellipse cx="256" cy="322" rx="78" ry="88" fill={b} />
+          <circle cx="214" cy="272" r="14" fill="#1f1f1f" />
+          <circle cx="298" cy="272" r="14" fill="#1f1f1f" />
+          <path d="M226 320 Q256 346 286 320" fill="none" stroke="#1f1f1f" strokeWidth="10" strokeLinecap="round" />
+          <path d="M256 142 Q268 98 304 86 Q300 130 256 142Z" fill={d} stroke="#1f1f1f" strokeWidth="10" strokeLinejoin="round" />
+        </>
+      )}
+      {style === "isometric" && (
+        <>
+          <ellipse cx="400" cy="450" rx="190" ry="44" fill="#000000" opacity="0.12" />
+          <polygon points="280,220 400,290 400,430 280,360" fill={a} />
+          <polygon points="280,220 400,290 400,430 280,360" fill="#000000" opacity="0.18" />
+          <polygon points="520,220 400,290 400,430 520,360" fill={a} />
+          <polygon points="520,220 400,290 400,430 520,360" fill="#000000" opacity="0.36" />
+          <polygon points="400,150 520,220 400,290 280,220" fill={a} />
+          <polygon points="400,40 460,75 400,110 340,75" fill={b} />
+          <polygon points="340,75 400,110 400,180 340,145" fill={b} />
+          <polygon points="340,75 400,110 400,180 340,145" fill="#000000" opacity="0.18" />
+          <polygon points="460,75 400,110 400,180 460,145" fill={b} />
+          <polygon points="460,75 400,110 400,180 460,145" fill="#000000" opacity="0.36" />
+        </>
+      )}
+      {style === "frame" && (
+        <>
+          {Array.from({ length: 12 }, (_, i) => (
+            <g key={i} transform={`rotate(${i * 30} 256 256)`}>
+              <ellipse cx="256" cy="62" rx="20" ry="50" fill={i % 2 === 0 ? a : b} />
+              <circle cx="256" cy="140" r="9" fill={c} />
+            </g>
+          ))}
+          <rect x="132" y="132" width="248" height="248" fill="none" stroke={c} strokeDasharray="10 10" strokeWidth="3" opacity="0.6" />
+        </>
+      )}
       {style === "abstract_background" && (
         <>
           <rect width="1500" height="1000" fill={bg} />
@@ -187,4 +227,7 @@ const VIEWBOX: Record<StyleId, string> = {
   line_icon: "0 0 512 512",
   glyph_icon: "0 0 512 512",
   geometric_tile: "0 0 512 512",
+  sticker: "0 0 512 512",
+  isometric: "0 0 800 600",
+  frame: "0 0 512 512",
 };

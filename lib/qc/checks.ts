@@ -104,6 +104,40 @@ export function checkTransparentBackground(p: Pixels): QcNote {
   return { check: "latar", status: "ok", message: "Latar transparan." };
 }
 
+/** Share of opaque pixels inside the central square whose side is `fraction` of the canvas side. */
+export function centerOpaqueShare(p: Pixels, fraction: number = QC.frame.centerFraction): number {
+  const x0 = Math.floor((p.width * (1 - fraction)) / 2);
+  const y0 = Math.floor((p.height * (1 - fraction)) / 2);
+  const x1 = p.width - x0;
+  const y1 = p.height - y0;
+  let opaque = 0;
+  let total = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      total += 1;
+      if (p.data[(y * p.width + x) * 4 + 3] > OPAQUE_ALPHA) opaque += 1;
+    }
+  }
+  return total === 0 ? 0 : opaque / total;
+}
+
+/** A frame is sold for the space inside it: the center must stay empty for the buyer's text or photo. */
+export function checkCopySpace(p: Pixels): QcNote {
+  const share = centerOpaqueShare(p);
+  const percent = Math.round(share * 100);
+  if (share > QC.frame.centerFailShare) {
+    return { check: "ruang", status: "gagal", message: `Bagian tengah terisi ${percent}%: ini bukan bingkai dengan ruang kosong.` };
+  }
+  if (share > QC.frame.centerOpaqueMax) {
+    return {
+      check: "ruang",
+      status: "cek",
+      message: `Bagian tengah tidak sepenuhnya kosong (${percent}% terisi); pembeli butuh ruang kosong untuk teks atau foto.`,
+    };
+  }
+  return { check: "ruang", status: "ok", message: "Bagian tengah kosong: ada ruang untuk teks atau foto." };
+}
+
 export function checkSeamless(p: Pixels): QcNote {
   const result = seamScore(p);
   if (!seamsOk(result)) {

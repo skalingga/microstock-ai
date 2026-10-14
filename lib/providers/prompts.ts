@@ -15,6 +15,8 @@ type StyleSpec = {
   fills?: string;
   /** Which colors to use, as a sentence. Defaults to "only these colors (plus white or near-black)". */
   colors?: (palette: string) => string;
+  /** Shape budget told to the model. Defaults to 60; scenes and frames need more. */
+  maxShapes?: number;
 };
 
 const DEFAULT_CONSISTENCY = "Set consistency: flat solid fills and no outlines, so this asset sits well next to the rest of its set.";
@@ -74,6 +76,36 @@ const STYLE_SPECS: Record<StyleId, StyleSpec> = {
       "Set consistency: the same tile shape, frame width and motif density in every tile, so this tile sits well next to the rest of its set.",
     fills: "- Flat solid fills; the motif may use strokes of one constant width. No gradients.",
     colors: (palette) => `Colors: use only these colors: ${palette}.`,
+  },
+  // Stage 14 wave 1.
+  sticker: {
+    viewBox: "0 0 512 512",
+    brief:
+      "One cartoon sticker: a single cute, simple object, animal, food item or plant, drawn with a bold dark outline (stroke-width 10, round line joins) and flat colors, with at most one small highlight shape. Add a thick white die-cut border: FIRST draw one smooth white shape that follows the silhouette about 20 px outside the artwork (this is the cut line), THEN draw the artwork on top of it. Center it with at least 40 px of margin. TRANSPARENT background: do not draw any background rectangle. No text, no letters.",
+    consistency:
+      "Set consistency: the same outline width (10) and the same near-black outline color, the same white border width and the same level of detail in every sticker, so this sticker sits well next to the rest of its set.",
+    fills: "- Flat solid fills; the dark outline is a stroke of one constant width, and the die-cut border is a white fill. No gradients.",
+    colors: (palette) =>
+      `Colors: use only these colors for the fills: ${palette}. The outline is one near-black color and the die-cut border is white.`,
+  },
+  isometric: {
+    viewBox: "0 0 800 600",
+    brief:
+      "One isometric object or a small isometric scene (an object on a small platform), seen from above: horizontal edges become 30 degree lines, no perspective, no vanishing points. Build every solid from parallelograms with three visible faces: the top face lightest, the left face medium, the right face darkest, all tints and shades of the same hue. No outlines. A flat, soft ground shadow is allowed. The object or scene fills about 70 percent of the canvas width: do not draw it small. Centered with a margin of at least 60 px. TRANSPARENT background: do not draw any background rectangle. No text, no letters, no screens or signs showing writing.",
+    consistency:
+      "Set consistency: the same isometric angle (30 degrees), the same light direction (top lightest, left medium, right darkest) and the same level of detail in every asset, so this asset sits well next to the rest of its set.",
+    fills: "- Flat solid fills only: every face is its own flat polygon. No outlines and no gradients.",
+    colors: (palette) => `Colors: build the faces from these colors and from darker and lighter shades of them: ${palette}.`,
+    maxShapes: 80,
+  },
+  frame: {
+    viewBox: "0 0 1000 1000",
+    brief:
+      "A decorative frame, wreath or border for stock use. Put all decoration in the outer band of the canvas and fill that band richly, from 40 px to about 220 px away from every edge: dense, bold ornament, never a thin hairline (no stroke thinner than 8). The central square from 250,250 to 750,750 must stay completely empty, with nothing drawn in it, so a buyer can place text or a photo there. Balanced, symmetric or rhythmic composition built from simple shapes (leaves, flowers, geometric ornaments, lines), colored with the palette (never white or near-white decoration on its own). TRANSPARENT background: do not draw any background rectangle or filled panel. No text, no letters.",
+    consistency:
+      "Set consistency: the same decoration style, line weight and level of detail in every frame, so this frame sits well next to the rest of its set.",
+    fills: "- Flat solid fills; thin ornament lines may use strokes of one constant width. No gradients.",
+    maxShapes: 90,
   },
   // Drawn by an image model and traced (stage 7): the viewBox is unused, the brief steers the concepts.
   silhouette: {
@@ -176,7 +208,7 @@ export function svgPrompt(input: SvgInput): { system: string; user: string } {
       "",
       "Technical rules:",
       `- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="${spec.viewBox}">.`,
-      "- Use simple <path>, <rect>, <circle>, <ellipse>, <polygon> elements and <g> groups. Keep it under 60 shapes in total.",
+      `- Use simple <path>, <rect>, <circle>, <ellipse>, <polygon> elements and <g> groups. Keep it under ${spec.maxShapes ?? 60} shapes in total.`,
       spec.fills ?? DEFAULT_FILLS,
       "- NO <text>, <image>, <foreignObject>, <script>, <style>, filters, masks, or external links.",
       "- Use short coordinates (integers, at most one decimal) and keep every shape inside the viewBox.",
@@ -221,6 +253,9 @@ const METADATA_STYLE: Record<StyleId, string> = {
   line_icon: "a single outline vector icon with uniform stroke width on a transparent background",
   glyph_icon: "a single solid glyph vector icon on a transparent background",
   geometric_tile: "a square geometric vector tile with a symmetric motif",
+  sticker: "a cartoon sticker illustration with a thick white die-cut border on a transparent background",
+  isometric: "an isometric vector illustration of an object or small scene on a transparent background",
+  frame: "a decorative vector frame or border with an empty center on a transparent background",
 };
 
 export function metadataPrompt(input: MetadataInput): { system: string; user: string } {

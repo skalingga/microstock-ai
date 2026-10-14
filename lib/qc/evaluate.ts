@@ -3,6 +3,7 @@ import type { SvgStats } from "@/lib/svg/stats";
 import {
   checkBounds,
   checkComplexity,
+  checkCopySpace,
   checkEmpty,
   checkOutline,
   checkSeamless,
@@ -46,6 +47,7 @@ export function evaluateVisual(input: VisualInput): { notes: QcNote[]; phash: st
   if (rules.transparentBackground) notes.push(checkTransparentBackground(input.pixels));
   if (rules.seamless) notes.push(checkSeamless(input.pixels));
   if (rules.outline) notes.push(checkOutline(input.stats));
+  if (rules.copySpace) notes.push(checkCopySpace(input.pixels));
   notes.push(checkSimilarity(phash, input.pool, input.selfId, input.batchMaxHamming));
 
   return { notes, phash };
