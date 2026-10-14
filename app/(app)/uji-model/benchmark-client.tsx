@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Clock, FlaskConical, Loader2, Plus, RotateCcw, Shapes, Square, Wallet, X } from "lucide-react";
+import { ChevronDown, Clock, EyeOff, FlaskConical, Loader2, Plus, RefreshCw, RotateCcw, Shapes, Shuffle, Square, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
@@ -35,37 +35,20 @@ import { STYLES, isImageStyle, type ProviderEntry, type StyleId } from "@/lib/se
 import { createClient } from "@/lib/supabase/client";
 import { selectClass, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_MODELS,
+  DEFAULT_THEMES,
+  MODEL_PREFS_KEY,
+  RECENT_THEMES_KEY,
+  RECENT_THEMES_MAX,
+  freshTheme,
+  freshThemes,
+  parseModelPrefs,
+  serializeModelPrefs,
+} from "@/lib/generate/benchmark-presets";
 import { kembalikanRantai, pakaiModelGambar, pakaiSaran } from "./actions";
 
 const MAX_THEMES = 12;
-
-// One theme per style, so every model is tried on every kind of asset it can draw. Fresh subjects, not ones the
-// gallery already holds many of, so the similarity check does not mark every model down alike.
-const DEFAULT_THEMES: { theme: string; style: StyleId }[] = [
-  { theme: "kitchen baking tools", style: "icon_set" },
-  { theme: "home office workspace", style: "line_icon" },
-  { theme: "weather forecast symbols", style: "glyph_icon" },
-  { theme: "tropical monstera leaves", style: "seamless_pattern" },
-  { theme: "moroccan star tiles", style: "geometric_tile" },
-  { theme: "rooftop garden in the city", style: "flat_illustration" },
-  { theme: "artisan bakery emblem", style: "badge_label" },
-  { theme: "flowing liquid shapes", style: "abstract_background" },
-  { theme: "wild birds in flight", style: "silhouette" },
-  { theme: "wildflower bouquet", style: "line_art" },
-];
-
-// Text models: the current chain (deepseek-v4-flash, gemini-3.5-flash-lite) and the free Kenari models that made
-// usable SVGs on 7 and 9 Oct 2026. Image models: the current default and two cheap alternatives (prices in
-// kenari-image-pricing.ts); they only draw the Siluet and Line art themes.
-const DEFAULT_MODELS: BenchModel[] = [
-  { provider: "kenari", model: "deepseek-v4-flash" },
-  { provider: "gemini", model: "gemini-3.5-flash-lite" },
-  { provider: "kenari", model: "muse-spark-1-3-contributor:free" },
-  { provider: "kenari", model: "agnes-2-0-flash:free" },
-  { provider: "kenari", model: "gpt-image-2" },
-  { provider: "kenari", model: "nano-banana-2-lite" },
-  { provider: "kenari", model: "hunyuan-image-v2.0" },
-];
 
 /** Before a run, for a model never tested: free models took 4-70s per SVG in the first check, plus quota waits. */
 const FALLBACK_MS_PER_SVG = 30_000;
@@ -75,6 +58,31 @@ const IMAGE_MODELS = Object.keys(KENARI_IMAGE_PRICES_IDR);
 
 const key = (m: { provider: string; model: string }) => `${m.provider}|${m.model}`;
 const isPaid = (m: BenchModel) => m.provider === "kenari" && !m.model.endsWith(":free");
+const imageCost = (id: string) => (KENARI_IMAGE_PRICES_IDR[id] === 0 ? "gratis" : `${formatIdr(KENARI_IMAGE_PRICES_IDR[id])}/gambar`);
+
+/** Browser storage can be missing or blocked (private window): every call is a no-op then. */
+function readStore(storeKey: string): string | null {
+  try {
+    return window.localStorage.getItem(storeKey);
+  } catch {
+    return null;
+  }
+}
+function writeStore(storeKey: string, value: string) {
+  try {
+    window.localStorage.setItem(storeKey, value);
+  } catch {
+    /* not saved: the list simply starts from the defaults next time */
+  }
+}
+function readRecent(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readStore(RECENT_THEMES_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 /** Wall clock for the elapsed-time display; only called from event handlers and timers, never while rendering. */
 function clock() {
@@ -134,6 +142,7 @@ export function BenchmarkRunner({
   const [catalog, setCatalog] = useState<CatalogModel[]>([]);
   const [geminiModels, setGeminiModels] = useState<string[]>([]);
   const [extra, setExtra] = useState("");
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   const [state, setState] = useState<BenchState | null>(null);
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [running, setRunning] = useState(false);
@@ -157,6 +166,17 @@ export function BenchmarkRunner({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Saved model list (per browser). Read after mount so the server and first client render agree.
+  useEffect(() => {
+    queueMicrotask(() => {
+      const prefs = parseModelPrefs(readStore(MODEL_PREFS_KEY));
+      if (!prefs) return;
+      setModels(prefs.models);
+      setChecked(new Set(prefs.checked.filter((k) => prefs.models.some((m) => key(m) === k))));
+      setHidden(new Set(prefs.hidden));
+    });
   }, []);
 
   // The queue lives in this page: warn before the tab closes, and tick a clock for the elapsed time.
@@ -198,6 +218,48 @@ export function BenchmarkRunner({
   const idleModels = picked.filter((m) => countFor(m) === 0);
   const overBudget = paid.length > 0 && costEstimate > budgetLeftIdr;
   const [overBudgetOk, setOverBudgetOk] = useState(false);
+
+  function setModelList(nextModels: BenchModel[], nextChecked: Set<string>, nextHidden: Set<string> = hidden) {
+    setModels(nextModels);
+    setChecked(nextChecked);
+    setHidden(nextHidden);
+    writeStore(MODEL_PREFS_KEY, serializeModelPrefs({ models: nextModels, checked: [...nextChecked], hidden: [...nextHidden] }));
+  }
+
+  /** Remembers shown themes so repeated clicks walk through the pool before repeating. */
+  function remember(shown: string[]) {
+    const next = [...readRecent().filter((t) => !shown.includes(t)), ...shown].slice(-RECENT_THEMES_MAX);
+    writeStore(RECENT_THEMES_KEY, JSON.stringify(next));
+  }
+
+  function shuffleAll() {
+    const next = freshThemes(themes, readRecent());
+    remember(next.map((t) => t.theme));
+    setThemes(next);
+  }
+
+  function shuffleOne(i: number) {
+    const row = themes[i];
+    const next = freshTheme(
+      row.style,
+      themes.map((t) => t.theme),
+      readRecent(),
+    );
+    if (!next) return;
+    remember([next]);
+    setThemes(themes.map((t, j) => (j === i ? { ...t, theme: next } : t)));
+  }
+
+  function hideExtra() {
+    if (!extra) return;
+    setModelList(models, checked, new Set([...hidden, extra]));
+    setExtra("");
+  }
+
+  function resetModels() {
+    setModelList(DEFAULT_MODELS, new Set(DEFAULT_MODELS.map(key)), new Set());
+    setExtra("");
+  }
 
   async function execute(run: (signal: AbortSignal, onState: (s: BenchState) => void) => Promise<void>) {
     urlsRef.current.forEach((u) => URL.revokeObjectURL(u));
@@ -251,8 +313,10 @@ export function BenchmarkRunner({
       sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       if (detail.kind === "setup") {
         setThemes(detail.setup.themes.map((t) => ({ theme: t.theme, style: t.style })));
-        setModels((prev) => [...detail.setup.models, ...prev.filter((m) => !detail.setup.models.some((x) => key(x) === key(m)))]);
-        setChecked(new Set(detail.setup.models.map(key)));
+        setModelList(
+          [...detail.setup.models, ...models.filter((m) => !detail.setup.models.some((x) => key(x) === key(m)))],
+          new Set(detail.setup.models.map(key)),
+        );
         setVariations(detail.setup.variations);
         setOpen(true);
         return;
@@ -281,10 +345,20 @@ export function BenchmarkRunner({
     const model = rest.join("|");
     if ((provider !== "kenari" && provider !== "gemini") || !model) return;
     const m = { provider, model } as BenchModel;
-    if (!models.some((x) => key(x) === key(m))) setModels([...models, m]);
-    setChecked(new Set([...checked, key(m)]));
+    const nextModels = models.some((x) => key(x) === key(m)) ? models : [...models, m];
+    setModelList(nextModels, new Set([...checked, key(m)]));
     setExtra("");
   }
+
+  // What the "add model" dropdown offers: chat and image models only, minus the ones already listed or hidden.
+  const listed = new Set(models.map(key));
+  const available = (k: string) => !hidden.has(k) && !listed.has(k);
+  const offered = {
+    free: catalog.filter((m) => m.free && m.chat && !m.image && available(`kenari|${m.id}`)),
+    paid: catalog.filter((m) => !m.free && m.chat && !m.image && !IMAGE_MODELS.includes(m.id) && available(`kenari|${m.id}`)),
+    image: IMAGE_MODELS.filter((id) => available(`kenari|${id}`)),
+    gemini: geminiModels.filter((id) => available(`gemini|${id}`)),
+  };
 
   const finished = state?.cells.filter((c) => c.status === "selesai" || c.status === "gagal").length ?? 0;
   const total = state?.cells.length ?? 0;
@@ -354,8 +428,17 @@ export function BenchmarkRunner({
 
             <fieldset className="space-y-2">
               <legend className="text-sm font-semibold">Tema (bahasa Inggris)</legend>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={shuffleAll}>
+                  <Shuffle />
+                  Acak semua tema
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Tiap baris diganti tema baru dengan gaya yang sama. Satu baris saja: pakai ikon panah di kanannya.
+                </span>
+              </div>
               {themes.map((t, i) => (
-                <div key={i} className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_16rem_auto]">
+                <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 sm:grid-cols-[1fr_16rem_auto_auto]">
                   <Input
                     aria-label={`Tema ${i + 1}`}
                     value={t.theme}
@@ -367,7 +450,7 @@ export function BenchmarkRunner({
                     aria-label={`Gaya tema ${i + 1}`}
                     value={t.style}
                     onChange={(e) => setThemes(themes.map((x, j) => (j === i ? { ...x, style: e.target.value as StyleId } : x)))}
-                    className={cn(selectClass, "max-sm:col-span-1 max-sm:row-start-2")}
+                    className={cn(selectClass, "max-sm:col-span-3 max-sm:row-start-2")}
                   >
                     {STYLES.map((s) => (
                       <option key={s.value} value={s.value}>
@@ -379,10 +462,19 @@ export function BenchmarkRunner({
                     type="button"
                     variant="ghost"
                     size="icon"
+                    aria-label={`Ganti tema ${i + 1} dengan yang baru`}
+                    title="Ganti dengan tema baru"
+                    onClick={() => shuffleOne(i)}
+                  >
+                    <RefreshCw />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     aria-label={`Hapus tema ${i + 1}`}
                     disabled={themes.length <= 1}
                     onClick={() => setThemes(themes.filter((_, j) => j !== i))}
-                    className="max-sm:row-span-2"
                   >
                     <X />
                   </Button>
@@ -410,7 +502,7 @@ export function BenchmarkRunner({
                           const next = new Set(checked);
                           if (e.target.checked) next.add(key(m));
                           else next.delete(key(m));
-                          setChecked(next);
+                          setModelList(models, next);
                         }}
                       />
                       <span className="truncate font-mono text-xs">{m.model}</span>
@@ -418,74 +510,108 @@ export function BenchmarkRunner({
                         {m.provider === "gemini"
                           ? "Gemini, gratis"
                           : isImageModel(m)
-                            ? `gambar, ${formatIdr(imagePriceIdr(m.model)!)}/gambar`
+                            ? `gambar, ${imagePriceIdr(m.model) === 0 ? "gratis" : `${formatIdr(imagePriceIdr(m.model)!)}/gambar`}`
                             : m.model.endsWith(":free")
                               ? "Kenari, gratis"
                               : "Kenari, berbayar"}
                       </span>
                     </label>
-                    {!DEFAULT_MODELS.some((d) => key(d) === key(m)) && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Buang ${m.model} dari daftar`}
-                        onClick={() => {
-                          setModels(models.filter((x) => key(x) !== key(m)));
-                          const next = new Set(checked);
-                          next.delete(key(m));
-                          setChecked(next);
-                        }}
-                      >
-                        <X />
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Buang ${m.model} dari daftar`}
+                      title="Buang dari daftar"
+                      onClick={() => {
+                        const next = new Set(checked);
+                        next.delete(key(m));
+                        setModelList(
+                          models.filter((x) => key(x) !== key(m)),
+                          next,
+                        );
+                      }}
+                    >
+                      <X />
+                    </Button>
                   </div>
                 ))}
               </div>
               {(catalog.length > 0 || geminiModels.length > 0) && (
-                <div className="flex gap-2">
-                  <select aria-label="Tambah model" value={extra} onChange={(e) => setExtra(e.target.value)} className={selectClass}>
-                    <option value="">Tambah model lain...</option>
-                    <optgroup label="Kenari gratis">
-                      {catalog
-                        .filter((m) => m.free)
-                        .map((m) => (
-                          <option key={m.id} value={`kenari|${m.id}`}>
-                            {m.id}
-                          </option>
-                        ))}
-                    </optgroup>
-                    <optgroup label="Kenari berbayar">
-                      {catalog
-                        .filter((m) => !m.free && !IMAGE_MODELS.includes(m.id))
-                        .map((m) => (
-                          <option key={m.id} value={`kenari|${m.id}`}>
-                            {m.id}
-                          </option>
-                        ))}
-                    </optgroup>
-                    <optgroup label="Kenari gambar (Siluet, Line art)">
-                      {IMAGE_MODELS.map((id) => (
-                        <option key={id} value={`kenari|${id}`}>
-                          {id} · {formatIdr(KENARI_IMAGE_PRICES_IDR[id])}/gambar
-                        </option>
-                      ))}
-                    </optgroup>
-                    {geminiModels.length > 0 && (
-                      <optgroup label="Gemini (free tier)">
-                        {geminiModels.map((id) => (
-                          <option key={id} value={`gemini|${id}`}>
-                            {id}
-                          </option>
-                        ))}
-                      </optgroup>
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      aria-label="Tambah model"
+                      value={extra}
+                      onChange={(e) => setExtra(e.target.value)}
+                      className={cn(selectClass, "min-w-0 flex-1")}
+                    >
+                      <option value="">Tambah model lain...</option>
+                      {offered.free.length > 0 && (
+                        <optgroup label="Kenari gratis">
+                          {offered.free.map((m) => (
+                            <option key={m.id} value={`kenari|${m.id}`}>
+                              {m.id}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {offered.paid.length > 0 && (
+                        <optgroup label="Kenari berbayar">
+                          {offered.paid.map((m) => (
+                            <option key={m.id} value={`kenari|${m.id}`}>
+                              {m.id}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {offered.image.length > 0 && (
+                        <optgroup label="Kenari gambar (Siluet, Line art)">
+                          {offered.image.map((id) => (
+                            <option key={id} value={`kenari|${id}`}>
+                              {id} · {imageCost(id)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {offered.gemini.length > 0 && (
+                        <optgroup label="Gemini (free tier)">
+                          {offered.gemini.map((id) => (
+                            <option key={id} value={`gemini|${id}`}>
+                              {id}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                    <Button type="button" variant="outline" onClick={addExtra} disabled={!extra}>
+                      Tambah
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={hideExtra} disabled={!extra} title="Sembunyikan model yang dipilih dari daftar ini">
+                      <EyeOff />
+                      Sembunyikan
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span>Daftar ini hanya memuat model teks dan gambar. Model suara, video, dan transkripsi tidak ditampilkan.</span>
+                    {hidden.size > 0 && (
+                      <button
+                        type="button"
+                        className="font-semibold text-foreground underline underline-offset-4"
+                        onClick={() => setModelList(models, checked, new Set())}
+                      >
+                        Tampilkan {hidden.size} model tersembunyi
+                      </button>
                     )}
-                  </select>
-                  <Button type="button" variant="outline" onClick={addExtra} disabled={!extra}>
-                    Tambah
-                  </Button>
-                </div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 font-semibold text-foreground underline underline-offset-4"
+                      onClick={resetModels}
+                    >
+                      <RotateCcw className="size-3" />
+                      Kembalikan daftar bawaan
+                    </button>
+                  </div>
+                </>
               )}
               {idleModels.length > 0 && (
                 <p className="text-xs text-warning-foreground">

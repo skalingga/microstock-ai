@@ -265,7 +265,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
       ))}
       <datalist id="models-image">
         {Object.entries(imagePrices).map(([id, price]) => (
-          <option key={id} value={id} label={`${formatIdr(price)} per gambar`} />
+          <option key={id} value={id} label={price === 0 ? "gratis" : `${formatIdr(price)} per gambar`} />
         ))}
       </datalist>
 
@@ -307,9 +307,11 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
             name="kenari_image_model"
             label="Model gambar (Siluet dan Line art)"
             hint={
-              imagePrice
-                ? `${formatIdr(imagePrice)} per gambar dari saldo Kenari. Tanpa cadangan.`
-                : `Harga ${effectiveImageModel} belum dikenal aplikasi, jadi panggilannya akan ditolak. Pilih dari daftar.`
+              imagePrice === 0
+                ? "Model gratis: tidak dihitung ke anggaran. Tanpa cadangan."
+                : imagePrice
+                  ? `${formatIdr(imagePrice)} per gambar dari saldo Kenari. Tanpa cadangan.`
+                  : `Harga ${effectiveImageModel} belum dikenal aplikasi, jadi panggilannya akan ditolak. Pilih dari daftar.`
             }
             error={errors.kenari_image_model}
           >
