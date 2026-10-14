@@ -54,8 +54,13 @@ export default async function HalamanPengaturan() {
   // Tested models first, so the benchmark winners are at the top of each list.
   const byTested = (a: ModelOption, b: ModelOption) => Number(b.tested) - Number(a.tested);
   const kenariOptions = catalog
-    .filter((m) => !NON_TEXT_MODEL.test(m.id))
+    .filter((m) => m.chat && !m.image && !NON_TEXT_MODEL.test(m.id))
     .map((m) => option("kenari", m.id, m.free ? "gratis" : "berbayar", !m.free))
+    .sort(byTested);
+  // Image models: the price table is the list of what the app can bill, so only those are offered.
+  const imageOptions: ModelOption[] = Object.entries(KENARI_IMAGE_PRICES_IDR)
+    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+    .map(([id, price]) => option("kenari", id, price === 0 ? "gratis" : `Rp${price}/gambar`, price > 0))
     .sort(byTested);
   const geminiOptions = geminiModels.map((id) => option("gemini", id, "gratis")).sort(byTested);
 
@@ -81,6 +86,7 @@ export default async function HalamanPengaturan() {
             image: process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL,
           }}
           imagePrices={KENARI_IMAGE_PRICES_IDR}
+          imageOptions={imageOptions}
           svgCostIdr={svgCostIdr}
           options={{ kenari: kenariOptions, gemini: geminiOptions }}
         />
