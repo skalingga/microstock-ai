@@ -121,7 +121,7 @@ Pemicu: contoh orang lain (bulk prompt di Flow, 15 tema "3D business icons", 6 i
 - **Satu lembar = satu aset.** Lembar Flow 2K (16:9, 4,2 MP) diunggah utuh. Jangan dipotong jadi ikon: satu ikon hasil
   potongan sekitar 0,9 MP, di bawah minimal Adobe 4 MP.
 - **Prompt satu baris**: `3D <sub-tema> icons, 6 icons in one frame: <6 ikon>, <tampilan + palet>, clean white
-  background, evenly spaced grid.` Mode "Subjek berbeda" = tiap prompt sub-tema berbeda; "Variasi satu subjek" = satu
+  background, no grid lines, no dividers, no panels, no cards, no frames.` Mode "Subjek berbeda" = tiap prompt sub-tema berbeda; "Variasi satu subjek" = satu
   topik, kelompok 6 ikon berbeda per lembar. Ikon yang biasanya bertulisan (badge ID, sertifikat, kontrak, stempel,
   papan, label harga, sampul buku, kalender, jam berangka) dilarang di prompt; contoh pengguna memuat "LOAN AGREEMENT",
   "ALEX JOHNSON", "RELAX", "APPROVED", yang akan jadi `visible_text`.

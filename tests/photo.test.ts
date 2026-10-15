@@ -211,6 +211,10 @@ describe("illustration variant", () => {
     expect(user).toMatch(/ONE single line/);
     expect(user).toMatch(/No text anywhere/);
     expect(user).toMatch(/ID badges, certificates/);
+    // The image model draws divider lines and card panels when the prompt says "grid"; the sheet must be one white field.
+    expect(user).toMatch(/no grid lines, no dividers, no panels, no cards, no frames/);
+    expect(user).not.toMatch(/evenly spaced grid/);
+    expect(user).toMatch(/Never use these at all: clocks, watches, rulers, compasses/);
     expect(user).toContain("generic briefcase");
     expect(user).not.toContain("ONE subject");
   });

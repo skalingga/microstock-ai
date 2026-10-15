@@ -388,7 +388,7 @@ const ILLUSTRATION_RULES = [
 // Icon sheets: one image of ICON_SET_SIZE separate icons. Things that carry writing are the usual failure (badges, signed
 // papers, stamps, signs, clock numerals, price tags), and Adobe refuses embedded text, so they are named and banned.
 const ICON_SET_RULES = [
-  "No text anywhere: no letters, numbers, words, labels, names, captions, logos, brand names, signatures, or watermarks, and no icon that normally carries writing. Avoid ID badges, certificates, contracts or agreements, stamps, signs, banners, price tags, book covers, calendars with dates, and clocks or rulers with numerals; if a clock appears it has plain tick marks only.",
+  "No text anywhere: no letters, numbers, words, labels, names, captions, logos, brand names, signatures, or watermarks, and no icon that normally carries writing. Avoid ID badges, certificates, contracts or agreements, stamps, signs, banners, price tags, book covers, calendars with dates, calculators, keyboards, barcodes, speedometers, thermometers, and anything with numerals or letters on it. Never use these at all: clocks, watches, rulers, compasses (a compass with N E S W letters is the usual failure; use a map pin instead), passports, mailboxes, license plates, road signs, and coins or bills (they carry currency symbols). When unsure whether an object carries writing, choose another object.",
   "Never name or imitate brands, trademarks, artists, studios, fictional characters, or mascots, and never write 'in the style of' anyone. Describe the look with technique and materials only.",
   "Use objects, tools, symbols, plants, animals, and buildings. No people, faces, or realistic body parts; a plain hand is the only exception.",
   "Never show or imply a real news event, disaster, protest, or politics.",
@@ -419,7 +419,7 @@ function iconSetPromptsPrompt(input: PhotoPromptsInput): { system: string; user:
       ...(input.avoid && input.avoid.length > 0
         ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
         : []),
-      `Write each prompt as ONE single line of plain English, 30 to 70 words, with no line breaks, in this order: "3D <sub-topic> icons, ${n} icons in one frame: <the ${n} icons separated by commas>, <the look above in a few words and the palette>, clean white background, evenly spaced grid."`,
+      `Write each prompt as ONE single line of plain English, 30 to 70 words, with no line breaks, in this order: "3D <sub-topic> icons, ${n} icons in one frame: <the ${n} icons separated by commas>, <the look above in a few words and the palette>, two even rows of three, one seamless pure white background, no grid lines, no dividers, no panels, no cards, no frames, no text."`,
       ...ICON_SET_RULES,
       "",
       'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',
