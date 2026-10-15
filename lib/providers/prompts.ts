@@ -1,7 +1,14 @@
 import { ADOBE, ADOBE_CATEGORIES } from "@/lib/adobe/rules";
 import { colorRangeFor, isIconStyle, isImageStyle, type ImageStyleId, type StyleId } from "@/lib/settings/schema";
 import { SVG_EXAMPLES, SVG_EXAMPLE_NOTES } from "./examples";
-import { PHOTO_PROBLEM_IDS } from "@/lib/photo/config";
+import {
+  DEFAULT_ILLUSTRATION_STYLE,
+  ICON_SET_SIZE,
+  ICON_SET_STYLE,
+  ILLUSTRATION_STYLES,
+  PHOTO_PROBLEM_IDS,
+  isIconSetPrompt,
+} from "@/lib/photo/config";
 import type { ConceptInput, MetadataInput, PhotoMetadataInput, PhotoPromptsInput, SvgInput, ThemesInput } from "./types";
 
 // Prompts to the AI are in English (CLAUDE.md).
@@ -369,8 +376,96 @@ function backgroundPromptsPrompt(input: PhotoPromptsInput): { system: string; us
   };
 }
 
+// Raster illustrations (stickers, watercolor...): drawn pictures of one clear subject. The category is crowded, and
+// Adobe refuses copied styles and IP, so every prompt needs a concrete differentiator and no names.
+const ILLUSTRATION_RULES = [
+  "No text anywhere: no letters, numbers, speech bubbles, signs, labels, banners, logos, brand names, signatures, or watermarks. A sticker has no caption.",
+  "Never name or imitate brands, trademarks, artists, illustrators, studios, fictional characters, mascots, or recognizable artworks, and never write 'in the style of' anyone. Describe the look with technique and materials only.",
+  "Prefer animals, objects, plants, food, vehicles, places, and generic friendly characters. If a person appears it is a simple generic cartoon character, never a real or famous person or a lookalike.",
+  "Never show or imply a real news event, disaster, protest, or politics.",
+];
+
+// Icon sheets: one image of ICON_SET_SIZE separate icons. Things that carry writing are the usual failure (badges, signed
+// papers, stamps, signs, clock numerals, price tags), and Adobe refuses embedded text, so they are named and banned.
+const ICON_SET_RULES = [
+  "No text anywhere: no letters, numbers, words, labels, names, captions, logos, brand names, signatures, or watermarks, and no icon that normally carries writing. Avoid ID badges, certificates, contracts or agreements, stamps, signs, banners, price tags, book covers, calendars with dates, and clocks or rulers with numerals; if a clock appears it has plain tick marks only.",
+  "Never name or imitate brands, trademarks, artists, studios, fictional characters, or mascots, and never write 'in the style of' anyone. Describe the look with technique and materials only.",
+  "Use objects, tools, symbols, plants, animals, and buildings. No people, faces, or realistic body parts; a plain hand is the only exception.",
+  "Never show or imply a real news event, disaster, protest, or politics.",
+];
+
+function iconSetPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  const style = ILLUSTRATION_STYLES.find((s) => s.value === ICON_SET_STYLE)!;
+  const n = ICON_SET_SIZE;
+  return {
+    system:
+      "You are a stock illustration art director planning AI-generated raster icon sheets for Adobe Stock. " +
+      "You write prompts for an image model and answer with a single JSON object and nothing else.",
+    user: [
+      `Theme: ${input.theme}`,
+      `Aspect ratio of every image: ${input.aspect}`,
+      `Look every prompt must keep: ${style.look}.`,
+      "",
+      ...(input.variations
+        ? [
+            `Write exactly ${input.count} prompts for ONE topic: the topic of the theme. Each prompt picks a different group of ${n} icons within that topic and may change the color palette, so every sheet is new yet the sheets belong together.`,
+          ]
+        : [
+            `Write exactly ${input.count} prompts, each for a clearly different sub-topic within this theme (for the theme "business": entrepreneurship, office equipment, teamwork, marketing, sales, project management...). Each sheet has its own sub-topic.`,
+          ]),
+      `Each prompt describes ONE sheet of exactly ${n} different icons of the same sub-topic, drawn as separate objects. Name all ${n} icons in the prompt. No icon repeats inside a sheet, and no two prompts share more than one icon.`,
+      "Every icon must be a simple, recognizable physical object that one clear 3D shape can show, easy to tell apart from the others at a small size. No abstract concepts, processes, diagrams, trajectories, screens with content, or 'model of' something. Prefer a specific, commercially useful object over its most generic version (a leather document case, not 'a box'). Each of the 6 icons must be something people tie to that sub-topic at once; do not pad a sheet with objects that belong to another sub-topic (no piggy bank in a teamwork sheet). Name a palette of 2 to 4 specific colors for the sheet.",
+      "Do not repeat an icon between sheets of this batch, and keep the subject field consistent with the icons named in the prompt.",
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
+      `Write each prompt as ONE single line of plain English, 30 to 70 words, with no line breaks, in this order: "3D <sub-topic> icons, ${n} icons in one frame: <the ${n} icons separated by commas>, <the look above in a few words and the palette>, clean white background, evenly spaced grid."`,
+      ...ICON_SET_RULES,
+      "",
+      'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',
+      "- subject: the sub-topic and its main icons, max 10 words.",
+      "- prompt: the full one-line prompt for the image model. Never mention Adobe, stock, AI, or these instructions in it.",
+    ].join("\n"),
+  };
+}
+
+function illustrationPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
+  if (input.illustrationStyle === ICON_SET_STYLE) return iconSetPromptsPrompt(input);
+  const style = ILLUSTRATION_STYLES.find((s) => s.value === input.illustrationStyle) ?? ILLUSTRATION_STYLES.find((s) => s.value === DEFAULT_ILLUSTRATION_STYLE)!;
+  return {
+    system:
+      "You are a stock illustration art director planning AI-generated raster illustrations for Adobe Stock. " +
+      "You write prompts for an image model and answer with a single JSON object and nothing else.",
+    user: [
+      `Theme: ${input.theme}`,
+      `Aspect ratio of every image: ${input.aspect}`,
+      `Look every prompt must keep: ${style.look}.`,
+      "",
+      ...(input.variations
+        ? [
+            `Write exactly ${input.count} prompts for ONE subject: the subject of the theme. Each prompt keeps the same look and changes the pose, the angle, the accessories, the details or the color palette, so the set is cohesive yet no two images look alike.`,
+          ]
+        : [
+            `Write exactly ${input.count} prompts for clearly different subjects within this theme, all in the same look. Vary the subject, the pose, the details and the palette so no two images look alike.`,
+          ]),
+      // Adobe refuses "similar content": the plain version of a popular subject is already in its collection many times over.
+      "Every subject must be specific and commercially useful, never the most generic version of the theme. Give each one a concrete differentiator: a particular variety, era, material, activity, season, or an unusual but believable detail. Name a palette of 2 to 4 specific colors. No two prompts may share the same subject and palette.",
+      ...(input.avoid && input.avoid.length > 0
+        ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
+        : []),
+      "Each prompt describes ONE illustration in 40 to 80 words of plain English: the subject and its pose, the look above, the colors, the details, and the background. Clean, sharp, high resolution, one centered subject, generous margin around it, nothing cropped at the edges.",
+      ...ILLUSTRATION_RULES,
+      "",
+      'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',
+      "- subject: what the illustration shows, max 10 words.",
+      "- prompt: the full prompt for the image model. Never mention Adobe, stock, AI, or these instructions in it.",
+    ].join("\n"),
+  };
+}
+
 export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; user: string } {
   if (input.variant === "background") return backgroundPromptsPrompt(input);
+  if (input.variant === "illustration") return illustrationPromptsPrompt(input);
   return {
     system:
       "You are a stock photography art director planning AI-generated photos for Adobe Stock. " +
@@ -404,10 +499,11 @@ export function photoPromptsPrompt(input: PhotoPromptsInput): { system: string; 
 
 export function photoMetadataPrompt(input: Omit<PhotoMetadataInput, "image">): { system: string; user: string } {
   const background = input.variant === "background";
-  const noun = background ? "picture" : "photo";
+  const illustration = input.variant === "illustration";
+  const noun = background ? "picture" : illustration ? "illustration" : "photo";
   return {
     system:
-      `You write search metadata for Adobe Stock ${background ? "background images" : "photos"} and check them for defects before upload. ` +
+      `You write search metadata for Adobe Stock ${background ? "background images" : illustration ? "raster illustrations" : "photos"} and check them for defects before upload. ` +
       `You look at the attached ${noun} and answer with a single JSON object and nothing else.`,
     user: [
       `Theme (the wording the creator typed, which can be loose): ${input.theme}`,
@@ -417,7 +513,14 @@ export function photoMetadataPrompt(input: Omit<PhotoMetadataInput, "image">): {
       `- title: a short, descriptive phrase of at most ${ADOBE.titleMaxChars} characters. Plain text: no commas, no quotes, no special characters. Do not mention AI or how the ${noun} was made.`,
       background
         ? '- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. This is a background with no subject: include "background", "backdrop" or "wallpaper" as fitting, the style or technique (gradient, bokeh, glass, texture, geometric...), the dominant colors, the mood, the uses (presentation, website banner, social media, technology, business...), and "copy space" when an area is left empty. No brand, artist, character, or celebrity names, and no words about AI.'
-        : "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
+        : illustration
+          ? '- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, "illustration", the art style (cartoon, sticker, watercolor, flat, isometric, retro...), the technique or materials, the dominant colors, the mood, the uses (print, card, scrapbook, children, decoration, social media...), and "isolated" or "white background" when it applies. Never use the word "vector": this is a raster image. No brand, artist, character, or celebrity names, and no words about AI.'
+          : "- keywords: 25 to 40 keywords ordered from most to least important (the first ten matter most). Single words or short phrases of at most three words. Include the subject, the action, the setting, the mood, concepts the photo can illustrate, and, when people appear, how many and their age group. No brand, artist, character, or celebrity names, and no words about AI.",
+      ...(illustration && isIconSetPrompt(input.prompt)
+        ? [
+            '- This picture is a sheet of several separate 3D icons. In the title and keywords name the sub-topic and the main icons shown, and use "3D icons", "icon set" and "icon collection" among the keywords. Describe only icons you can see. Any writing on an icon (letters, numbers, names) is visible_text.',
+          ]
+        : []),
       `- category: exactly one of: ${ADOBE_CATEGORIES.join(" | ")}`,
       "- has_people: true if any person or part of a person is visible, otherwise false.",
       `- problems: the defects you see, as a list using only these ids: ${PHOTO_PROBLEM_IDS.join(", ")}. visible_text = any readable or garbled letters, numbers, signs, labels or book titles. logo_or_watermark = any logo, brand mark or watermark. deformed_people = extra, missing or merged fingers, distorted faces, impossible limbs. real_person_or_brand = looks like a celebrity, a branded product or a trademarked design. artifact = melted or impossible objects and other obvious AI glitches. Be strict and report anything you notice; use an empty list only when the ${noun} is clean.`,

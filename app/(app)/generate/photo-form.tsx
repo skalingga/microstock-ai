@@ -17,13 +17,20 @@ import { RateGate } from "@/lib/generate/queue";
 import {
   DEFAULT_BACKGROUND_ASPECT,
   DEFAULT_FLOW_MODEL,
+  DEFAULT_ILLUSTRATION_ASPECT,
+  DEFAULT_ILLUSTRATION_STYLE,
   DEFAULT_PHOTO_ASPECT,
   DEFAULT_PHOTO_VARIANT,
   FLOW_MODELS,
   FLOW_URL,
+  ICON_SET_ASPECT,
+  ICON_SET_SIZE,
+  ICON_SET_STYLE,
+  ILLUSTRATION_STYLES,
   MAX_PHOTO_PROMPTS,
   PHOTO_ASPECTS,
   PHOTO_INPUT_TYPES,
+  type IllustrationStyleId,
   type PhotoAspect,
   type PhotoVariant,
 } from "@/lib/photo/config";
@@ -65,7 +72,14 @@ const STAGE_LABEL: Record<UploadStage, string> = {
 const VARIANTS: { value: PhotoVariant; label: string }[] = [
   { value: "photo", label: "Foto" },
   { value: "background", label: "Background" },
+  { value: "illustration", label: "Ilustrasi" },
 ];
+
+const DEFAULT_ASPECT: Record<PhotoVariant, PhotoAspect> = {
+  photo: DEFAULT_PHOTO_ASPECT,
+  background: DEFAULT_BACKGROUND_ASPECT,
+  illustration: DEFAULT_ILLUSTRATION_ASPECT,
+};
 
 const SET_MODES: Record<PhotoVariant, { label: string; variations: boolean }[]> = {
   photo: [
@@ -75,6 +89,10 @@ const SET_MODES: Record<PhotoVariant, { label: string; variations: boolean }[]> 
   background: [
     { label: "Desain beragam", variations: false },
     { label: "Variasi satu gaya", variations: true },
+  ],
+  illustration: [
+    { label: "Subjek beragam", variations: false },
+    { label: "Variasi satu subjek", variations: true },
   ],
 };
 
@@ -94,7 +112,17 @@ const VARIANT_COPY: Record<PhotoVariant, { title: string; intro: string; placeho
     hint: "Bahasa Inggris. Tanpa orang, teks, logo, atau merek. Makin spesifik (bahan, pasangan warna, kegunaan) makin kecil risiko \"similar content\".",
     button: "Tulis prompt background",
   },
+  illustration: {
+    title: "Prompt ilustrasi baru",
+    intro:
+      "Ilustrasi raster berdetail (stiker, cat air, buku cerita, isometrik) yang dibuat model gambar, bukan SVG. Aplikasi menulis prompt, kamu membuatnya di Google Flow, lalu unggah hasilnya ke sini (diekspor sebagai JPEG).",
+    placeholder: "mis. retro motorcycle",
+    hint: "Bahasa Inggris. Satu subjek jelas per gambar; tanpa teks, merek, tokoh, atau nama seniman. Makin spesifik makin kecil risiko \"similar content\".",
+    button: "Tulis prompt ilustrasi",
+  },
 };
+
+const TYPE_LABEL: Record<PhotoVariant, string> = { photo: "Foto", background: "Background", illustration: "Ilustrasi" };
 
 export function PhotoForm({
   userId,
@@ -118,8 +146,9 @@ export function PhotoForm({
   const [countText, setCountText] = useState("5");
   // After writing prompts the page reloads with the job open: keep the kind the user was working on.
   const [variant, setVariant] = useState<PhotoVariant>(openJob?.data.variant ?? DEFAULT_PHOTO_VARIANT);
-  const [aspect, setAspect] = useState<PhotoAspect>(
-    openJob?.data.variant === "background" ? DEFAULT_BACKGROUND_ASPECT : DEFAULT_PHOTO_ASPECT,
+  const [aspect, setAspect] = useState<PhotoAspect>(DEFAULT_ASPECT[openJob?.data.variant ?? DEFAULT_PHOTO_VARIANT]);
+  const [illustrationStyle, setIllustrationStyle] = useState<IllustrationStyleId>(
+    openJob?.data.illustrationStyle ?? DEFAULT_ILLUSTRATION_STYLE,
   );
   const [variations, setVariations] = useState(false);
   const [writing, setWriting] = useState(false);
@@ -127,7 +156,7 @@ export function PhotoForm({
   const [error, setError] = useState<string | null>(null);
 
   const [flowModel, setFlowModel] = useState<string>(DEFAULT_FLOW_MODEL);
-  const [copied, setCopied] = useState<number | "semua" | null>(null);
+  const [copied, setCopied] = useState<number | "semua" | "baris" | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const files = useRef(new Map<string, File>());
   const busy = useRef(false);
@@ -146,12 +175,15 @@ export function PhotoForm({
   function pickVariant(next: PhotoVariant) {
     if (next === variant) return;
     setVariant(next);
-    // Backgrounds are wide; switch the ratio unless the user already chose another one.
-    setAspect((current) => {
-      const was = next === "background" ? DEFAULT_PHOTO_ASPECT : DEFAULT_BACKGROUND_ASPECT;
-      const now = next === "background" ? DEFAULT_BACKGROUND_ASPECT : DEFAULT_PHOTO_ASPECT;
-      return current === was ? now : current;
-    });
+    // Each kind has its usual ratio; switch it unless the user already chose another one.
+    setAspect((current) => (current === DEFAULT_ASPECT[variant] ? DEFAULT_ASPECT[next] : current));
+  }
+
+  function pickStyle(next: IllustrationStyleId) {
+    setIllustrationStyle(next);
+    // An icon sheet is a 3 by 2 grid and wants a wide frame; go back to the usual ratio when leaving it.
+    if (next === ICON_SET_STYLE && aspect === DEFAULT_ASPECT.illustration) setAspect(ICON_SET_ASPECT);
+    if (next !== ICON_SET_STYLE && illustrationStyle === ICON_SET_STYLE && aspect === ICON_SET_ASPECT) setAspect(DEFAULT_ASPECT.illustration);
   }
 
   // Object URLs of the previews belong to this page.
@@ -162,7 +194,7 @@ export function PhotoForm({
     if (!themeValid || !countValid || bannedHits.length > 0 || writing) return;
     setWriting(true);
     setError(null);
-    setStatus(variant === "background" ? "Menulis prompt background..." : "Menulis prompt foto...");
+    setStatus(`Menulis prompt ${TYPE_LABEL[variant].toLowerCase()}...`);
     const controller = new AbortController();
     try {
       const { jobId } = await writePhotoPrompts({
@@ -173,6 +205,7 @@ export function PhotoForm({
         avoid: saturated.slice(0, MAX_AVOID).map((s) => s.subject),
         variations,
         variant,
+        illustrationStyle: variant === "illustration" ? illustrationStyle : undefined,
         signal: controller.signal,
         onStatus: setStatus,
       });
@@ -186,7 +219,7 @@ export function PhotoForm({
     }
   }
 
-  async function copy(text: string, which: number | "semua") {
+  async function copy(text: string, which: number | "semua" | "baris") {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
@@ -276,6 +309,8 @@ export function PhotoForm({
   const gagalQc = finished.filter((u) => u.qc === "gagal").length;
   const perPrompt = (index: number) => uploads.filter((u) => u.promptIndex === index && u.stage !== "gagal").length;
   const allPrompts = openJob?.data.prompts.map((p, i) => `${i + 1}. ${p.prompt}`).join("\n\n") ?? "";
+  // Bulk prompt tools take one prompt per line, no numbering and no blank lines.
+  const promptLines = openJob?.data.prompts.map((p) => p.prompt.replace(/\s*\n\s*/g, " ").trim()).join("\n") ?? "";
 
   return (
     <div className="space-y-6">
@@ -284,7 +319,8 @@ export function PhotoForm({
           <CardHeader>
             <CardTitle>
               <h2 className="text-lg font-extrabold">
-                {openJob.data.variant === "background" ? "Prompt background untuk Flow" : "Prompt untuk Flow"}: {openJob.theme}
+                {openJob.data.variant === "photo" ? "Prompt untuk Flow" : `Prompt ${TYPE_LABEL[openJob.data.variant].toLowerCase()} untuk Flow`}:{" "}
+                {openJob.theme}
               </h2>
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -297,6 +333,10 @@ export function PhotoForm({
               <Button type="button" variant="secondary" onClick={() => copy(allPrompts, "semua")}>
                 {copied === "semua" ? <Check /> : <Copy />}
                 {copied === "semua" ? "Tersalin" : `Salin semua (${openJob.data.prompts.length})`}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => copy(promptLines, "baris")}>
+                {copied === "baris" ? <Check /> : <Copy />}
+                {copied === "baris" ? "Tersalin" : "Salin per baris (bulk)"}
               </Button>
               <a href={FLOW_URL} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "outline" })}>
                 <ExternalLink />
@@ -488,6 +528,30 @@ export function PhotoForm({
               )}
             </div>
 
+            {variant === "illustration" && (
+              <div className="space-y-2">
+                <Label htmlFor="illustration-style">Gaya gambar</Label>
+                <select
+                  id="illustration-style"
+                  value={illustrationStyle}
+                  onChange={(e) => pickStyle(e.target.value as IllustrationStyleId)}
+                  disabled={writing}
+                  className={selectClass}
+                >
+                  {ILLUSTRATION_STYLES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-muted-foreground">
+                  {illustrationStyle === ICON_SET_STYLE
+                    ? `Satu prompt = satu lembar berisi ${ICON_SET_SIZE} ikon berbeda (3×2), diunggah utuh sebagai satu aset. Jangan dipotong: satu ikon hasil potongan di bawah 4 MP. Ikon yang biasanya bertulisan (badge, dokumen, stempel) dihindari prompt.`
+                    : "Satu gaya per set. Hasilnya JPEG di latar polos (JPEG tidak punya transparansi)."}
+                </p>
+              </div>
+            )}
+
             <fieldset className="space-y-2" disabled={writing}>
               <legend className="text-sm font-medium">Isi set</legend>
               <div className="flex flex-wrap gap-1">
@@ -582,8 +646,8 @@ export function PhotoForm({
                   {job.theme}
                 </Link>
                 <span className="text-muted-foreground">
-                  {job.variant === "background" ? "Background · " : ""}
-                  {job.prompts} prompt · {job.uploaded} {job.variant === "background" ? "gambar" : "foto"} ·{" "}
+                  {job.variant === "photo" ? "" : `${TYPE_LABEL[job.variant]} · `}
+                  {job.prompts} prompt · {job.uploaded} {job.variant === "photo" ? "foto" : "gambar"} ·{" "}
                   {new Date(job.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" })}
                 </span>
               </li>

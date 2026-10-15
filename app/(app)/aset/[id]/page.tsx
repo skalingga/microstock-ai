@@ -13,7 +13,7 @@ import { STYLES, type StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { applyGalleryFilter, galleryQuery, parseGalleryFilter, withQuery, type GalleryParams } from "../filters";
+import { applyGalleryFilter, galleryQuery, parseGalleryFilter, photoLabel, withQuery, type GalleryParams } from "../filters";
 import { AdobeResultForm } from "./adobe-result-form";
 import { RegenerateMetadataButton, RerunQcButton } from "./asset-actions";
 import { DeleteButton } from "./delete-button";
@@ -88,8 +88,9 @@ export default async function HalamanDetailAset({
 
   const isPhoto = asset.kind === "photo";
   const style = (STYLES.find((s) => s.value === job?.style)?.value ?? "icon_set") as StyleId;
-  const isBackground = isPhoto && asset.photo_variant === "background";
-  const styleLabel = isPhoto ? (isBackground ? "Background (Google Flow)" : "Foto (Google Flow)") : (STYLES.find((s) => s.value === style)?.label ?? style);
+  const photoVariant: "photo" | "background" | "illustration" =
+    asset.photo_variant === "background" ? "background" : asset.photo_variant === "illustration" ? "illustration" : "photo";
+  const styleLabel = isPhoto ? `${photoLabel(photoVariant)} (Google Flow)` : (STYLES.find((s) => s.value === style)?.label ?? style);
 
   // Same file name the export would give it, so a manual upload matches the CSV.
   const extension = isPhoto ? ADOBE_PHOTO.extension : ".svg";
@@ -276,7 +277,7 @@ export default async function HalamanDetailAset({
               bannedWords={settings?.banned_words ?? []}
               photo={
                 isPhoto && asset.image_path
-                  ? { imagePath: asset.image_path, prompt: photoPrompt || undefined, variant: isBackground ? "background" : "photo" }
+                  ? { imagePath: asset.image_path, prompt: photoPrompt || undefined, variant: photoVariant }
                   : undefined
               }
             />

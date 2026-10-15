@@ -1,4 +1,4 @@
-import type { PhotoAspect, PhotoProblem, PhotoVariant } from "@/lib/photo/config";
+import type { IllustrationStyleId, PhotoAspect, PhotoProblem, PhotoVariant } from "@/lib/photo/config";
 import type { StyleId } from "@/lib/settings/schema";
 
 export type ProviderId = "kenari" | "gemini" | "recraft";
@@ -56,8 +56,10 @@ export type PhotoPromptsInput = {
   variations?: boolean;
   /** "background": subject-less backgrounds and textures instead of photographed scenes. Default "photo". */
   variant?: PhotoVariant;
+  /** For variant "illustration": the look (id from ILLUSTRATION_STYLES) every prompt must keep. */
+  illustrationStyle?: IllustrationStyleId;
 };
-export type PhotoPrompt = { subject: string; prompt: string };
+export type PhotoPrompt ={ subject: string; prompt: string };
 
 export type PhotoMetadataInput = {
   theme: string;

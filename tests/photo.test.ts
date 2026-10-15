@@ -3,6 +3,7 @@ import { photoMetadataRequestSchema, photoPromptsRequestSchema } from "@/lib/gen
 import { normalizePhotoMetadata } from "@/lib/metadata/postprocess";
 import { visionOrder } from "@/lib/providers";
 import { GeminiProvider } from "@/lib/providers/gemini";
+import { isIconSetPrompt } from "@/lib/photo/config";
 import { photoMetadataPrompt, photoPromptsPrompt } from "@/lib/providers/prompts";
 
 const IMAGE = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
@@ -177,6 +178,89 @@ describe("photo file names and gallery filter", () => {
     expect(filter.kind).toBe("foto");
     expect(galleryQuery(filter)).toBe("jenis=foto");
     expect(parseGalleryFilter({ jenis: "video" }).kind).toBe("semua");
+  });
+});
+
+describe("illustration variant", () => {
+  const base = { theme: "retro motorcycle", count: 6, aspect: "1:1" as const, variant: "illustration" as const };
+
+  it("writes specific, text-free, name-free illustration prompts in the chosen look", () => {
+    const { system, user } = photoPromptsPrompt({ ...base, illustrationStyle: "watercolor", avoid: ["cute cat sticker"] });
+    expect(system).toContain("raster illustrations");
+    expect(user).toContain("exactly 6 prompts");
+    expect(user).toContain("1:1");
+    expect(user).toMatch(/watercolor illustration/);
+    expect(user).toMatch(/No text anywhere/);
+    expect(user).toMatch(/in the style of/);
+    expect(user).toContain("cute cat sticker");
+    expect(user).not.toMatch(/fictional ordinary adults/);
+  });
+
+  it("falls back to the sticker look and keeps one subject for variations", () => {
+    const { user } = photoPromptsPrompt({ ...base, variations: true });
+    expect(user).toMatch(/die-cut border/);
+    expect(user).toContain("ONE subject");
+  });
+
+  it("writes one-line icon sheet prompts with six named icons and no writing", () => {
+    const { system, user } = photoPromptsPrompt({ ...base, aspect: "16:9", illustrationStyle: "icon_set_3d", avoid: ["generic briefcase"] });
+    expect(system).toContain("icon sheets");
+    expect(user).toContain("exactly 6 prompts");
+    expect(user).toContain("exactly 6 different icons");
+    expect(user).toContain("6 icons in one frame:");
+    expect(user).toMatch(/ONE single line/);
+    expect(user).toMatch(/No text anywhere/);
+    expect(user).toMatch(/ID badges, certificates/);
+    expect(user).toContain("generic briefcase");
+    expect(user).not.toContain("ONE subject");
+  });
+
+  it("keeps one topic for icon sheet variations and spots a sheet prompt for metadata", () => {
+    const { user } = photoPromptsPrompt({ ...base, illustrationStyle: "icon_set_3d", variations: true });
+    expect(user).toContain("ONE topic");
+    const prompt = "3D business icons, 6 icons in one frame: rocket, lightbulb, target, coin stack, gear, chart";
+    expect(photoMetadataPrompt({ theme: "business", variant: "illustration", prompt }).user).toContain("sheet of several separate 3D icons");
+    expect(photoMetadataPrompt({ theme: "business", variant: "illustration", prompt: "a sticker of a cat" }).user).not.toContain("sheet of several");
+    expect(isIconSetPrompt(prompt)).toBe(true);
+    expect(isIconSetPrompt("a retro motorcycle sticker")).toBe(false);
+  });
+
+  it("asks for illustration search words and bans the word vector", () => {
+    const { user } = photoMetadataPrompt({ theme: "motorcycle", variant: "illustration" });
+    expect(user).toContain("raster");
+    expect(user).toContain('Never use the word "vector"');
+    expect(photoMetadataPrompt({ theme: "motorcycle" }).user).not.toContain("raster");
+  });
+
+  it("accepts the variant and a known style in requests, and rejects an unknown style", () => {
+    const req = { theme: "forest", count: 5, aspect: "1:1", variant: "illustration" };
+    expect(photoPromptsRequestSchema.parse({ ...req, illustrationStyle: "sticker" }).illustrationStyle).toBe("sticker");
+    expect(photoPromptsRequestSchema.safeParse({ ...req, illustrationStyle: "oil" }).success).toBe(false);
+    expect(photoMetadataRequestSchema.parse({ theme: "forest", image: IMAGE, variant: "illustration" }).variant).toBe("illustration");
+  });
+
+  it("stores variant and style in the job; old jobs stay photos", async () => {
+    const { parsePhotoJob } = await import("@/lib/photo/run");
+    const row = { aspect: "1:1", model: "m", provider: "gemini", prompts: [{ subject: "a", prompt: "b" }] };
+    const job = parsePhotoJob({ ...row, variant: "illustration", illustrationStyle: "flat" });
+    expect(job?.variant).toBe("illustration");
+    expect(job?.illustrationStyle).toBe("flat");
+    expect(parsePhotoJob({ ...row, variant: "illustration", illustrationStyle: "oil" })?.illustrationStyle).toBeUndefined();
+    expect(parsePhotoJob(row)?.variant).toBe("photo");
+  });
+
+  it("filters and labels illustrations", async () => {
+    const { parseGalleryFilter, galleryQuery, photoLabel } = await import("@/app/(app)/aset/filters");
+    expect(parseGalleryFilter({ jenis: "ilustrasi" }).kind).toBe("ilustrasi");
+    expect(galleryQuery(parseGalleryFilter({ jenis: "ilustrasi" }))).toBe("jenis=ilustrasi");
+    expect(photoLabel("illustration")).toBe("Ilustrasi");
+    expect(photoLabel(null)).toBe("Foto");
+  });
+
+  it("notes what to check by hand on a clean illustration", async () => {
+    const { photoContentNotes } = await import("@/lib/qc/photo");
+    const notes = photoContentNotes([], false, "illustration");
+    expect(notes[0].message).toMatch(/die-cut/);
   });
 });
 

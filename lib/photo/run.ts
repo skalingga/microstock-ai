@@ -8,7 +8,15 @@ import { combine, type Verdict } from "@/lib/qc/evaluate";
 import { photoContentNotes, photoTechNotes } from "@/lib/qc/photo";
 import { applyMetadata } from "@/lib/qc/store";
 import type { HashPoolEntry } from "@/lib/qc/types";
-import { DEFAULT_PHOTO_VARIANT, PHOTO_VARIANTS, type PhotoAspect, type PhotoProblem, type PhotoVariant } from "./config";
+import {
+  DEFAULT_PHOTO_VARIANT,
+  ILLUSTRATION_STYLE_IDS,
+  PHOTO_VARIANTS,
+  type IllustrationStyleId,
+  type PhotoAspect,
+  type PhotoProblem,
+  type PhotoVariant,
+} from "./config";
 import { PhotoReadError, readPhoto } from "./process";
 
 // Stage 12, browser side. The prompts come from one AI call; every uploaded photo then gets one vision call for its
@@ -20,7 +28,15 @@ const BUCKET = "assets";
 export type PhotoPromptItem = { subject: string; prompt: string };
 
 /** What generation_jobs.photo_prompts holds. */
-export type PhotoJobData = { aspect: PhotoAspect; prompts: PhotoPromptItem[]; model: string; provider: string; variant: PhotoVariant };
+export type PhotoJobData = {
+  aspect: PhotoAspect;
+  prompts: PhotoPromptItem[];
+  model: string;
+  provider: string;
+  variant: PhotoVariant;
+  /** Only for variant "illustration". */
+  illustrationStyle?: IllustrationStyleId;
+};
 
 type PromptsResponse = { prompts: PhotoPromptItem[]; model: string; provider: string; rateLimit?: RateLimit };
 type PhotoMetadataResponse = {
@@ -53,6 +69,7 @@ export function parsePhotoJob(value: Json | null | undefined): PhotoJobData | nu
     provider: typeof v.provider === "string" ? v.provider : "",
     // Jobs written before backgrounds existed have no variant: they are photos.
     variant: PHOTO_VARIANTS.find((x) => x === v.variant) ?? DEFAULT_PHOTO_VARIANT,
+    ...(ILLUSTRATION_STYLE_IDS.find((x) => x === v.illustrationStyle) ? { illustrationStyle: v.illustrationStyle as IllustrationStyleId } : {}),
   };
 }
 
@@ -69,22 +86,41 @@ export async function writePhotoPrompts(p: {
   avoid: string[];
   variations: boolean;
   variant?: PhotoVariant;
+  /** For variant "illustration": the look every prompt keeps. */
+  illustrationStyle?: IllustrationStyleId;
   signal: AbortSignal;
   onStatus: (message: string) => void;
 }): Promise<{ jobId: string; data: PhotoJobData }> {
   const variant = p.variant ?? DEFAULT_PHOTO_VARIANT;
+  const illustrationStyle = variant === "illustration" ? p.illustrationStyle : undefined;
   const gate = new RateGate();
   const res = await callWithRetry(
     (ctx) =>
       postJson<PromptsResponse>(
         "/api/generate/photo-prompts",
-        { theme: p.theme, count: p.count, aspect: p.aspect, avoid: p.avoid, variations: p.variations, variant, ...skip(ctx) },
+        {
+          theme: p.theme,
+          count: p.count,
+          aspect: p.aspect,
+          avoid: p.avoid,
+          variations: p.variations,
+          variant,
+          ...(illustrationStyle ? { illustrationStyle } : {}),
+          ...skip(ctx),
+        },
         p.signal,
       ),
     { gate, signal: p.signal, onStatus: p.onStatus },
   );
 
-  const data: PhotoJobData = { aspect: p.aspect, prompts: res.prompts, model: res.model, provider: res.provider, variant };
+  const data: PhotoJobData = {
+    aspect: p.aspect,
+    prompts: res.prompts,
+    model: res.model,
+    provider: res.provider,
+    variant,
+    ...(illustrationStyle ? { illustrationStyle } : {}),
+  };
   const theme = await p.supabase.from("themes").insert({ title: p.theme }).select("id").single();
   if (theme.error) throw new ApiError("internal", "Gagal menyimpan tema.");
   const job = await p.supabase

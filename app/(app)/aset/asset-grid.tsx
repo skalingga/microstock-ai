@@ -21,8 +21,8 @@ export type GridAsset = {
   label: string;
   /** Stage 12: a photo from Google Flow instead of an SVG. */
   photo?: boolean;
-  /** Stage 15: a photo without a subject (abstract, technology, texture). */
-  background?: boolean;
+  /** Badge for a photo-kind asset: "Foto", "Background" (stage 15) or "Ilustrasi" (stage 16). */
+  photoLabel?: string;
   qcStatus: string;
   exported: boolean;
   adobeStatus: string | null;
@@ -424,7 +424,7 @@ export function AssetGrid({
               </Link>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 pb-1">
                 <QcBadge status={asset.qcStatus} />
-                {asset.photo && <span className="rounded-sm border px-1.5 text-muted-foreground">{asset.background ? "Background" : "Foto"}</span>}
+                {asset.photo && <span className="rounded-sm border px-1.5 text-muted-foreground">{asset.photoLabel ?? "Foto"}</span>}
                 {asset.kind === "bundle" && <span className="rounded-sm border border-foreground/40 px-1.5 font-medium">Bundle</span>}
                 {asset.heldBy && <span className="rounded-sm border px-1.5 text-muted-foreground">Dalam bundle</span>}
                 {asset.exported && <span className="text-muted-foreground">Diekspor</span>}

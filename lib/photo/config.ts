@@ -11,11 +11,71 @@ export const DEFAULT_PHOTO_ASPECT: PhotoAspect = "4:3";
  * that buyers put text or objects on; it follows the same Flow workflow but needs its own prompts, metadata words
  * and a looser similarity check (smooth pictures hash alike).
  */
-export const PHOTO_VARIANTS = ["photo", "background"] as const;
+export const PHOTO_VARIANTS = ["photo", "background", "illustration"] as const;
 export type PhotoVariant = (typeof PHOTO_VARIANTS)[number];
 export const DEFAULT_PHOTO_VARIANT: PhotoVariant = "photo";
 /** Backgrounds are wide: desktop wallpapers and presentation slides. */
 export const DEFAULT_BACKGROUND_ASPECT: PhotoAspect = "16:9";
+/** Stage 16: a raster illustration (sticker, watercolor...) is a drawn picture, mostly one object; square suits it. */
+export const DEFAULT_ILLUSTRATION_ASPECT: PhotoAspect = "1:1";
+
+/**
+ * Looks the user can ask for in illustration mode (docs/PLAN-mode-ilustrasi.md). `look` goes into the prompt writer as
+ * the style every prompt must keep; one job is one style. JPEG has no transparency, so stickers sit on plain white.
+ */
+export const ILLUSTRATION_STYLES = [
+  {
+    value: "sticker",
+    label: "Stiker kartun (die-cut)",
+    look: "cute cartoon sticker illustration: bold clean outlines, flat vivid colors with simple cel shading, a thick white die-cut border around the subject, centered, isolated on a plain pure white background",
+  },
+  {
+    value: "flat",
+    label: "Ilustrasi datar berwarna",
+    look: "modern flat illustration: clean geometric shapes, no outlines, a limited harmonious palette, subtle shading only, one clear subject, isolated on a plain light background",
+  },
+  {
+    value: "watercolor",
+    label: "Cat air",
+    look: "soft watercolor illustration: visible paper texture, gentle color bleeds and wet edges, delicate details, one clear subject, isolated on a plain white paper background",
+  },
+  {
+    value: "storybook",
+    label: "Buku cerita anak",
+    look: "warm children's storybook illustration: textured gouache and pencil feel, rounded friendly shapes, soft natural palette, one clear subject, isolated on a plain cream background",
+  },
+  {
+    value: "isometric",
+    label: "Isometrik",
+    look: "detailed isometric illustration seen from a 30 degree angle: clean edges, soft lighting, a small tidy diorama of the subject, isolated on a plain pure white background",
+  },
+  {
+    value: "retro_cartoon",
+    label: "Kartun retro garis tebal",
+    look: "retro mid-century cartoon illustration: thick uneven ink outlines, limited muted vintage palette with a slight print texture, one clear subject, isolated on a plain off-white background",
+  },
+  {
+    value: "icon_set_3d",
+    label: "Set ikon 3D (6 ikon per lembar)",
+    look: "glossy 3D icon set: soft clay-like rounded shapes, smooth highlights, soft studio lighting, vivid harmonious colors, every icon fully visible and separate, evenly spaced in a tidy 3 by 2 grid on a clean pure white background",
+  },
+] as const;
+export type IllustrationStyleId = (typeof ILLUSTRATION_STYLES)[number]["value"];
+export const ILLUSTRATION_STYLE_IDS = ILLUSTRATION_STYLES.map((s) => s.value) as [IllustrationStyleId, ...IllustrationStyleId[]];
+export const DEFAULT_ILLUSTRATION_STYLE: IllustrationStyleId = "sticker";
+
+/**
+ * Icon sheet look: one image holds several separate icons (the whole sheet is one asset, because a crop of a 2K sheet
+ * is under Adobe's 4 MP minimum). It has its own prompt writer and metadata words.
+ */
+export const ICON_SET_STYLE: IllustrationStyleId = "icon_set_3d";
+export const ICON_SET_SIZE = 6;
+/** The sheet look works best wide; Flow's 16:9 2K Upscale is 4.2 MP. */
+export const ICON_SET_ASPECT: PhotoAspect = "16:9";
+/** Prompts written for the icon sheet say "N icons in one frame"; metadata uses it to know the picture is a sheet. */
+export function isIconSetPrompt(prompt: string | undefined): boolean {
+  return !!prompt && /\bicons? in one frame\b/i.test(prompt);
+}
 
 export const MAX_PHOTO_PROMPTS = 20;
 

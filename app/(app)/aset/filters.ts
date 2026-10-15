@@ -17,9 +17,16 @@ export const KINDS = [
   { value: "vektor", label: "Vektor", kind: "vector", variant: null },
   { value: "foto", label: "Foto", kind: "photo", variant: "photo" },
   { value: "background", label: "Background", kind: "photo", variant: "background" },
+  // Stage 16: raster illustrations (sticker, watercolor...) made in Flow, exported as JPEG.
+  { value: "ilustrasi", label: "Ilustrasi", kind: "photo", variant: "illustration" },
   { value: "bundle", label: "Bundle", kind: "bundle", variant: null },
 ] as const;
 export type KindValue = (typeof KINDS)[number]["value"];
+
+/** The badge text of a photo-kind asset. Rows from before photo_variant existed count as photos. */
+export function photoLabel(variant: string | null | undefined): string {
+  return variant === "background" ? "Background" : variant === "illustration" ? "Ilustrasi" : "Foto";
+}
 
 /** What the gallery is showing. Carried into the detail page so "back" and prev/next stay in the same view. */
 export type GalleryFilter = {
