@@ -7,7 +7,7 @@ import { GRID_OPTIONS, gridCells, gridFor } from "@/lib/bundle/compose";
 import { makeBundle } from "@/lib/bundle/make";
 import { createClient } from "@/lib/supabase/client";
 
-/** Choices a bundle can have, as text: "9, 16, 24 atau 25". */
+/** Choices a bundle can have, as text: "6, 9, 12, 16, 20, 24 atau 25". */
 const SIZES = GRID_OPTIONS.map((g) => gridCells(g)).sort((a, b) => a - b);
 const sizesText = `${SIZES.slice(0, -1).join(", ")} atau ${SIZES.at(-1)}`;
 

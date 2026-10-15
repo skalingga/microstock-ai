@@ -4,12 +4,18 @@
 
 export type GridOption = { id: string; columns: number; rows: number };
 
-/** Square grids and one 3:2 grid: all fit Adobe's artboard rules (15 to 65 MP, longest side 4800 px). */
+/**
+ * Member counts 6, 9, 12, 16, 20, 24 and 25 (user's rule, 15 Oct 2026). Wide grids (at most 3:2) and squares all fit
+ * Adobe's artboard rules (15 to 65 MP, longest side 4800 px, so the short side may be at most 0.65 of the long one).
+ */
 export const GRID_OPTIONS: GridOption[] = [
+  { id: "3x2", columns: 3, rows: 2 },
   { id: "3x3", columns: 3, rows: 3 },
+  { id: "4x3", columns: 4, rows: 3 },
   { id: "4x4", columns: 4, rows: 4 },
-  { id: "5x5", columns: 5, rows: 5 },
+  { id: "5x4", columns: 5, rows: 4 },
   { id: "6x4", columns: 6, rows: 4 },
+  { id: "5x5", columns: 5, rows: 5 },
 ];
 
 /** User's choice (15 Oct 2026): 25 assets per bundle unless told otherwise. */

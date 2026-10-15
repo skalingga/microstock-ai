@@ -97,7 +97,7 @@ Tujuan: 16 aset Lolos dari satu tema dan satu gaya digabung jadi **satu SVG grid
 
 ### Keputusan desain (usulan)
 
-- **Ukuran grid:** **5 × 5 (25) sebagai bawaan** (keputusan pengguna); pilihan 3 × 3, 4 × 4, dan 6 × 4 (lebar × tinggi, rasio 3:2). Jumlah anggota harus sama dengan jumlah sel; kalau aset Lolos kurang dari itu, pilih grid yang lebih kecil.
+- **Ukuran grid:** **5 × 5 (25) sebagai bawaan** (keputusan pengguna); pilihan 3 × 2 (6), 3 × 3 (9), 4 × 3 (12), 4 × 4 (16), 5 × 4 (20), dan 6 × 4 (24, rasio 3:2). Aturan pengguna 15 Okt 2026: jumlah anggota hanya 6, 9, 12, 16, 20, 24, atau 25. Jumlah anggota harus sama dengan jumlah sel; kalau aset Lolos kurang dari itu, pilih grid yang lebih kecil.
   Rasio 1:1 dan 3:2 lolos aturan artboard Adobe (15–65 MP, sisi terpanjang 4800 px).
 - **Data:** perluas `assets.kind` dengan `'bundle'`, kolom baru `bundle_of uuid[]` (di aset bundle) dan `bundled_in uuid`
   (di anggota, menunjuk bundle-nya; `on delete set null`), dan `assets.provider` dengan `'local'` (disusun di browser,
