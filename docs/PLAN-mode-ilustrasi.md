@@ -1,6 +1,9 @@
 # Rencana Tahap 16: Mode ilustrasi raster (Google Flow atau Gemini, setengah manual)
 
-Disusun 15 Okt 2026 atas permintaan pengguna. Status: **rencana, menunggu persetujuan**; belum ada kode.
+Disusun 15 Okt 2026 atas permintaan pengguna. Disetujui 15 Okt 2026 ("kita kerjakan"), gaya pertama stiker kartun die-cut.
+Status: **kode selesai (langkah 2-5) di branch `dev`, menunggu uji pengguna (langkah 6)**. Langkah 1 (cek portal Adobe) menunggu unggahan pertama.
+Penyimpangan dari rencana: tidak ada `maxHammingIllustration` baru (batas foto 8 + `maxRelative` sudah cukup; setel dari data bila perlu);
+migrasi `20261020000000_photo_variant_illustration.sql` diperlukan karena `photo_variant` punya check constraint (sudah diterapkan ke Supabase).
 Varian ketiga dari Mode foto (Tahap 12, `docs/PLAN-mode-foto.md`), sejajar dengan Mode background (Tahap 15,
 `docs/PLAN-mode-background.md`). Kerjakan seperti tahap lain: rencana → persetujuan → kode → `npm run lint`,
 `npx tsc --noEmit`, `npm test`, `npm run build` → commit + push → perbarui `PROGRESS.md`.

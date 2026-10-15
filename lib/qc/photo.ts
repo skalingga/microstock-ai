@@ -18,7 +18,7 @@ const mp = (px: number) => `${(px / 1_000_000).toLocaleString("id-ID", { maximum
 export function photoRejection(f: Pick<PhotoFacts, "width" | "height" | "bytes">): string | null {
   const pixels = f.width * f.height;
   if (pixels < ADOBE_PHOTO.minMegapixels * 1_000_000) {
-    return `Foto ${f.width}×${f.height} = ${mp(pixels)}, di bawah minimum Adobe ${ADOBE_PHOTO.minMegapixels} MP. Unduh ulang dari Flow dengan pilihan 2K Upscale.`;
+    return `Gambar ${f.width}×${f.height} = ${mp(pixels)}, di bawah minimum Adobe ${ADOBE_PHOTO.minMegapixels} MP. Unduh ulang dari Flow dengan pilihan 2K Upscale (hasil aplikasi Gemini biasanya juga terlalu kecil).`;
   }
   if (pixels > ADOBE_PHOTO.maxMegapixels * 1_000_000) {
     return `Foto ${mp(pixels)}, di atas maksimum Adobe ${ADOBE_PHOTO.maxMegapixels} MP.`;
@@ -53,7 +53,9 @@ export function photoContentNotes(problems: PhotoProblem[], hasPeople: boolean, 
   const clean =
     variant === "background"
       ? "AI tidak melihat teks, logo, atau cacat. Tetap periksa sendiri bagian tepi dan pola yang berulang."
-      : "AI tidak melihat teks, logo, atau cacat. Tetap periksa wajah dan tangan sendiri.";
+      : variant === "illustration"
+        ? "AI tidak melihat teks, logo, atau cacat. Tetap periksa sendiri tepi die-cut, bentuk yang meleleh, dan huruf acak."
+        : "AI tidak melihat teks, logo, atau cacat. Tetap periksa wajah dan tangan sendiri.";
   const notes: QcNote[] =
     problems.length > 0
       ? problems.map((p) => ({ check: "isi" as const, status: "cek" as const, message: PHOTO_PROBLEMS[p] }))

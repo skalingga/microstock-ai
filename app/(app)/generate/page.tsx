@@ -130,7 +130,7 @@ export default async function HalamanGenerate({
       <nav aria-label="Jenis aset" className="flex gap-1">
         {[
           { label: "Vektor (SVG)", href: `/generate${tema ? `?tema=${encodeURIComponent(tema)}` : ""}`, active: !photo },
-          { label: "Foto dan background (Flow)", href: `/generate?jenis=foto${tema ? `&tema=${encodeURIComponent(tema)}` : ""}`, active: photo },
+          { label: "Foto, background, ilustrasi (Flow)", href: `/generate?jenis=foto${tema ? `&tema=${encodeURIComponent(tema)}` : ""}`, active: photo },
         ].map((tab) => (
           <Link
             key={tab.label}

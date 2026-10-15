@@ -180,6 +180,66 @@ describe("photo file names and gallery filter", () => {
   });
 });
 
+describe("illustration variant", () => {
+  const base = { theme: "retro motorcycle", count: 6, aspect: "1:1" as const, variant: "illustration" as const };
+
+  it("writes specific, text-free, name-free illustration prompts in the chosen look", () => {
+    const { system, user } = photoPromptsPrompt({ ...base, illustrationStyle: "watercolor", avoid: ["cute cat sticker"] });
+    expect(system).toContain("raster illustrations");
+    expect(user).toContain("exactly 6 prompts");
+    expect(user).toContain("1:1");
+    expect(user).toMatch(/watercolor illustration/);
+    expect(user).toMatch(/No text anywhere/);
+    expect(user).toMatch(/in the style of/);
+    expect(user).toContain("cute cat sticker");
+    expect(user).not.toMatch(/fictional ordinary adults/);
+  });
+
+  it("falls back to the sticker look and keeps one subject for variations", () => {
+    const { user } = photoPromptsPrompt({ ...base, variations: true });
+    expect(user).toMatch(/die-cut border/);
+    expect(user).toContain("ONE subject");
+  });
+
+  it("asks for illustration search words and bans the word vector", () => {
+    const { user } = photoMetadataPrompt({ theme: "motorcycle", variant: "illustration" });
+    expect(user).toContain("raster");
+    expect(user).toContain('Never use the word "vector"');
+    expect(photoMetadataPrompt({ theme: "motorcycle" }).user).not.toContain("raster");
+  });
+
+  it("accepts the variant and a known style in requests, and rejects an unknown style", () => {
+    const req = { theme: "forest", count: 5, aspect: "1:1", variant: "illustration" };
+    expect(photoPromptsRequestSchema.parse({ ...req, illustrationStyle: "sticker" }).illustrationStyle).toBe("sticker");
+    expect(photoPromptsRequestSchema.safeParse({ ...req, illustrationStyle: "oil" }).success).toBe(false);
+    expect(photoMetadataRequestSchema.parse({ theme: "forest", image: IMAGE, variant: "illustration" }).variant).toBe("illustration");
+  });
+
+  it("stores variant and style in the job; old jobs stay photos", async () => {
+    const { parsePhotoJob } = await import("@/lib/photo/run");
+    const row = { aspect: "1:1", model: "m", provider: "gemini", prompts: [{ subject: "a", prompt: "b" }] };
+    const job = parsePhotoJob({ ...row, variant: "illustration", illustrationStyle: "flat" });
+    expect(job?.variant).toBe("illustration");
+    expect(job?.illustrationStyle).toBe("flat");
+    expect(parsePhotoJob({ ...row, variant: "illustration", illustrationStyle: "oil" })?.illustrationStyle).toBeUndefined();
+    expect(parsePhotoJob(row)?.variant).toBe("photo");
+  });
+
+  it("filters and labels illustrations", async () => {
+    const { parseGalleryFilter, galleryQuery, photoLabel } = await import("@/app/(app)/aset/filters");
+    expect(parseGalleryFilter({ jenis: "ilustrasi" }).kind).toBe("ilustrasi");
+    expect(galleryQuery(parseGalleryFilter({ jenis: "ilustrasi" }))).toBe("jenis=ilustrasi");
+    expect(photoLabel("illustration")).toBe("Ilustrasi");
+    expect(photoLabel(null)).toBe("Foto");
+  });
+
+  it("notes what to check by hand on a clean illustration", async () => {
+    const { photoContentNotes } = await import("@/lib/qc/photo");
+    const notes = photoContentNotes([], false, "illustration");
+    expect(notes[0].message).toMatch(/die-cut/);
+  });
+});
+
 describe("background variant", () => {
   const base = { theme: "technology background", count: 6, aspect: "16:9" as const };
 

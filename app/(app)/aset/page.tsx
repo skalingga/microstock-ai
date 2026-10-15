@@ -15,7 +15,7 @@ import { AssetGrid } from "./asset-grid";
 import { BatchPicker } from "./batch-picker";
 import { AssetToolbar } from "./asset-toolbar";
 import { FilterSheet } from "./filter-sheet";
-import { applyGalleryFilter, FILTERS, KINDS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, withQuery, type FilterValue, type GalleryParams } from "./filters";
+import { applyGalleryFilter, FILTERS, KINDS, galleryQuery, MAX_SEARCH_LENGTH, parseGalleryFilter, photoLabel, withQuery, type FilterValue, type GalleryParams } from "./filters";
 
 export const metadata: Metadata = { title: "Aset" };
 
@@ -89,7 +89,7 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
     job && `batch "${jobInfo?.data?.themes?.title ?? "tanpa tema"}"`,
     adobePending && "sudah diekspor, keputusan Adobe belum dicatat",
     q && `judul memuat "${q}"`,
-    kind !== "semua" && (kind === "foto" ? "foto" : kind === "background" ? "background" : kind === "bundle" ? "bundle" : "vektor"),
+    kind !== "semua" && (kind === "vektor" ? "vektor" : (KINDS.find((k) => k.value === kind)?.label ?? "").toLowerCase()),
   ].filter(Boolean);
 
   return (
@@ -243,9 +243,9 @@ export default async function HalamanAset({ searchParams }: { searchParams: Prom
               label:
                 asset.title ??
                 asset.concept ??
-                (asset.kind === "photo" ? (asset.photo_variant === "background" ? "Background" : "Foto") : asset.kind === "bundle" ? "Bundle" : "Aset SVG"),
+                (asset.kind === "photo" ? photoLabel(asset.photo_variant) : asset.kind === "bundle" ? "Bundle" : "Aset SVG"),
               photo: asset.kind === "photo",
-              background: asset.photo_variant === "background",
+              photoLabel: photoLabel(asset.photo_variant),
               kind: asset.kind,
               heldBy: asset.bundled_in,
               qcStatus: asset.qc_status,

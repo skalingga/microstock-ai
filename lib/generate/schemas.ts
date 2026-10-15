@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_PHOTO_PROMPTS, PHOTO_ASPECTS, PHOTO_VARIANTS, VISION_MAX_DATA_URL } from "@/lib/photo/config";
+import { ILLUSTRATION_STYLE_IDS, MAX_PHOTO_PROMPTS, PHOTO_ASPECTS, PHOTO_VARIANTS, VISION_MAX_DATA_URL } from "@/lib/photo/config";
 import { STYLES } from "@/lib/settings/schema";
 
 export const MAX_VARIATIONS = 30;
@@ -62,6 +62,8 @@ export const photoPromptsRequestSchema = z.object({
   avoid: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
   variations: z.boolean().default(false),
   variant: z.enum(PHOTO_VARIANTS).default("photo"),
+  /** Only for variant "illustration": the look every prompt keeps. */
+  illustrationStyle: z.enum(ILLUSTRATION_STYLE_IDS).optional(),
 });
 
 export const photoMetadataRequestSchema = z.object({

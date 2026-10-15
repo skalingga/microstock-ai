@@ -18,7 +18,7 @@ type Props = {
   concept: string;
   bannedWords: string[];
   /** Stage 12: a photo is described by a vision model looking at the stored JPEG. */
-  photo?: { imagePath: string; prompt?: string; variant?: "photo" | "background" };
+  photo?: { imagePath: string; prompt?: string; variant?: "photo" | "background" | "illustration" };
 };
 
 type PhotoMetadataReply = Omit<MetadataResponse, "metadata"> & {
