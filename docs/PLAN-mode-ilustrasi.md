@@ -104,6 +104,16 @@ Tidak ada route atau tabel baru. Satu panggilan AI per aset per request tetap be
 
 ## Pertanyaan terbuka (tanya pengguna sebelum langkah terkait)
 
-1. Gaya pertama yang diuji: stiker kartun die-cut (seperti contoh motor) atau gaya lain?
-2. Sumber gambar: Flow 2K Upscale (dijamin ≥ 4 MP) atau aplikasi Gemini bila hasilnya ≥ 4 MP? Cek ukuran file Gemini dulu.
-3. Perlu latar transparan? Bila ya, itu tahap terpisah (PNG + penghapus latar).
+1. Terjawab 15 Okt 2026: gaya pertama stiker kartun die-cut.
+2. Terjawab 15 Okt 2026: sumber gambar Google Flow (2K Upscale).
+3. Terjawab 15 Okt 2026 sebagian: pengguna **menginginkan latar transparan** (untuk bundle dan agar lebih mudah diterima Adobe),
+   tetapi memilih **tetap JPEG dulu**. Halaman syarat ilustrasi Adobe hanya menyebut JPEG; PNG transparan untuk AI hanya
+   disebut postingan komunitas 2023. Sebelum membangun alur PNG (hapus latar di browser, simpan PNG, ekspor PNG, CSV `.png`),
+   pengguna mengunggah satu PNG transparan ke portal Adobe sebagai ilustrasi dan mencatat apakah diterima. Rencana teknis
+   bila diterima: stiker dibuat di atas latar warna kunci polos (bukan putih, supaya tepi die-cut putih tetap ada),
+   dihapus di browser lewat flood-fill dari tepi + despill, tanpa dependensi model ML.
+
+## Uji batch pertama
+
+Tema "machine learning" (permintaan pengguna 15 Okt 2026). Tema abstrak: prompt harus memakai subjek konkret (robot,
+otak, rangkaian, tanaman bertumbuh) tanpa teks, rumus, atau diagram berlabel.
