@@ -414,7 +414,8 @@ function iconSetPromptsPrompt(input: PhotoPromptsInput): { system: string; user:
             `Write exactly ${input.count} prompts, each for a clearly different sub-topic within this theme (for the theme "business": entrepreneurship, office equipment, teamwork, marketing, sales, project management...). Each sheet has its own sub-topic.`,
           ]),
       `Each prompt describes ONE sheet of exactly ${n} different icons of the same sub-topic, drawn as separate objects. Name all ${n} icons in the prompt. No icon repeats inside a sheet, and no two prompts share more than one icon.`,
-      "Every icon must be specific and commercially useful, never the most generic object of the topic, and the icons must be easy to tell apart at a small size. Name a palette of 2 to 4 specific colors for the sheet.",
+      "Every icon must be a simple, recognizable physical object that one clear 3D shape can show, easy to tell apart from the others at a small size. No abstract concepts, processes, diagrams, trajectories, screens with content, or 'model of' something. Prefer a specific, commercially useful object over its most generic version (a leather document case, not 'a box'). Each of the 6 icons must be something people tie to that sub-topic at once; do not pad a sheet with objects that belong to another sub-topic (no piggy bank in a teamwork sheet). Name a palette of 2 to 4 specific colors for the sheet.",
+      "Do not repeat an icon between sheets of this batch, and keep the subject field consistent with the icons named in the prompt.",
       ...(input.avoid && input.avoid.length > 0
         ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
         : []),
