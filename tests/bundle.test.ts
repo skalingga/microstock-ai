@@ -25,7 +25,15 @@ describe("grid options", () => {
     expect(gridFor(24)?.id).toBe("6x4");
     expect(gridFor(16)?.id).toBe("4x4");
     expect(gridFor(9)?.id).toBe("3x3");
+    expect(gridFor(6)?.id).toBe("3x2");
+    expect(gridFor(12)?.id).toBe("4x3");
+    expect(gridFor(20)?.id).toBe("5x4");
     expect(gridFor(10)).toBeNull();
+  });
+
+  it("offers exactly the sizes 6, 9, 12, 16, 20, 24 and 25", () => {
+    const sizes = GRID_OPTIONS.map((g) => g.columns * g.rows).sort((a, b) => a - b);
+    expect(sizes).toEqual([6, 9, 12, 16, 20, 24, 25]);
   });
 
   it("every grid fits Adobe's artboard rules", () => {
