@@ -128,8 +128,11 @@ Pemicu: contoh orang lain (bulk prompt di Flow, 15 tema "3D business icons", 6 i
 - **Metadata**: prompt yang memuat "icons in one frame" (`isIconSetPrompt`) membuat metadata menyebut sub-tema dan ikon
   utama, memakai "3D icons", "icon set", "icon collection" (kata "icon" aman untuk raster 3D; larangan kata itu hanya
   untuk ilustrasi vektor), tetap tanpa kata "vector".
-- **Form**: memilih gaya ini mengganti rasio ke 16:9 (kembali ke 1:1 saat gaya lain dipilih); tombol baru **Salin per
-  baris (bulk)** untuk semua varian: satu prompt per baris tanpa nomor dan baris kosong, untuk kotak Bulk Input Flow.
+- **Form**: memilih gaya ini mengganti rasio ke 16:9 (kembali ke 1:1 saat gaya lain dipilih). Tombol "Salin per baris
+  (bulk)" sempat ditambahkan lalu dihapus atas permintaan pengguna (15 Okt 2026); "Salin semua" dan "Salin" per prompt tetap.
+- **Temuan uji Flow pertama** (5 lembar): model gambar menggambar garis pemisah sel dan kartu panel karena kata "grid",
+  dan kompas berhuruf N E S W. Akhiran prompt kini "two even rows of three, one seamless pure white background, no grid
+  lines, no dividers, no panels, no cards, no frames, no text" dan jam, kompas, penggaris, paspor, uang dilarang.
 - **Belum diketahui**: apakah Adobe menerima lembar multi-ikon JPEG sebagai ilustrasi AI dan tidak menandainya
   "similar". Unggah 1 sampai 3 lembar dulu sebelum satu batch penuh; catat di data Tahap 6.
 
