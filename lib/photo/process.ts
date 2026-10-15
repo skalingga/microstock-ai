@@ -1,6 +1,6 @@
 import { dHash } from "@/lib/qc/hash";
 import { QC } from "@/lib/qc/config";
-import { photoRejection } from "@/lib/qc/photo";
+import { borderColor, photoRejection, type BorderColor } from "@/lib/qc/photo";
 import {
   JPEG_QUALITY,
   PHOTO_INPUT_TYPES,
@@ -21,6 +21,8 @@ export type ReadPhoto = {
   /** Small JPEG for the vision model, as a data URL. */
   visionImage: string;
   phash: string;
+  /** Mean color of the outer ring, to tell a plain white sheet from a gray one. */
+  border: BorderColor;
 };
 
 export class PhotoReadError extends Error {
@@ -82,6 +84,7 @@ export async function readPhoto(file: File): Promise<ReadPhoto> {
     const smallCanvas = draw(bitmap, small.w, small.h);
     const pixels = smallCanvas.getContext("2d")!.getImageData(0, 0, small.w, small.h);
     const phash = dHash({ data: pixels.data, width: small.w, height: small.h });
+    const border = borderColor({ data: pixels.data, width: small.w, height: small.h });
 
     const p = fit(width, height, PHOTO_PREVIEW_MAX_SIDE);
     const preview = await toBlob(draw(bitmap, p.w, p.h), 0.85);
@@ -89,7 +92,7 @@ export async function readPhoto(file: File): Promise<ReadPhoto> {
     const v = fit(width, height, VISION_MAX_SIDE);
     const visionImage = draw(bitmap, v.w, v.h).toDataURL("image/jpeg", VISION_JPEG_QUALITY);
 
-    return { jpeg, converted, width, height, preview, visionImage, phash };
+    return { jpeg, converted, width, height, preview, visionImage, phash, border };
   } finally {
     bitmap.close();
   }

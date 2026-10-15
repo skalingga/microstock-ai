@@ -390,7 +390,10 @@ const ILLUSTRATION_RULES = [
 const ICON_SET_RULES = [
   "No text anywhere: no letters, numbers, words, labels, names, captions, logos, brand names, signatures, or watermarks, and no icon that normally carries writing. Avoid ID badges, certificates, contracts or agreements, stamps, signs, banners, price tags, book covers, calendars with dates, calculators, keyboards, barcodes, speedometers, thermometers, and anything with numerals or letters on it. Never use these at all: clocks, watches, rulers, compasses (a compass with N E S W letters is the usual failure; use a map pin instead), passports, mailboxes, license plates, road signs, and coins or bills (they carry currency symbols). When unsure whether an object carries writing, choose another object.",
   "Never name or imitate brands, trademarks, artists, studios, fictional characters, or mascots, and never write 'in the style of' anyone. Describe the look with technique and materials only.",
-  "Use objects, tools, symbols, plants, animals, and buildings. No people, faces, or realistic body parts; a plain hand is the only exception.",
+  "Use objects, tools, devices, plants, animals, and buildings. No hands, people, faces, body parts, organs, bones, or medical or orthopedic items (braces, collars, implants, prosthetics) unless the theme itself is medical; a robot or cyborg theme is not an excuse for body parts.",
+  "Each of the 6 icons must be one clearly recognizable everyday object whose purpose is obvious at a glance. Skip anything ambiguous, abstract, or twisted into a strange shape (no 'plasma conduit', 'logic gate block', 'flight controller'), and never describe an object by something else it resembles.",
+  "Every icon is drawn complete with a generous margin of about 10 percent of the frame on every side, so nothing touches the edge of the image.",
+  "The same stock objects keep appearing across sheets: microchip, battery, power plug, gear, light bulb, rocket, shield, magnifying glass. Use at most one of them per sheet, and prefer a more specific object of the sub-topic.",
   "Never show or imply a real news event, disaster, protest, or politics.",
 ];
 
@@ -419,7 +422,7 @@ function iconSetPromptsPrompt(input: PhotoPromptsInput): { system: string; user:
       ...(input.avoid && input.avoid.length > 0
         ? [`Adobe already refused these subjects as too similar to existing content. Do not propose them or close variants: ${input.avoid.join("; ")}.`]
         : []),
-      `Write each prompt as ONE single line of plain English, 30 to 70 words, with no line breaks, in this order: "3D <sub-topic> icons, ${n} icons in one frame: <the ${n} icons separated by commas>, <the look above in a few words and the palette>, two even rows of three, one seamless pure white background, no grid lines, no dividers, no panels, no cards, no frames, no text."`,
+      `Write each prompt as ONE single line of plain English, 30 to 70 words, with no line breaks, in this order: "3D <sub-topic> icons, ${n} icons in one frame: <the ${n} icons separated by commas>, <the look above in a few words and the palette>, two even rows of three, generous margin around every icon, one seamless pure white background (no gray, no tint), no floor shadows, no grid lines, no dividers, no panels, no cards, no frames, no text."`,
       ...ICON_SET_RULES,
       "",
       'Reply with JSON only, in this exact shape: {"prompts":[{"subject":"...","prompt":"..."}]}',

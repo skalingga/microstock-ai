@@ -32,11 +32,28 @@ export const QC = {
     /** Backgrounds (smooth gradients, bokeh, textures) have little structure, so unrelated ones hash close: only near copies count. */
     maxHammingBackground: 3,
     /**
+     * Raster illustrations, mostly icon sheets: six icons on white in the same 3 by 2 layout hash 6 to 7 bits apart
+     * though nothing alike (15 Oct 2026, 3 of 9 sheets flagged by mistake). A re-render of one sheet is within 2 bits.
+     */
+    maxHammingIllustration: 4,
+    /**
      * Differing bits as a share of the bits set in either hash. A small object on an empty canvas sets only 10 to 25 of
      * the 64 bits, so unrelated pictures sit 4 to 8 bits apart (15 Oct 2026: an isometric solar farm "matched" a
      * retro car). Those are 0.25 to 0.5 of the set bits; a real near copy is well under 0.2.
      */
     maxRelative: 0.2,
+  },
+  /**
+   * Icon sheets must sit on one white field. Flow sometimes returns light gray with floor shadows and panel seams
+   * (15 Oct 2026, sheet "workshop tools", mean border about 239) that Adobe refuses and the vision model does not report.
+   */
+  sheetBackground: {
+    /** Share of the image side, on every edge, that is sampled as "the background". */
+    borderFraction: 0.02,
+    /** Each channel of the mean border color must reach this (0-255). Flow's white comes back as 250 to 255. */
+    minChannel: 244,
+    /** Largest gap between the red, green and blue means (a bluish or warm tint). */
+    maxSpread: 8,
   },
   outline: {
     /** Share of shapes that may carry a fill on an outline icon (an eye or a dot) before it needs a look. */

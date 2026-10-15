@@ -12,6 +12,7 @@ import {
   DEFAULT_PHOTO_VARIANT,
   ILLUSTRATION_STYLE_IDS,
   PHOTO_VARIANTS,
+  isIconSetPrompt,
   type IllustrationStyleId,
   type PhotoAspect,
   type PhotoProblem,
@@ -178,6 +179,8 @@ export async function uploadPhoto(file: File, p: PhotoUploadParams): Promise<Pho
     p.pool,
     assetId,
     p.variant,
+    // An icon sheet must sit on plain white; the vision model does not notice a gray field.
+    isIconSetPrompt(p.prompt?.prompt) ? read.border : undefined,
   );
 
   p.onStage("mengunggah");

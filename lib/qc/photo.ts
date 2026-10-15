@@ -2,7 +2,7 @@ import { ADOBE_PHOTO, FICTIONAL_LABEL } from "@/lib/adobe/rules";
 import { PHOTO_PROBLEMS, type PhotoProblem, type PhotoVariant } from "@/lib/photo/config";
 import { checkSimilarity } from "./checks";
 import { QC } from "./config";
-import type { HashPoolEntry, QcNote } from "./types";
+import type { HashPoolEntry, Pixels, QcNote } from "./types";
 
 // Stage 12: QC for photos uploaded from Google Flow. Pure functions; reading the file happens in lib/photo/process.ts.
 
@@ -29,22 +29,77 @@ export function photoRejection(f: Pick<PhotoFacts, "width" | "height" | "bytes">
   return null;
 }
 
-/** Notes for a photo that passed photoRejection: size and format, then similarity with the user's other photos. */
+export type BorderColor = { r: number; g: number; b: number };
+
+/** Mean color of the outer ring of the picture (the "background" of a sheet that is meant to be plain white). */
+export function borderColor(pixels: Pixels, fraction: number = QC.sheetBackground.borderFraction): BorderColor {
+  const { data, width, height } = pixels;
+  const ring = Math.max(1, Math.round(Math.min(width, height) * fraction));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+  for (let y = 0; y < height; y++) {
+    const edgeRow = y < ring || y >= height - ring;
+    for (let x = 0; x < width; x++) {
+      if (!edgeRow && x >= ring && x < width - ring) {
+        // Inside the ring: jump to its right side.
+        x = width - ring - 1;
+        continue;
+      }
+      const i = (y * width + x) * 4;
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      n++;
+    }
+  }
+  return n === 0 ? { r: 255, g: 255, b: 255 } : { r: r / n, g: g / n, b: b / n };
+}
+
+/** A note when the border of an icon sheet is not one plain white field (gray, tinted, or shadowed). */
+export function sheetBackgroundNote(border: BorderColor): QcNote {
+  const { minChannel, maxSpread } = QC.sheetBackground;
+  const channels = [border.r, border.g, border.b];
+  const dark = Math.min(...channels);
+  const spread = Math.max(...channels) - dark;
+  if (dark < minChannel || spread > maxSpread) {
+    return {
+      check: "latar",
+      status: "cek",
+      message: `Latar bukan putih polos (rata-rata tepi RGB ${channels.map((c) => Math.round(c)).join("/")}): abu-abu, tinted, atau ada bayangan dan garis panel. Adobe menolak ini; generate ulang dengan prompt yang sama.`,
+    };
+  }
+  return { check: "latar", status: "ok", message: "Latar putih polos." };
+}
+
+/**
+ * Notes for a photo that passed photoRejection: size and format, then similarity with the user's other photos.
+ * `sheetBorder` is passed for icon sheets only, which must sit on plain white.
+ */
 export function photoTechNotes(
   f: PhotoFacts,
   phash: string,
   pool: HashPoolEntry[],
   selfId?: string,
   variant: PhotoVariant = "photo",
+  sheetBorder?: BorderColor,
 ): QcNote[] {
+  const maxHamming =
+    variant === "background"
+      ? QC.similarity.maxHammingBackground
+      : variant === "illustration"
+        ? QC.similarity.maxHammingIllustration
+        : QC.similarity.maxHamming;
   return [
+    ...(sheetBorder ? [sheetBackgroundNote(sheetBorder)] : []),
     { check: "resolusi", status: "ok", message: `${f.width}×${f.height} = ${mp(f.width * f.height)} (Adobe: ${ADOBE_PHOTO.minMegapixels}–${ADOBE_PHOTO.maxMegapixels} MP).` },
     {
       check: "berkas",
       status: "ok",
       message: f.converted ? `Diubah ke JPEG, ${mb(f.bytes)}.` : `JPEG asli dari Flow, ${mb(f.bytes)}, tidak diubah.`,
     },
-    checkSimilarity(phash, pool, selfId, undefined, variant === "background" ? QC.similarity.maxHammingBackground : QC.similarity.maxHamming),
+    checkSimilarity(phash, pool, selfId, undefined, maxHamming),
   ];
 }
 

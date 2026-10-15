@@ -215,6 +215,12 @@ describe("illustration variant", () => {
     expect(user).toMatch(/no grid lines, no dividers, no panels, no cards, no frames/);
     expect(user).not.toMatch(/evenly spaced grid/);
     expect(user).toMatch(/Never use these at all: clocks, watches, rulers, compasses/);
+    // 15 Oct 2026 review of 9 sheets: organs and hands, gray floors, icons touching the edge, repeated stock objects.
+    expect(user).toMatch(/No hands, people, faces, body parts, organs, bones/);
+    expect(user).toMatch(/generous margin of about 10 percent/);
+    expect(user).toMatch(/no gray, no tint\), no floor shadows/);
+    expect(user).toMatch(/microchip, battery, power plug, gear/);
+    expect(user).toMatch(/clearly recognizable everyday object/);
     expect(user).toContain("generic briefcase");
     expect(user).not.toContain("ONE subject");
   });
@@ -329,5 +335,50 @@ describe("background variant", () => {
     expect(status("background")).toBe("ok");
     const people = photoContentNotes([], true, "background");
     expect(people.find((n) => n.check === "orang")?.status).toBe("cek");
+  });
+
+  it("does not flag two icon sheets 6 bits apart, but still flags a near copy", async () => {
+    const { photoTechNotes } = await import("@/lib/qc/photo");
+    const facts = { width: 2752, height: 1536, bytes: 200_000, converted: false };
+    const a = "ffffffffff000000";
+    const sixApart = "ffffffff03000000"; // 6 bits differ: same 3x2 layout, different icons
+    const twoApart = "fffffffffc000000";
+    const status = (other: string) =>
+      photoTechNotes(facts, a, [{ id: "o", phash: other }], "self", "illustration").find((n) => n.check === "kemiripan")?.status;
+    expect(status(sixApart)).toBe("ok");
+    expect(status(twoApart)).toBe("cek");
+  });
+
+  it("tells a plain white icon sheet from a gray one by its border", async () => {
+    const { borderColor, sheetBackgroundNote, photoTechNotes } = await import("@/lib/qc/photo");
+    const make = (w: number, h: number, rgb: [number, number, number], inner: [number, number, number]) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const edge = x < 3 || y < 3 || x >= w - 3 || y >= h - 3;
+          const c = edge ? rgb : inner;
+          const i = (y * w + x) * 4;
+          data[i] = c[0];
+          data[i + 1] = c[1];
+          data[i + 2] = c[2];
+          data[i + 3] = 255;
+        }
+      }
+      return { data, width: w, height: h };
+    };
+    const white = borderColor(make(100, 56, [254, 254, 254], [20, 120, 200]), 0.05);
+    expect(Math.round(white.r)).toBe(254);
+    expect(sheetBackgroundNote(white).status).toBe("ok");
+
+    const gray = borderColor(make(100, 56, [239, 240, 241], [255, 255, 255]), 0.05);
+    expect(sheetBackgroundNote(gray).status).toBe("cek");
+    const tinted = borderColor(make(100, 56, [240, 246, 252], [255, 255, 255]), 0.05);
+    expect(sheetBackgroundNote(tinted).status).toBe("cek");
+
+    const facts = { width: 2752, height: 1536, bytes: 200_000, converted: false };
+    const withSheet = photoTechNotes(facts, "ffffffffff000000", [], "self", "illustration", gray);
+    expect(withSheet.find((n) => n.check === "latar")?.status).toBe("cek");
+    // Without a sheet border (stickers, ordinary photos) there is no background check.
+    expect(photoTechNotes(facts, "ffffffffff000000", [], "self", "illustration").some((n) => n.check === "latar")).toBe(false);
   });
 });
