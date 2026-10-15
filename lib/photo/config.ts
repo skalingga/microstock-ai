@@ -57,7 +57,7 @@ export const ILLUSTRATION_STYLES = [
   {
     value: "icon_set_3d",
     label: "Set ikon 3D (6 ikon per lembar)",
-    look: "glossy 3D icon set: soft clay-like rounded shapes, smooth highlights, soft studio lighting, vivid harmonious colors, every icon fully visible and separate, evenly spaced in a tidy 3 by 2 grid on a clean pure white background",
+    look: "glossy 3D icon set: soft clay-like rounded shapes, smooth highlights, soft studio lighting, vivid harmonious colors, every icon fully visible and separate, laid out in two even rows of three on one seamless pure white background with no grid lines, no dividers, no panels, no cards, no frames and no drop-shadow boxes",
   },
 ] as const;
 export type IllustrationStyleId = (typeof ILLUSTRATION_STYLES)[number]["value"];

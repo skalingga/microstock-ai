@@ -156,7 +156,7 @@ export function PhotoForm({
   const [error, setError] = useState<string | null>(null);
 
   const [flowModel, setFlowModel] = useState<string>(DEFAULT_FLOW_MODEL);
-  const [copied, setCopied] = useState<number | "semua" | "baris" | null>(null);
+  const [copied, setCopied] = useState<number | "semua" | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const files = useRef(new Map<string, File>());
   const busy = useRef(false);
@@ -219,7 +219,7 @@ export function PhotoForm({
     }
   }
 
-  async function copy(text: string, which: number | "semua" | "baris") {
+  async function copy(text: string, which: number | "semua") {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
@@ -309,9 +309,6 @@ export function PhotoForm({
   const gagalQc = finished.filter((u) => u.qc === "gagal").length;
   const perPrompt = (index: number) => uploads.filter((u) => u.promptIndex === index && u.stage !== "gagal").length;
   const allPrompts = openJob?.data.prompts.map((p, i) => `${i + 1}. ${p.prompt}`).join("\n\n") ?? "";
-  // Bulk prompt tools take one prompt per line, no numbering and no blank lines.
-  const promptLines = openJob?.data.prompts.map((p) => p.prompt.replace(/\s*\n\s*/g, " ").trim()).join("\n") ?? "";
-
   return (
     <div className="space-y-6">
       {openJob && (
@@ -333,10 +330,6 @@ export function PhotoForm({
               <Button type="button" variant="secondary" onClick={() => copy(allPrompts, "semua")}>
                 {copied === "semua" ? <Check /> : <Copy />}
                 {copied === "semua" ? "Tersalin" : `Salin semua (${openJob.data.prompts.length})`}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => copy(promptLines, "baris")}>
-                {copied === "baris" ? <Check /> : <Copy />}
-                {copied === "baris" ? "Tersalin" : "Salin per baris (bulk)"}
               </Button>
               <a href={FLOW_URL} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "outline" })}>
                 <ExternalLink />
