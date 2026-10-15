@@ -29,6 +29,13 @@ export function photoRejection(f: Pick<PhotoFacts, "width" | "height" | "bytes">
   return null;
 }
 
+/** How close two hashes may be before pictures of this kind count as alike. */
+export function photoMaxHamming(variant: PhotoVariant): number {
+  if (variant === "background") return QC.similarity.maxHammingBackground;
+  if (variant === "illustration") return QC.similarity.maxHammingIllustration;
+  return QC.similarity.maxHamming;
+}
+
 export type BorderColor = { r: number; g: number; b: number };
 
 /** Mean color of the outer ring of the picture (the "background" of a sheet that is meant to be plain white). */
@@ -85,12 +92,7 @@ export function photoTechNotes(
   variant: PhotoVariant = "photo",
   sheetBorder?: BorderColor,
 ): QcNote[] {
-  const maxHamming =
-    variant === "background"
-      ? QC.similarity.maxHammingBackground
-      : variant === "illustration"
-        ? QC.similarity.maxHammingIllustration
-        : QC.similarity.maxHamming;
+  const maxHamming = photoMaxHamming(variant);
   return [
     ...(sheetBorder ? [sheetBackgroundNote(sheetBorder)] : []),
     { check: "resolusi", status: "ok", message: `${f.width}×${f.height} = ${mp(f.width * f.height)} (Adobe: ${ADOBE_PHOTO.minMegapixels}–${ADOBE_PHOTO.maxMegapixels} MP).` },

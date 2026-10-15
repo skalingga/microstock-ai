@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
+import type { PhotoVariant } from "@/lib/photo/config";
 import type { StyleId } from "@/lib/settings/schema";
+import { checkSimilarity } from "./checks";
 import { combine, evaluateVisual, type Verdict } from "./evaluate";
 import { measureSvg } from "./measure";
+import { photoMaxHamming } from "./photo";
 import { parseNotes, type HashPoolEntry, type MetadataFields, type QcNote } from "./types";
 
 type Client = SupabaseClient<Database>;
@@ -112,6 +115,32 @@ export async function rerunQc(
 
   const verdict = combine(visual, metadataOf(asset), bannedWords);
   return (await saveVerdict(supabase, asset.id, verdict, phash)) ? verdict : null;
+}
+
+/**
+ * Photos: the file is not read again. The similarity note is judged again against the photos the user has now, with
+ * the threshold of the photo's own kind (a note written under an older threshold otherwise stays "Perlu cek" forever),
+ * the other notes stay, and the metadata notes are recomputed.
+ */
+export async function rerunPhotoQc(
+  supabase: Client,
+  asset: StoredAsset,
+  variant: PhotoVariant,
+  bannedWords: string[],
+): Promise<Verdict | null> {
+  const row = await supabase.from("assets").select("phash").eq("id", asset.id).single();
+  const phash = row.data?.phash;
+  if (!phash) return null;
+
+  const pool = await fetchHashPool(supabase, "photo");
+  const similarity = checkSimilarity(phash, pool, asset.id, undefined, photoMaxHamming(variant));
+  const kept = parseNotes(asset.qc_notes).filter((n) => n.check !== "metadata");
+  const notes = kept.some((n) => n.check === "kemiripan")
+    ? kept.map((n) => (n.check === "kemiripan" ? similarity : n))
+    : [...kept, similarity];
+
+  const verdict = combine(notes, metadataOf(asset), bannedWords);
+  return (await saveVerdict(supabase, asset.id, verdict)) ? verdict : null;
 }
 
 /** Stores metadata on an asset and re-judges it: visual notes stay, metadata notes are recomputed. */
