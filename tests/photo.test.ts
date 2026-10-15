@@ -349,6 +349,47 @@ describe("background variant", () => {
     expect(status(twoApart)).toBe("cek");
   });
 
+  it("re-judges a stored photo's similarity note with the threshold of its own kind", async () => {
+    const { rerunPhotoQc } = await import("@/lib/qc/store");
+    const a = "ffffffffff000000";
+    const stale = {
+      id: "self",
+      svg_path: null,
+      title: "3D technology icon set",
+      keywords: ["3d icons", "icon set"],
+      category: "Technology",
+      needs_release: false,
+      qc_notes: [
+        { check: "resolusi", status: "ok", message: "4,23 MP" },
+        { check: "kemiripan", status: "cek", message: "Sangat mirip dengan aset lain (other, selisih 6 dari 64 bit)." },
+        { check: "metadata", status: "ok", message: "Metadata lengkap dan sesuai aturan." },
+      ],
+    };
+    const written: { value?: { qc_status?: string; qc_notes?: { check: string; status: string }[] } } = {};
+    const supabase = {
+      from: () => ({
+        // select("phash").eq().single() reads this asset; select("id, phash").eq().not().limit() reads the pool.
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: { phash: a } }),
+            not: () => ({ limit: async () => ({ data: [{ id: "other", phash: "ffffffff03000000" }] }) }),
+          }),
+        }),
+        update: (v: (typeof written)["value"]) => {
+          written.value = v;
+          return { eq: async () => ({ error: null }) };
+        },
+      }),
+    };
+    const verdict = await rerunPhotoQc(supabase as never, stale as never, "illustration", []);
+    expect(verdict?.status).toBe("lolos");
+    expect(written.value?.qc_status).toBe("lolos");
+    expect(written.value?.qc_notes?.find((n) => n.check === "kemiripan")?.status).toBe("ok");
+    // The same 6 bits are "alike" for an ordinary photo (limit 8).
+    const photoVerdict = await rerunPhotoQc(supabase as never, stale as never, "photo", []);
+    expect(photoVerdict?.status).toBe("perlu_cek");
+  });
+
   it("tells a plain white icon sheet from a gray one by its border", async () => {
     const { borderColor, sheetBackgroundNote, photoTechNotes } = await import("@/lib/qc/photo");
     const make = (w: number, h: number, rgb: [number, number, number], inner: [number, number, number]) => {

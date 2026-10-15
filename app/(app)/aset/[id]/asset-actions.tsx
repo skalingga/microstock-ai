@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, postJson, type MetadataResponse } from "@/lib/generate/client";
 import { PhotoReadError, visionCopy } from "@/lib/photo/process";
 import { photoContentNotes } from "@/lib/qc/photo";
-import { applyMetadata, fetchHashPool, rerunQc, type StoredAsset } from "@/lib/qc/store";
+import { applyMetadata, fetchHashPool, rerunPhotoQc, rerunQc, type StoredAsset } from "@/lib/qc/store";
 import { parseNotes } from "@/lib/qc/types";
 import type { StyleId } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/client";
@@ -26,7 +26,7 @@ type PhotoMetadataReply = Omit<MetadataResponse, "metadata"> & {
 };
 
 /** Re-run QC on this asset. Sits under the QC notes. */
-export function RerunQcButton({ asset, style, bannedWords }: Pick<Props, "asset" | "style" | "bannedWords">) {
+export function RerunQcButton({ asset, style, bannedWords, photo }: Pick<Props, "asset" | "style" | "bannedWords" | "photo">) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
@@ -36,11 +36,13 @@ export function RerunQcButton({ asset, style, bannedWords }: Pick<Props, "asset"
     setMessage(null);
     try {
       const supabase = createClient();
-      const verdict = await rerunQc(supabase, asset, style, await fetchHashPool(supabase), bannedWords);
+      const verdict = photo
+        ? await rerunPhotoQc(supabase, asset, photo.variant ?? "photo", bannedWords)
+        : await rerunQc(supabase, asset, style, await fetchHashPool(supabase), bannedWords);
       setMessage(
         verdict
           ? { text: "QC selesai dijalankan ulang." }
-          : { text: "QC gagal dijalankan: file SVG tidak bisa diambil atau hasilnya tidak tersimpan. Coba lagi.", error: true },
+          : { text: "QC gagal dijalankan: file atau hash aset tidak bisa diambil, atau hasilnya tidak tersimpan. Coba lagi.", error: true },
       );
       router.refresh();
     } catch {

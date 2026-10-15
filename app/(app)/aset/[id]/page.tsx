@@ -257,7 +257,12 @@ export default async function HalamanDetailAset({
                 )}
               </>
             )}
-            {!isPhoto && <RerunQcButton asset={storedAsset} style={style} bannedWords={settings?.banned_words ?? []} />}
+            <RerunQcButton
+              asset={storedAsset}
+              style={style}
+              bannedWords={settings?.banned_words ?? []}
+              photo={isPhoto && asset.image_path ? { imagePath: asset.image_path, variant: photoVariant } : undefined}
+            />
           </Section>
 
           <Section id="meta-heading" title="Metadata">
