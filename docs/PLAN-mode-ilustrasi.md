@@ -113,6 +113,26 @@ Tidak ada route atau tabel baru. Satu panggilan AI per aset per request tetap be
    bila diterima: stiker dibuat di atas latar warna kunci polos (bukan putih, supaya tepi die-cut putih tetap ada),
    dihapus di browser lewat flood-fill dari tepi + despill, tanpa dependensi model ML.
 
+## Tambahan 15 Okt 2026: gaya set ikon 3D (permintaan pengguna)
+
+Pemicu: contoh orang lain (bulk prompt di Flow, 15 tema "3D business icons", 6 ikon per frame, latar putih). Gaya
+`icon_set_3d` di `ILLUSTRATION_STYLES`, kode selesai di `dev`, menunggu uji pengguna.
+
+- **Satu lembar = satu aset.** Lembar Flow 2K (16:9, 4,2 MP) diunggah utuh. Jangan dipotong jadi ikon: satu ikon hasil
+  potongan sekitar 0,9 MP, di bawah minimal Adobe 4 MP.
+- **Prompt satu baris**: `3D <sub-tema> icons, 6 icons in one frame: <6 ikon>, <tampilan + palet>, clean white
+  background, evenly spaced grid.` Mode "Subjek berbeda" = tiap prompt sub-tema berbeda; "Variasi satu subjek" = satu
+  topik, kelompok 6 ikon berbeda per lembar. Ikon yang biasanya bertulisan (badge ID, sertifikat, kontrak, stempel,
+  papan, label harga, sampul buku, kalender, jam berangka) dilarang di prompt; contoh pengguna memuat "LOAN AGREEMENT",
+  "ALEX JOHNSON", "RELAX", "APPROVED", yang akan jadi `visible_text`.
+- **Metadata**: prompt yang memuat "icons in one frame" (`isIconSetPrompt`) membuat metadata menyebut sub-tema dan ikon
+  utama, memakai "3D icons", "icon set", "icon collection" (kata "icon" aman untuk raster 3D; larangan kata itu hanya
+  untuk ilustrasi vektor), tetap tanpa kata "vector".
+- **Form**: memilih gaya ini mengganti rasio ke 16:9 (kembali ke 1:1 saat gaya lain dipilih); tombol baru **Salin per
+  baris (bulk)** untuk semua varian: satu prompt per baris tanpa nomor dan baris kosong, untuk kotak Bulk Input Flow.
+- **Belum diketahui**: apakah Adobe menerima lembar multi-ikon JPEG sebagai ilustrasi AI dan tidak menandainya
+  "similar". Unggah 1 sampai 3 lembar dulu sebelum satu batch penuh; catat di data Tahap 6.
+
 ## Uji batch pertama
 
 Tema "machine learning" (permintaan pengguna 15 Okt 2026). Tema abstrak: prompt harus memakai subjek konkret (robot,

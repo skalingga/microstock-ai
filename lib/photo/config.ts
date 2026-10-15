@@ -54,10 +54,28 @@ export const ILLUSTRATION_STYLES = [
     label: "Kartun retro garis tebal",
     look: "retro mid-century cartoon illustration: thick uneven ink outlines, limited muted vintage palette with a slight print texture, one clear subject, isolated on a plain off-white background",
   },
+  {
+    value: "icon_set_3d",
+    label: "Set ikon 3D (6 ikon per lembar)",
+    look: "glossy 3D icon set: soft clay-like rounded shapes, smooth highlights, soft studio lighting, vivid harmonious colors, every icon fully visible and separate, evenly spaced in a tidy 3 by 2 grid on a clean pure white background",
+  },
 ] as const;
 export type IllustrationStyleId = (typeof ILLUSTRATION_STYLES)[number]["value"];
 export const ILLUSTRATION_STYLE_IDS = ILLUSTRATION_STYLES.map((s) => s.value) as [IllustrationStyleId, ...IllustrationStyleId[]];
 export const DEFAULT_ILLUSTRATION_STYLE: IllustrationStyleId = "sticker";
+
+/**
+ * Icon sheet look: one image holds several separate icons (the whole sheet is one asset, because a crop of a 2K sheet
+ * is under Adobe's 4 MP minimum). It has its own prompt writer and metadata words.
+ */
+export const ICON_SET_STYLE: IllustrationStyleId = "icon_set_3d";
+export const ICON_SET_SIZE = 6;
+/** The sheet look works best wide; Flow's 16:9 2K Upscale is 4.2 MP. */
+export const ICON_SET_ASPECT: PhotoAspect = "16:9";
+/** Prompts written for the icon sheet say "N icons in one frame"; metadata uses it to know the picture is a sheet. */
+export function isIconSetPrompt(prompt: string | undefined): boolean {
+  return !!prompt && /\bicons? in one frame\b/i.test(prompt);
+}
 
 export const MAX_PHOTO_PROMPTS = 20;
 

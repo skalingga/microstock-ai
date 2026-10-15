@@ -3,6 +3,7 @@ import { photoMetadataRequestSchema, photoPromptsRequestSchema } from "@/lib/gen
 import { normalizePhotoMetadata } from "@/lib/metadata/postprocess";
 import { visionOrder } from "@/lib/providers";
 import { GeminiProvider } from "@/lib/providers/gemini";
+import { isIconSetPrompt } from "@/lib/photo/config";
 import { photoMetadataPrompt, photoPromptsPrompt } from "@/lib/providers/prompts";
 
 const IMAGE = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
@@ -199,6 +200,29 @@ describe("illustration variant", () => {
     const { user } = photoPromptsPrompt({ ...base, variations: true });
     expect(user).toMatch(/die-cut border/);
     expect(user).toContain("ONE subject");
+  });
+
+  it("writes one-line icon sheet prompts with six named icons and no writing", () => {
+    const { system, user } = photoPromptsPrompt({ ...base, aspect: "16:9", illustrationStyle: "icon_set_3d", avoid: ["generic briefcase"] });
+    expect(system).toContain("icon sheets");
+    expect(user).toContain("exactly 6 prompts");
+    expect(user).toContain("exactly 6 different icons");
+    expect(user).toContain("6 icons in one frame:");
+    expect(user).toMatch(/ONE single line/);
+    expect(user).toMatch(/No text anywhere/);
+    expect(user).toMatch(/ID badges, certificates/);
+    expect(user).toContain("generic briefcase");
+    expect(user).not.toContain("ONE subject");
+  });
+
+  it("keeps one topic for icon sheet variations and spots a sheet prompt for metadata", () => {
+    const { user } = photoPromptsPrompt({ ...base, illustrationStyle: "icon_set_3d", variations: true });
+    expect(user).toContain("ONE topic");
+    const prompt = "3D business icons, 6 icons in one frame: rocket, lightbulb, target, coin stack, gear, chart";
+    expect(photoMetadataPrompt({ theme: "business", variant: "illustration", prompt }).user).toContain("sheet of several separate 3D icons");
+    expect(photoMetadataPrompt({ theme: "business", variant: "illustration", prompt: "a sticker of a cat" }).user).not.toContain("sheet of several");
+    expect(isIconSetPrompt(prompt)).toBe(true);
+    expect(isIconSetPrompt("a retro motorcycle sticker")).toBe(false);
   });
 
   it("asks for illustration search words and bans the word vector", () => {

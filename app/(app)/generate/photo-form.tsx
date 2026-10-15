@@ -23,6 +23,9 @@ import {
   DEFAULT_PHOTO_VARIANT,
   FLOW_MODELS,
   FLOW_URL,
+  ICON_SET_ASPECT,
+  ICON_SET_SIZE,
+  ICON_SET_STYLE,
   ILLUSTRATION_STYLES,
   MAX_PHOTO_PROMPTS,
   PHOTO_ASPECTS,
@@ -153,7 +156,7 @@ export function PhotoForm({
   const [error, setError] = useState<string | null>(null);
 
   const [flowModel, setFlowModel] = useState<string>(DEFAULT_FLOW_MODEL);
-  const [copied, setCopied] = useState<number | "semua" | null>(null);
+  const [copied, setCopied] = useState<number | "semua" | "baris" | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const files = useRef(new Map<string, File>());
   const busy = useRef(false);
@@ -174,6 +177,13 @@ export function PhotoForm({
     setVariant(next);
     // Each kind has its usual ratio; switch it unless the user already chose another one.
     setAspect((current) => (current === DEFAULT_ASPECT[variant] ? DEFAULT_ASPECT[next] : current));
+  }
+
+  function pickStyle(next: IllustrationStyleId) {
+    setIllustrationStyle(next);
+    // An icon sheet is a 3 by 2 grid and wants a wide frame; go back to the usual ratio when leaving it.
+    if (next === ICON_SET_STYLE && aspect === DEFAULT_ASPECT.illustration) setAspect(ICON_SET_ASPECT);
+    if (next !== ICON_SET_STYLE && illustrationStyle === ICON_SET_STYLE && aspect === ICON_SET_ASPECT) setAspect(DEFAULT_ASPECT.illustration);
   }
 
   // Object URLs of the previews belong to this page.
@@ -209,7 +219,7 @@ export function PhotoForm({
     }
   }
 
-  async function copy(text: string, which: number | "semua") {
+  async function copy(text: string, which: number | "semua" | "baris") {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
@@ -299,6 +309,8 @@ export function PhotoForm({
   const gagalQc = finished.filter((u) => u.qc === "gagal").length;
   const perPrompt = (index: number) => uploads.filter((u) => u.promptIndex === index && u.stage !== "gagal").length;
   const allPrompts = openJob?.data.prompts.map((p, i) => `${i + 1}. ${p.prompt}`).join("\n\n") ?? "";
+  // Bulk prompt tools take one prompt per line, no numbering and no blank lines.
+  const promptLines = openJob?.data.prompts.map((p) => p.prompt.replace(/\s*\n\s*/g, " ").trim()).join("\n") ?? "";
 
   return (
     <div className="space-y-6">
@@ -321,6 +333,10 @@ export function PhotoForm({
               <Button type="button" variant="secondary" onClick={() => copy(allPrompts, "semua")}>
                 {copied === "semua" ? <Check /> : <Copy />}
                 {copied === "semua" ? "Tersalin" : `Salin semua (${openJob.data.prompts.length})`}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => copy(promptLines, "baris")}>
+                {copied === "baris" ? <Check /> : <Copy />}
+                {copied === "baris" ? "Tersalin" : "Salin per baris (bulk)"}
               </Button>
               <a href={FLOW_URL} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "outline" })}>
                 <ExternalLink />
@@ -518,7 +534,7 @@ export function PhotoForm({
                 <select
                   id="illustration-style"
                   value={illustrationStyle}
-                  onChange={(e) => setIllustrationStyle(e.target.value as IllustrationStyleId)}
+                  onChange={(e) => pickStyle(e.target.value as IllustrationStyleId)}
                   disabled={writing}
                   className={selectClass}
                 >
@@ -529,7 +545,9 @@ export function PhotoForm({
                   ))}
                 </select>
                 <p className="text-sm text-muted-foreground">
-                  Satu gaya per set. Hasilnya JPEG di latar polos (JPEG tidak punya transparansi).
+                  {illustrationStyle === ICON_SET_STYLE
+                    ? `Satu prompt = satu lembar berisi ${ICON_SET_SIZE} ikon berbeda (3×2), diunggah utuh sebagai satu aset. Jangan dipotong: satu ikon hasil potongan di bawah 4 MP. Ikon yang biasanya bertulisan (badge, dokumen, stempel) dihindari prompt.`
+                    : "Satu gaya per set. Hasilnya JPEG di latar polos (JPEG tidak punya transparansi)."}
                 </p>
               </div>
             )}
