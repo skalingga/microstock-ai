@@ -17,15 +17,20 @@ function singular(word: string): string {
   return word;
 }
 
+/** One lower-case word as a subject word: singular, or null when it is filler. */
+export function subjectWord(word: string): string | null {
+  if (word.length <= 1) return null;
+  const one = singular(word);
+  return FILLER.has(one) ? null : one;
+}
+
 /** The words that identify the subject, sorted and without duplicates. */
 export function subjectTokens(text: string): string[] {
   const words = text
     .toLowerCase()
     .replace(/[^a-z\s-]/g, " ")
     .split(/[\s-]+/)
-    .filter((w) => w.length > 1)
-    .map(singular)
-    .filter((w) => !FILLER.has(w));
+    .flatMap((w) => subjectWord(w) ?? []);
   return [...new Set(words)].sort();
 }
 

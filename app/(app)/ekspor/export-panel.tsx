@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ADOBE } from "@/lib/adobe/rules";
 import { exportLabel } from "@/lib/export/label";
 import { buildExport, downloadBlob, exportStamp, markExported, saveExport, type Agency, type ExportResult } from "@/lib/export/build";
+import { findTwins, TWIN_LOOKBACK_DAYS, type SentAsset, type TwinGroup } from "@/lib/subjects/twins";
 import { createClient } from "@/lib/supabase/client";
 import { pinnedBar, tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,9 @@ export type Candidate = {
   photo?: boolean;
   fictional?: boolean;
   thumbUrl: string | null;
+  /** Main subject (concept, else title) and medium, for the twin-subject warning. */
+  subject: string;
+  media: string;
   /** The generation job (batch) the asset came from; assets are grouped by it. */
   groupId: string;
   groupLabel: string;
@@ -35,6 +39,8 @@ export type Candidate = {
 type Props = {
   userId: string;
   candidates: Candidate[];
+  /** Assets exported in the last TWIN_LOOKBACK_DAYS. */
+  sent: SentAsset[];
   /** Asset ids picked in the gallery; replaces the default selection. */
   preselect?: string[];
 };
@@ -63,7 +69,7 @@ const CEK_NAMES_SHOWN = 3;
 
 const linkClass = cn("inline-flex items-center font-semibold underline underline-offset-4 hover:decoration-2", tapTarget);
 
-export function ExportPanel({ userId, candidates: allCandidates, preselect }: Props) {
+export function ExportPanel({ userId, candidates: allCandidates, sent, preselect }: Props) {
   const router = useRouter();
   const [agency, setAgency] = useState<Agency>("adobe");
   const isShutterstock = agency === "shutterstock";
@@ -81,6 +87,8 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
       ),
   );
   const [cleared, setCleared] = useState<Set<string> | null>(null);
+  /** Twins just taken out of the selection, for the undo line. */
+  const [untwinned, setUntwinned] = useState<string[] | null>(null);
   const [open, setOpen] = useState<Set<string>>(() => {
     // Gallery picks: show the batches they came from.
     if (fromGallery) return new Set(fromGallery.map((c) => c.groupId));
@@ -115,6 +123,20 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
   // Only what is on screen counts: assets hidden by the filter (already exported) are not part of the next export.
   const chosen = visible.filter((c) => selected.has(c.id));
   const hiddenPicked = selected.size - chosen.length;
+  // Same main object twice in one Adobe export, or again within weeks: Adobe's "Similar content" (18 of the first 20
+  // rejections). Shutterstock is a photo-only trial without its own history, so it is not checked.
+  const twins = useMemo(
+    () =>
+      isShutterstock
+        ? []
+        : findTwins(
+            visible.filter((c) => selected.has(c.id)).map((c) => ({ id: c.id, subject: c.subject, title: c.title, lolos: c.status === "lolos", media: c.media })),
+            sent,
+          ),
+    [visible, selected, isShutterstock, sent],
+  );
+  const twinDrop = twins.flatMap((g) => g.drop);
+  const twinIds = new Set(twinDrop);
   const cekChosen = chosen.filter((c) => c.status === "perlu_cek");
   const releaseChosen = chosen.filter((c) => c.needsRelease);
   // The statement covers exactly these assets: adding or removing one asks again.
@@ -134,6 +156,7 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
 
   function setMany(ids: string[], on: boolean) {
     setCleared(null);
+    setUntwinned(null);
     setSelected((prev) => {
       const next = new Set(prev);
       for (const id of ids) {
@@ -142,6 +165,11 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
       }
       return next;
     });
+  }
+
+  function dropTwins() {
+    setMany(twinDrop, false);
+    setUntwinned(twinDrop);
   }
 
   function clearAll() {
@@ -530,6 +558,22 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
           </p>
         )}
 
+        {twins.length > 0 && <TwinWarning groups={twins} onDrop={dropTwins} />}
+        {untwinned && untwinned.length > 0 && twins.length === 0 && (
+          <p className="text-sm text-muted-foreground" role="status">
+            {untwinned.length} aset kembar dikeluarkan dari pilihan. Simpan untuk kiriman berikutnya, setelah yang pertama diterima.{" "}
+            <button
+              type="button"
+              className="font-semibold text-foreground underline underline-offset-4"
+              onClick={() => {
+                setMany(untwinned, true);
+              }}
+            >
+              Batalkan
+            </button>
+          </p>
+        )}
+
         {visible.length === 0 ? (
           <div className="space-y-3 rounded-md border border-dashed p-6 text-center text-sm">
             <PenPath className="mx-auto max-w-56" />
@@ -588,6 +632,7 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
                         <span className="block text-xs text-muted-foreground">
                           {g.detail} · {picked}/{g.items.length} dipilih
                           {cek > 0 && ` · ${cek} Perlu cek`}
+                          {g.items.some((c) => twinIds.has(c.id)) && ` · ${g.items.filter((c) => twinIds.has(c.id)).length} kembar`}
                         </span>
                       </span>
                       <span aria-hidden className="flex shrink-0 gap-1">
@@ -631,6 +676,7 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
                                   {c.exportedAt && <span className="text-xs text-muted-foreground">Sudah diekspor</span>}
                                   {c.photo && <span className="text-xs text-muted-foreground">Foto</span>}
                                   {c.needsRelease && <span className="text-xs font-semibold text-warning-foreground">Perlu Release</span>}
+                                  {twinIds.has(c.id) && <span className="text-xs font-semibold text-warning-foreground">Kembar</span>}
                                 </span>
                               </span>
                             </label>
@@ -670,6 +716,14 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
                 {cekChosen.length > CEK_NAMES_SHOWN && `; dan ${cekChosen.length - CEK_NAMES_SHOWN} lainnya`}.
               </span>
             </label>
+          )}
+          {twinDrop.length > 0 && !building && (
+            <p className="text-sm text-warning-foreground" role="status">
+              <strong>{twinDrop.length} aset kembar</strong> ikut terpilih dan berisiko ditolak &ldquo;Similar content&rdquo;.{" "}
+              <button type="button" className="font-semibold underline underline-offset-4" onClick={dropTwins}>
+                Sisakan satu per subjek
+              </button>
+            </p>
           )}
           {releaseChosen.length > 0 && !building && (
             <p className="text-sm text-warning-foreground" role="status">
@@ -737,6 +791,43 @@ export function ExportPanel({ userId, candidates: allCandidates, preselect }: Pr
           <div className="px-5 pb-5">{isShutterstock ? <ShutterstockSteps /> : <UploadChecklist />}</div>
         </details>
       )}
+    </div>
+  );
+}
+
+const TWIN_GROUPS_SHOWN = 8;
+
+/** The twin groups in the selection, with the one kept per subject and the one-click fix. Never blocks the export. */
+function TwinWarning({ groups, onDrop }: { groups: TwinGroup[]; onDrop: () => void }) {
+  const dropCount = groups.reduce((n, g) => n + g.drop.length, 0);
+  return (
+    <div role="status" className="space-y-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
+      <p>
+        <strong>{dropCount} aset bersubjek kembar</strong> dengan aset lain di ekspor ini atau kiriman {TWIN_LOOKBACK_DAYS} hari
+        terakhir. Adobe sering menolak subjek yang sama sebagai &ldquo;Similar content&rdquo;, walau gambarnya berbeda. Kirim satu
+        dulu, sisanya setelah yang pertama diterima.
+      </p>
+      <ul className="space-y-1">
+        {groups.slice(0, TWIN_GROUPS_SHOWN).map((g) => (
+          <li key={g.chosen[0].id}>
+            <strong>{g.label}</strong>:{" "}
+            {g.keep ? (
+              <>
+                kirim &ldquo;{g.chosen.find((c) => c.id === g.keep)?.title}&rdquo;, tahan {g.drop.length} lainnya
+              </>
+            ) : (
+              <>
+                sudah dikirim &ldquo;{g.sent[0].title}&rdquo;{g.sent.length > 1 && ` dan ${g.sent.length - 1} lainnya`}, tahan{" "}
+                {g.drop.length} aset ini
+              </>
+            )}
+          </li>
+        ))}
+        {groups.length > TWIN_GROUPS_SHOWN && <li>dan {groups.length - TWIN_GROUPS_SHOWN} subjek lainnya</li>}
+      </ul>
+      <Button type="button" size="sm" variant="outline" onClick={onDrop}>
+        Sisakan satu per subjek
+      </Button>
     </div>
   );
 }

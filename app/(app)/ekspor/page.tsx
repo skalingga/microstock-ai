@@ -6,6 +6,8 @@ import { MAX_BULK_DELETE, SIGNED_URL_TTL_SEC, UUID_RE } from "@/lib/assets";
 import { createClient } from "@/lib/supabase/server";
 import type { ReviewedAsset } from "@/lib/adobe/stats";
 import { STYLES } from "@/lib/settings/schema";
+import { subjectOf } from "@/lib/subjects/saturation";
+import { TWIN_LOOKBACK_DAYS, twinSubject, type SentAsset } from "@/lib/subjects/twins";
 import { tapTarget } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { AcceptanceReport } from "./acceptance-report";
@@ -23,6 +25,7 @@ const dateFormat = new Intl.DateTimeFormat("id-ID", {
 });
 
 
+const DAY_MS = 24 * 60 * 60 * 1000;
 const HISTORY_RECENT = 10;
 const HISTORY_ALL = 60;
 /** Thumbnails per history row. */
@@ -54,6 +57,8 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const sentSince = daysAgo(TWIN_LOOKBACK_DAYS);
+
   const [
     { data: assets, error: assetsError },
     { data: history, error: historyError },
@@ -61,10 +66,11 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
     failed,
     { data: reviewed, error: reviewedError },
     awaiting,
+    { data: recentlySent },
   ] = await Promise.all([
     supabase
       .from("assets")
-      .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release, kind, fictional_people")
+      .select("id, title, qc_status, exported_at, preview_path, job_id, needs_release, kind, fictional_people, concept")
       .not("title", "is", null)
       .is("bundled_in", null)
       .in("qc_status", ["lolos", "perlu_cek"])
@@ -87,6 +93,12 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
       .select("id", { count: "exact", head: true })
       .not("exported_at", "is", null)
       .is("adobe_status", null),
+    // What went to Adobe lately, for the twin-subject warning. Missing data only means no warning against it.
+    supabase
+      .from("assets")
+      .select("id, title, concept, kind")
+      .gte("exported_at", sentSince)
+      .limit(1000),
   ]);
 
   // Style and theme live on the job (batch), not the asset.
@@ -155,12 +167,21 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
             needsRelease: a.needs_release,
             photo: a.kind === "photo",
             fictional: a.kind === "photo" && a.fictional_people,
+            subject: twinSubject(a.kind === "bundle" ? "" : subjectOf(a.concept), a.title),
+            media: mediaOf(a.kind),
             thumbUrl: a.preview_path ? (thumbByPath.get(a.preview_path) ?? null) : null,
             ...groupOf(a.job_id),
           },
         ]
       : [],
   );
+
+  const sent: SentAsset[] = (recentlySent ?? []).map((a) => ({
+    id: a.id,
+    title: a.title ?? "Tanpa judul",
+    subject: twinSubject(a.kind === "bundle" ? "" : subjectOf(a.concept), a.title ?? ""),
+    media: mediaOf(a.kind),
+  }));
 
   const readyCount = candidates.filter((c) => c.status === "lolos" && !c.exportedAt).length;
 
@@ -183,7 +204,7 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
       {assetsError ? (
         <LoadError>Daftar aset untuk ekspor tidak bisa dimuat. Muat ulang halaman.</LoadError>
       ) : (
-        <ExportPanel userId={user.id} candidates={candidates} preselect={preselect.length > 0 ? preselect : undefined} />
+        <ExportPanel userId={user.id} candidates={candidates} sent={sent} preselect={preselect.length > 0 ? preselect : undefined} />
       )}
 
       <section className="space-y-3" aria-labelledby="riwayat-heading">
@@ -244,4 +265,14 @@ export default async function HalamanEkspor({ searchParams }: { searchParams: Pr
       )}
     </div>
   );
+}
+
+/** ISO time of `days` days ago; read per request (this page is rendered on every visit). */
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * DAY_MS).toISOString();
+}
+
+/** Adobe compares like with like: a photo is never the twin of a vector, while a bundle is a vector made of vectors. */
+function mediaOf(kind: string): string {
+  return kind === "photo" ? "photo" : "vector";
 }
