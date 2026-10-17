@@ -18,6 +18,7 @@ export type SettingsField =
   | "backup_model"
   | "kenari_text_model"
   | "default_style"
+  | "show_experimental_styles"
   | "palettes"
   | "banned_words";
 
@@ -53,6 +54,7 @@ export async function simpanPengaturan(formData: FormData): Promise<SaveResult> 
     provider_order: providerOrder,
     banned_words: parseBannedWords(String(formData.get("banned_words") ?? "")),
     default_style: formData.get("default_style"),
+    show_experimental_styles: formData.get("show_experimental_styles") === "on",
     palettes: parsePalettes(palettesText),
     kenari_text_model: String(formData.get("kenari_text_model") ?? ""),
     kenari_image_model: String(formData.get("kenari_image_model") ?? ""),

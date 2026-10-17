@@ -385,6 +385,7 @@ export type Database = {
           banned_words: string[]
           created_at: string
           default_style: string
+          show_experimental_styles: boolean
           kenari_monthly_budget_idr: number
           kenari_image_model: string
           kenari_text_model: string
@@ -398,6 +399,7 @@ export type Database = {
           banned_words?: string[]
           created_at?: string
           default_style?: string
+          show_experimental_styles?: boolean
           kenari_monthly_budget_idr?: number
           kenari_image_model?: string
           kenari_text_model?: string
@@ -411,6 +413,7 @@ export type Database = {
           banned_words?: string[]
           created_at?: string
           default_style?: string
+          show_experimental_styles?: boolean
           kenari_monthly_budget_idr?: number
           kenari_image_model?: string
           kenari_text_model?: string

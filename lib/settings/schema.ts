@@ -20,6 +20,30 @@ export const STYLES = [
   { value: "frame", label: "Bingkai dan border dekoratif" },
 ] as const;
 
+/**
+ * Styles with no kept asset after 5 to 9 trial batches each (Adobe data review of 17 Oct 2026). They stay in the code, and
+ * in labels and history, but the Generate form and the default-style setting only list them when the user turns on
+ * "Tampilkan gaya eksperimen" in Pengaturan.
+ */
+export const EXPERIMENTAL_STYLES = [
+  "badge_label",
+  "seamless_pattern",
+  "flat_illustration",
+  "line_icon",
+  "glyph_icon",
+  "geometric_tile",
+  "sticker",
+  "isometric",
+  "frame",
+] as const satisfies readonly StyleId[];
+export function isExperimentalStyle(style: string): boolean {
+  return (EXPERIMENTAL_STYLES as readonly string[]).includes(style);
+}
+/** The styles to offer: the proven ones, plus the experimental ones when switched on or still selected. */
+export function offeredStyles(showExperimental: boolean, ...keep: (string | null | undefined)[]) {
+  return STYLES.filter((s) => showExperimental || !isExperimentalStyle(s.value) || keep.includes(s.value));
+}
+
 /** The styles that make interface-style icons: unlike clipart, "icon" is the right word in their titles and keywords. */
 export const ICON_STYLES = ["line_icon", "glyph_icon"] as const;
 export function isIconStyle(style: string): boolean {
@@ -94,6 +118,7 @@ export const settingsSchema = z.object({
     .array(z.string().min(1).max(60, "Setiap kata terlarang maksimal 60 karakter."))
     .max(500, "Maksimal 500 kata terlarang."),
   default_style: z.enum(styleValues),
+  show_experimental_styles: z.boolean(),
   palettes: palettesSchema,
   kenari_text_model: z.string().trim().max(120, "Nama model terlalu panjang."),
   kenari_image_model: z.string().trim().max(120, "Nama model terlalu panjang."),

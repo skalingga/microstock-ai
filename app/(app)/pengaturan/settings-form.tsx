@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatIdr } from "@/lib/budget";
 import type { Tables } from "@/lib/database.types";
-import { isImageStyle, AUTO_PROVIDERS, STYLES, formatBannedWords, formatPalettes, parseBannedWords, parsePalettes, toPalettes, toProviderOrder } from "@/lib/settings/schema";
+import { isImageStyle, offeredStyles, AUTO_PROVIDERS, EXPERIMENTAL_STYLES, formatBannedWords, formatPalettes, parseBannedWords, parsePalettes, toPalettes, toProviderOrder } from "@/lib/settings/schema";
 import { pinnedBar, selectClass, tapTarget } from "@/lib/ui";
 import { useUnsavedGuard } from "@/lib/use-unsaved-guard";
 import { cn } from "@/lib/utils";
@@ -104,6 +104,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     textModel: settings.kenari_text_model,
     imageModel: settings.kenari_image_model,
     style: settings.default_style,
+    experimental: settings.show_experimental_styles,
     palettes: formatPalettes(toPalettes(settings.palettes)),
     banned: formatBannedWords(settings.banned_words),
   };
@@ -120,6 +121,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
   const [textModel, setTextModel] = useState(initial.textModel);
   const [imageModel, setImageModel] = useState(initial.imageModel);
   const [style, setStyle] = useState(initial.style);
+  const [experimental, setExperimental] = useState(initial.experimental);
   const [palettes, setPalettes] = useState(initial.palettes);
   const [banned, setBanned] = useState(initial.banned);
   const [dirty, setDirty] = useState(false);
@@ -170,6 +172,7 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
     setTextModel(initial.textModel);
     setImageModel(initial.imageModel);
     setStyle(initial.style);
+    setExperimental(initial.experimental);
     setPalettes(initial.palettes);
     setBanned(initial.banned);
     setErrors({});
@@ -453,12 +456,31 @@ export function SettingsForm({ settings, spentIdr, resetLabel, defaults, imagePr
             className={cn(selectClass, "max-w-sm")}
             {...describe("default_style", errors.default_style, true)}
           >
-            {STYLES.map((s) => (
+            {offeredStyles(experimental, style).map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
             ))}
           </select>
+        </Field>
+        <Field
+          name="show_experimental_styles"
+          label="Gaya eksperimen"
+          hint={`${EXPERIMENTAL_STYLES.length} gaya yang belum menghasilkan aset layak (badge, pola, ikon garis dan glyph, ubin, stiker, isometrik, bingkai, ilustrasi flat) disembunyikan dari Generate. Aset dan batch lamanya tetap terbaca.`}
+          error={errors.show_experimental_styles}
+        >
+          <label className={cn("flex cursor-pointer items-center gap-2 text-sm", tapTarget)}>
+            <input
+              type="checkbox"
+              id="show_experimental_styles"
+              name="show_experimental_styles"
+              checked={experimental}
+              onChange={(e) => setExperimental(e.target.checked)}
+              className="size-4 accent-foreground pointer-coarse:size-5"
+              {...describe("show_experimental_styles", errors.show_experimental_styles, true)}
+            />
+            Tampilkan gaya eksperimen di Generate
+          </label>
         </Field>
         {paidStyleBlocked && (
           <p className="text-sm text-warning-foreground">Batas biaya Rp0 dan model gambar {effectiveImageModel} berbayar, jadi gaya ini tidak akan jalan. Pilih model gambar gratis atau naikkan batasnya.</p>

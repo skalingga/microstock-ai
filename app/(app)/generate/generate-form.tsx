@@ -18,7 +18,7 @@ import { KENARI_IMAGE_PRICES_IDR, imagePriceIdr } from "@/lib/providers/kenari-i
 import { findBannedWords } from "@/lib/settings/banned";
 import { MAX_AVOID, matchSaturated, type SaturatedSubject } from "@/lib/subjects/saturation";
 import { isPaidEntry, orderLabel } from "@/lib/settings/provider-label";
-import { STYLES, isImageStyle, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
+import { STYLES, isImageStyle, offeredStyles, type Palette, type ProviderEntry, type StyleId } from "@/lib/settings/schema";
 import type { CatalogModel } from "@/lib/providers/kenari-pricing";
 import { createClient } from "@/lib/supabase/client";
 import { pinnedBar, selectClass, tapTarget } from "@/lib/ui";
@@ -56,6 +56,7 @@ const shortStyleLabel = (label: string) => label.replace(/\s*\(gambar AI, berbay
 export function GenerateForm({
   userId,
   defaultStyle,
+  showExperimental,
   palettes,
   bannedWords,
   initialTheme = "",
@@ -71,6 +72,8 @@ export function GenerateForm({
 }: {
   userId: string;
   defaultStyle: StyleId;
+  /** Show the experimental styles in the picker (Pengaturan). */
+  showExperimental: boolean;
   palettes: Palette[];
   bannedWords: string[];
   initialTheme?: string;
@@ -214,7 +217,8 @@ export function GenerateForm({
   const overBudget = cost.paid && cost.totalIdr !== undefined && left !== null && cost.totalIdr > left;
   const costHeavy = cost.paid && cost.totalIdr !== undefined && left !== null && cost.totalIdr > left / 2;
 
-  const styleChoices: Choice[] = STYLES.map((s) => ({
+  // The style in use stays listed even when hidden (a repeated batch), so the picker never loses its own value.
+  const styleChoices: Choice[] = offeredStyles(showExperimental, style, lastJob?.style).map((s) => ({
     value: s.value,
     label: shortStyleLabel(s.label),
     visual: (

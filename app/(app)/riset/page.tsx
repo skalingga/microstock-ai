@@ -5,10 +5,18 @@ import { orderForKind } from "@/lib/providers";
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
 import { toProviderOrder } from "@/lib/settings/schema";
 import { createClient } from "@/lib/supabase/server";
+import { SIGNED_URL_TTL_SEC } from "@/lib/assets";
+import { buildHistory, HISTORY_THUMBS } from "@/lib/research/history";
 import { fetchSaturatedSubjects } from "@/lib/subjects/fetch";
 import { RisetForm, type RunInfo, type ThemeRow } from "./riset-form";
+import { RiwayatRiset } from "./riwayat-riset";
 
 export const metadata: Metadata = { title: "Riset" };
+
+/** Past runs shown in the history, and the most batches and assets read for them. */
+const HISTORY_RUNS = 12;
+const HISTORY_JOBS = 400;
+const HISTORY_ASSETS = 1000;
 
 export default async function HalamanRiset() {
   const supabase = await createClient();
@@ -32,6 +40,8 @@ export default async function HalamanRiset() {
     supabase.from("generation_jobs").select("themes(title)").order("created_at", { ascending: false }).limit(300),
     fetchSaturatedSubjects(supabase),
   ]);
+
+  const loaded = await loadHistory(supabase);
 
   const { data: themes, error: themesError } = run
     ? await supabase.from("themes").select("*").eq("run_id", run.id).limit(50)
@@ -93,6 +103,46 @@ export default async function HalamanRiset() {
         usedTitles={usedTitles}
         saturated={saturated}
       />
+      {loaded && <RiwayatRiset history={loaded.history} urls={loaded.urls} />}
     </div>
   );
+}
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/** Past runs and own themes with the assets made from them. A failed read hides the section instead of breaking the page. */
+async function loadHistory(supabase: Supabase) {
+  const { data: runs, error: runsError } = await supabase
+    .from("research_runs")
+    .select("id, created_at, region")
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_RUNS);
+  if (runsError || !runs) return null;
+  const [{ data: themes }, { data: jobs }, { data: assets }] = await Promise.all([
+    supabase.from("themes").select("id, run_id, title").in("run_id", runs.map((r) => r.id)).limit(1000),
+    supabase
+      .from("generation_jobs")
+      .select("id, style, created_at, themes(title)")
+      .order("created_at", { ascending: false })
+      .limit(HISTORY_JOBS),
+    supabase
+      .from("assets")
+      .select("id, job_id, preview_path, qc_status, adobe_status")
+      .order("created_at", { ascending: false })
+      .limit(HISTORY_ASSETS),
+  ]);
+
+  const built = buildHistory({
+    runs: runs.map((r) => ({ id: r.id, createdAt: r.created_at, region: r.region })),
+    themes: (themes ?? []).flatMap((t) => (t.run_id ? [{ id: t.id, runId: t.run_id, title: t.title }] : [])),
+    jobs: (jobs ?? []).flatMap((j) => (j.themes?.title ? [{ id: j.id, themeTitle: j.themes.title, style: j.style, createdAt: j.created_at }] : [])),
+    assets: (assets ?? []).map((a) => ({ id: a.id, jobId: a.job_id, previewPath: a.preview_path, qcStatus: a.qc_status, adobeStatus: a.adobe_status })),
+  });
+
+  // Only the thumbnails on screen need a signed link.
+  const shown = [...built.runs.flatMap((r) => r.themes), ...built.own];
+  const paths = [...new Set(shown.flatMap((t) => t.assets.slice(0, HISTORY_THUMBS).flatMap((a) => (a.previewPath ? [a.previewPath] : []))))];
+  const { data: signed } = paths.length > 0 ? await supabase.storage.from("assets").createSignedUrls(paths, SIGNED_URL_TTL_SEC) : { data: [] };
+  const urls = new Map((signed ?? []).flatMap((s) => (s.path && s.signedUrl ? [[s.path, s.signedUrl] as const] : [])));
+  return { history: built, urls };
 }

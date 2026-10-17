@@ -11,7 +11,7 @@ import { fetchSaturatedSubjects } from "@/lib/subjects/fetch";
 import { withPresetPalettes } from "@/lib/settings/palettes";
 import { KENARI_IMAGE_FALLBACK_MODEL } from "@/lib/providers/kenari-image-pricing";
 import { withEnvDefaults } from "@/lib/settings/provider-defaults";
-import { STYLES, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
+import { STYLES, offeredStyles, toPalettes, toProviderOrder, type StyleId } from "@/lib/settings/schema";
 import { ActiveJobCard, JOB_PREVIEWS } from "./active-job-card";
 import { GenerateForm, type LastJob, type TestedModel } from "./generate-form";
 import { PhotoForm, type OpenPhotoJob, type PhotoJobSummary } from "./photo-form";
@@ -59,7 +59,9 @@ export default async function HalamanGenerate({
     supabase.from("generation_jobs").select("count, style, palette, themes(title)").neq("style", "photo").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
-  const defaultStyle = (STYLES.find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
+  const showExperimental = settings?.show_experimental_styles ?? false;
+  // A default style that was hidden after it was chosen falls back to the first proven style.
+  const defaultStyle = (offeredStyles(showExperimental).find((s) => s.value === settings?.default_style)?.value ?? "icon_set") as StyleId;
   // Same order as the server's imageOrder(): settings, then env, then the built-in model.
   const defaultImageModel =
     settings?.kenari_image_model.trim() || process.env.KENARI_IMAGE_MODEL || KENARI_IMAGE_FALLBACK_MODEL;
@@ -168,6 +170,7 @@ export default async function HalamanGenerate({
       <GenerateForm
         userId={user.id}
         defaultStyle={defaultStyle}
+        showExperimental={showExperimental}
         palettes={palettes}
         bannedWords={settings?.banned_words ?? []}
         initialTheme={initialTheme}
